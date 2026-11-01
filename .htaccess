@@ -1,7 +1,5 @@
-# HTTPS — только по %{HTTPS} (см. «Хостинги — что проверено»)
-RewriteEngine On
-RewriteCond %{HTTPS} off
-RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# HTTPS включается галочкой в ISPmanager. Редирект по %{HTTPS} здесь не пишем:
+# на REG.RU nginx снимает TLS перед Apache, и такое правило даёт бесконечный цикл 301.
 
 AddType application/javascript .js .mjs
 AddType application/json .json
