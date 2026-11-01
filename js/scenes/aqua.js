@@ -49,7 +49,7 @@ export function build({ THREE, kit, font, renderer }) {
   b.add(G.box(18, 0.06, 0.06), CYAN, 'neon', M([0, top + 0.15, SZ + 3.27]));
   const ST = top + 1.6;
   kit.djBooth(b, [0, ST, SZ + 1.2], 0, { w: 3.4 });
-  kit.figure(b, { p: [0, ST, SZ + 0.3], pose: 'dj', top: '#f4f4f4', bottom: '#1a1a22', hair: '#1a1410', cap: '#111', glasses: true, i: 2 });
+  kit.figure(b, { p: [0, ST, SZ + 0.3], pose: 'dj', top: '#0b0b0f', bottom: '#0b0b0f', hair: '#0b0a0a', cap: '#0b0b0f', glasses: true, i: 2 });
   kit.figure(b, { p: [-1.6, ST, SZ - 0.2], pose: 'up', top: '#ffe14a', bottom: '#222', hair: '#f3d38a', longHair: 2, i: 3 });
   kit.figure(b, { p: [1.7, ST, SZ - 0.1], pose: 'wave', top: '#ff7ad1', bottom: '#2a2a33', hair: '#2a1710', longHair: 1, i: 0 });
   // ферма над сценой
@@ -156,11 +156,15 @@ export function build({ THREE, kit, font, renderer }) {
   keys.push(
     { p: [-8.5, 2.6, 3.3], l: [0, 6, -14] },
     { p: [-4, 3.6, 0.5], l: [0, 7.5, -15] },
-    { p: [0.5, 4.6, -2.5], l: [0, 9, -16], t: 0.66 },
-    { p: [5, 3.6, -4.5], l: [-1, 3.2, -13] },
-    { p: [4.2, 1.9, -1.4], l: [2.4, -1.5, 2.5], t: 0.88 },
-    { p: [2.8, 0.6, 0.6], l: [2.2, -4, 3.2] },
-    { p: [2.4, -1.2, 1.6], l: [2, -6, 3.5], t: 1 },
+    { p: [0.5, 4.6, -3], l: [0, 8.5, -16], t: 0.6 },
+    // облёт пульта справа и заход за спины артистов
+    { p: [6.5, 4.2, -9.5], l: [0, 3.2, -15] },
+    { p: [7.6, 3.7, -15.6], l: [0, 3.2, -16] },
+    { p: [4.6, 3.5, -17.7], l: [0, 3.3, -15] },
+    { p: [1.6, 3.4, -17.3], l: [0, 3.35, -14.5], t: 0.88 },
+    // в спину диджея до упора — чёрный кадр
+    { p: [0, 3.38, -16.2], l: [0, 3.35, -12] },
+    { p: [0, 3.38, -15.47], l: [0, 3.35, -12], t: 1 },
   );
   return { scene, cam: kit.camPath(keys) };
 }

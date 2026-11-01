@@ -111,7 +111,7 @@ export function limb(b, A, B, r, color, kind = 'gloss') {
   const d = B.clone().sub(A), len = d.length();
   const q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), d.normalize());
   const m = new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), q, V(1, 1, 1));
-  b.add(G.cap(r, len, 3, 8), color, kind, m);
+  b.add(G.cap(r, len, _lo ? 1 : 3, _lo ? 6 : 8), color, kind, m);
 }
 // Луч прожектора: вершина в from, основание в to
 export function beam(b, from, to, radius, color) {
@@ -131,11 +131,14 @@ export function rng(seed = 1) { let s = seed >>> 0; return () => ((s = (s * 1664
 
 // Стилизованная «глянцевая» фигура человека (как игрушка в 3D motion STAYA).
 // Лицо смотрит в +Z. Ноги на y=0.
+let _lo = false;
+const FS = (r, a, c) => G.sph(r, _lo ? 9 : a, _lo ? 6 : c);
 export function figure(b, o = {}) {
   const s = o.s ?? 1, skin = o.skin ?? pick(SKIN, o.i ?? 0);
   const top = o.top ?? '#ff3fa4', bottom = o.bottom ?? top, hair = o.hair ?? '#2a1a14';
   const pose = o.pose ?? 'stand', legs = o.legs ?? (pose === 'feetUp' ? 'feetUp' : pose === 'sit' || pose === 'relax' || pose === 'behindHead' ? 'sit' : 'stand');
   const kind = o.kind ?? 'gloss';
+  _lo = !!o.lo;
   b.push(M(o.p ?? [0, 0, 0], [0, o.ry ?? 0, 0], s));
   const hipY = legs === 'stand' ? 0.95 : 0.5;
   const H = hipY;
@@ -151,27 +154,27 @@ export function figure(b, o = {}) {
     if (!o.swim) b.add(G.rbox(0.13, 0.09, 0.26, 0.04), o.shoes ?? '#f4f4f4', 'plastic', M([F[0], F[1] - 0.03, F[2] + 0.06]));
   }
   // таз и торс
-  b.add(G.sph(0.17, 14, 10), bottom, kind, M([0, H + 0.02, 0], [0, 0, 0], [1.08, 0.75, 0.8]));
+  b.add(FS(0.17, 14, 10), bottom, kind, M([0, H + 0.02, 0], [0, 0, 0], [1.08, 0.75, 0.8]));
   if (o.skirt) b.add(G.cone(0.5 * (o.skirtW ?? 1), 1.0, 18, true), o.skirt, kind, M([0, H - 0.38, 0], [0, 0, 0], [1, 1, 0.85]));
   const torsoC = o.swim ? skin : top;
   limb(b, [0, H + 0.12, 0], [0, H + 0.48, 0], 0.155, torsoC, kind);
   if (o.swim) { // купальник
-    b.add(G.sph(0.17, 14, 10), top, kind, M([0, H + 0.4, 0.035], [0, 0, 0], [1.02, 0.42, 0.92]));
-    b.add(G.sph(0.175, 14, 10), top, kind, M([0, H + 0.05, 0], [0, 0, 0], [1.05, 0.5, 0.82]));
+    b.add(FS(0.17, 14, 10), top, kind, M([0, H + 0.4, 0.035], [0, 0, 0], [1.02, 0.42, 0.92]));
+    b.add(FS(0.175, 14, 10), top, kind, M([0, H + 0.05, 0], [0, 0, 0], [1.05, 0.5, 0.82]));
   }
-  if (o.hoodie) b.add(G.sph(0.21, 14, 10), top, kind, M([0, H + 0.36, 0], [0, 0, 0], [1.25, 1.1, 0.95]));
+  if (o.hoodie) b.add(FS(0.21, 14, 10), top, kind, M([0, H + 0.36, 0], [0, 0, 0], [1.25, 1.1, 0.95]));
   // шея и голова
   limb(b, [0, H + 0.58, 0], [0, H + 0.68, 0], 0.05, skin, kind);
   const HY = H + 0.8;
-  b.add(G.sph(0.115, 16, 12), skin, kind, M([0, HY, 0.01], [0, 0, 0], [0.95, 1.08, 1]));
-  if (o.mask) b.add(G.sph(0.118, 16, 12), o.mask, kind, M([0, HY + 0.01, 0.025], [0, 0, 0], [0.96, 1.0, 0.95]));
+  b.add(FS(0.115, 16, 12), skin, kind, M([0, HY, 0.01], [0, 0, 0], [0.95, 1.08, 1]));
+  if (o.mask) b.add(FS(0.118, 16, 12), o.mask, kind, M([0, HY + 0.01, 0.025], [0, 0, 0], [0.96, 1.0, 0.95]));
   if (o.glasses) b.add(G.rbox(0.2, 0.05, 0.03, 0.015), '#05050a', 'gloss', M([0, HY + 0.02, 0.105]));
   if (hair !== 'none') {
-    b.add(G.sph(0.125, 16, 12), hair, kind, M([0, HY + 0.035, -0.02], [0, 0, 0], [1.02, 0.95, 1.02]));
+    b.add(FS(0.125, 16, 12), hair, kind, M([0, HY + 0.035, -0.02], [0, 0, 0], [1.02, 0.95, 1.02]));
     if (o.longHair) limb(b, [0, HY - 0.02, -0.07], [0, HY - (o.longHair === 2 ? 0.55 : 0.38), -0.1], 0.1, hair, kind);
   }
   if (o.cap) {
-    b.add(G.sph(0.13, 16, 8, ), o.cap, kind, M([0, HY + 0.04, -0.01], [0, 0, 0], [1.02, 0.85, 1.05]));
+    b.add(FS(0.13, 16, 8, ), o.cap, kind, M([0, HY + 0.04, -0.01], [0, 0, 0], [1.02, 0.85, 1.05]));
     b.add(G.rbox(0.2, 0.025, 0.16, 0.01), o.cap, kind, M([0, HY + 0.06, 0.15], [o.capBack ? 0 : -0.15, o.capBack ? Math.PI : 0, 0]));
   }
   if (o.hat === 'witch') b.add(G.cone(0.2, 0.45, 14), '#120d16', kind, M([0, HY + 0.3, 0])), b.add(G.cyl(0.3, 0.3, 0.02, 20), '#120d16', kind, M([0, HY + 0.1, 0]));
@@ -197,6 +200,7 @@ export function figure(b, o = {}) {
     if (ap === 'phone' && sx > 0) b.add(G.rbox(0.08, 0.15, 0.015, 0.01), '#111', 'gloss', M([Hn[0], Hn[1] + 0.05, Hn[2] + 0.02], [0.4, 0, 0]));
   }
   b.pop();
+  _lo = false;
 }
 
 // Надувной 3D-текст (глянец)
@@ -531,4 +535,34 @@ export function disposeScene(scene) {
     ms.forEach((m) => { for (const k in m) { const v = m[k]; if (v && v.isTexture && !v.userData.shared) v.dispose(); } m.dispose(); });
   });
   if (scene.environment) scene.environment.dispose();
+}
+
+/* ---------- луна: одна текстура для арт-объекта в клубе и настоящей луны ---------- */
+// Направление «от луны к камере» в кадре-склейке клуб → бассейн. Отношение радиус/дистанция — MOON_K.
+export const MOON_DIR = [0, -0.19, -0.982];
+export const MOON_K = 0.383;
+export function moonTexture() {
+  return canvasTex(1024, 512, (x, w, h) => {
+    x.fillStyle = '#fff1d6'; x.fillRect(0, 0, w, h);
+    const r = rng(5);
+    for (let i = 0; i < 120; i++) {
+      const cx = r() * w, cy = h * 0.12 + r() * h * 0.76, rr = 6 + r() * 42;
+      const g = x.createRadialGradient(cx, cy, 0, cx, cy, rr);
+      g.addColorStop(0, 'rgba(160,150,140,.55)'); g.addColorStop(0.7, 'rgba(170,160,150,.25)'); g.addColorStop(1, 'rgba(170,160,150,0)');
+      x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, rr, rr * 0.8, 0, 0, 7); x.fill();
+    }
+  });
+}
+// Луна с освещённой и тёмной стороной. lightDir — откуда свет (в мире).
+export function moonMesh(radius, lightDir = null, o = {}) {
+  const map = moonTexture();
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { map: { value: map }, L: { value: new THREE.Vector3(...(lightDir ?? [0, 0, 0])).normalize() }, lit: { value: lightDir ? 0 : 1 }, glow: { value: new THREE.Color(o.tint ?? '#fff3dc') } },
+    vertexShader: `varying vec2 vUv; varying vec3 vN; void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
+    fragmentShader: `uniform sampler2D map; uniform vec3 L, glow; uniform float lit; varying vec2 vUv; varying vec3 vN;
+      void main(){ vec3 c=texture2D(map,vUv).rgb*glow; float k = lit>0.5 ? 1. : smoothstep(-0.15,0.35,dot(vN,L)); gl_FragColor=vec4(c*(0.035+0.965*k),1.);
+      #include <colorspace_fragment>
+    }`,
+  });
+  return new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 40), mat);
 }
