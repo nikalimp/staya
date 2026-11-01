@@ -175,14 +175,15 @@ export function build({ THREE, kit, font, renderer }) {
   // свет из-под дверей, пока закрыто
   b.add(G.box(6, 0.04, 0.1), '#ff8a2a', 'neon', M([0, 0.03, FZ - 0.3]));
 
-  /* --- телефон на галерее 2-го этажа: пост с фото следующей сцены --- */
-  const PH = [14.5, 13.1, 0.3], phRy = -2.18, nx = Math.sin(phRy), nz = Math.cos(phRy);
-  b.push(M(PH, [0, phRy, 0]));
-  b.add(G.rbox(2.7, 5.4, 0.3, 0.34, 3), '#0b0b10', 'gloss');
-  b.add(G.rbox(2.76, 5.46, 0.18, 0.35, 3), '#d8c8a8', 'metal', M([0, 0, -0.08]));
-  b.add(G.box(0.4, 2.7, 0.4), '#0b0b10', 'plastic', M([0, -2.6 - 0.2, -0.6], [0.2, 0, 0]));
-  b.pop();
-  glows.push([PH[0] + nx * 1.2, PH[1], PH[2] + nz * 1.2, '#ffb36b', 6, 0.3]);
+  /* --- гость на галерее держит смартфон: пост с фото следующей сцены --- */
+  const GP = [13.4, 10.4, -0.5], gry = 0.96, cs = Math.cos(gry), sn = Math.sin(gry);
+  const W = (x, y, z) => [GP[0] + x * cs + z * sn, GP[1] + y, GP[2] - x * sn + z * cs];
+  kit.figure(b, { p: GP, ry: gry, pose: 'hold', top: '#120d16', skirt: '#120d16', mask: '#f2f2f2', horns: '#c0101a', hair: '#0e0e12', longHair: 2, i: 4 });
+  // телефон в руках: экран смотрит на лицо (наклон вверх)
+  const phone = new THREE.Group(); phone.rotation.order = 'YXZ';
+  phone.position.set(...W(0, 1.27, 0.38)); phone.rotation.set(-1.03, gry + Math.PI, 0);
+  const body = new THREE.Mesh(kit.G.rbox(0.078, 0.162, 0.009, 0.01, 3), new THREE.MeshPhysicalMaterial({ color: '#0b0b10', roughness: 0.25, clearcoat: 1 }));
+  body.position.z = -0.0047; phone.add(body);
   const ui = kit.canvasTex(512, 1024, (x, w, h) => {
     x.fillStyle = '#0d0d10'; x.fillRect(0, 0, w, h);
     x.fillStyle = '#ff3fb4'; x.beginPath(); x.arc(52, 70, 28, 0, 7); x.fill();
@@ -201,17 +202,18 @@ export function build({ THREE, kit, font, renderer }) {
     x.font = '600 23px Manrope, sans-serif'; x.fillText('stayaekb', 26, y0 + 96); x.fillStyle = '#d8d8e0'; x.fillText('Следующая остановка — Пхукет 🌴', 140, y0 + 96);
     x.fillStyle = '#7a7a84'; x.font = '600 20px Manrope, sans-serif'; x.fillText('Посмотреть все комментарии (318)', 26, y0 + 134);
   });
-  const uiM = kit.screen(2.45, 5.1, ui, [PH[0] + nx * 0.16, PH[1], PH[2] + nz * 0.16], [0, phRy, 0]);
-  scene.add(uiM);
+  const uiM = kit.screen(0.07, 0.1457, ui, [0, 0, 0.0002]); phone.add(uiM);
   const ph = kit.canvasTex(256, 256, (x, w, h) => { const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#2a1a5a'); g.addColorStop(0.5, '#ff6a8a'); g.addColorStop(1, '#ffb36b'); x.fillStyle = g; x.fillRect(0, 0, w, h); });
-  const PY = 0.35, photoC = [PH[0] + nx * 0.17, PH[1] + PY, PH[2] + nz * 0.17];
-  const photo = kit.screen(2.45, 2.45, ph, photoC, [0, phRy, 0]);
-  scene.add(photo);
+  const photo = kit.screen(0.07, 0.07, ph, [0, 0.01, 0.0004]); phone.add(photo);
+  scene.add(phone); phone.updateMatrixWorld(true);
+  const photoC = photo.getWorldPosition(new THREE.Vector3()).toArray();
+  const nrm = new THREE.Vector3(0, 0, 1).applyQuaternion(phone.quaternion);
+  glows.push([...W(0, 1.45, 0.25), '#9fb2ff', 0.6, 0.5]);
 
   scene.add(kit.glowPoints(glows));
   scene.add(b.build());
 
-  const P = (k) => [photoC[0] + nx * k, photoC[1], photoC[2] + nz * k];
+  const P = (k) => [photoC[0] + nrm.x * k, photoC[1] + nrm.y * k, photoC[2] + nrm.z * k];
   const keys = [
     // перед закрытыми дверями — двери открываются
     { p: [0, 3.6, 29.2], l: [0, 3.6, 20], t: 0 },
@@ -227,15 +229,18 @@ export function build({ THREE, kit, font, renderer }) {
     { p: [6.6, 8.6, -14.6], l: [8.6, 10.5, -8] },
     { p: [8.6, 9.6, -12], l: [8.8, 11.6, -4] },
     { p: [8.8, 11.6, -7.6], l: [11, 12.8, -1.5], t: 0.78 },
-    { p: [10, 12.8, -3.8], l: photoC },
-    // к экрану телефона и внутрь фотографии
-    { p: P(2.6), l: photoC, t: 0.9 },
-    { p: P(1.1), l: photoC, t: 0.96 },
-    { p: P(0.42), l: photoC, t: 1 },
+    // за спину гостя → через плечо в экран его смартфона
+    { p: W(1.1, 2.3, -2.8), l: W(0, 1.5, 0.4), t: 0.86 },
+    { p: W(0.5, 2.12, -0.5), l: photoC, t: 0.92 },
+    { p: P(0.16), l: photoC, t: 0.96 },
+    { p: P(0.045), l: photoC },
+    { p: P(0.022), l: photoC, t: 1 },
   ];
   const update = (t) => {
     const k = Math.min(1, Math.max(0, (t - 0.02) / 0.13)), a = (k * k * (3 - 2 * k)) * 1.75;
     leaves.forEach(({ g, sx }) => (g.rotation.y = sx < 0 ? a : -a));
   };
-  return { scene, cam: kit.camPath(keys), update, preview: { mesh: photo, w: 512, h: 512 } };
+  // у экрана смартфона камера подходит на сантиметры — ближняя плоскость отсечения меньше
+  const near = (t) => (t > 0.9 ? 0.004 : 0.05);
+  return { scene, cam: kit.camPath(keys), update, near, preview: { mesh: photo, w: 512, h: 512 } };
 }
