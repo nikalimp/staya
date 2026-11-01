@@ -1,5 +1,6 @@
 // 01 · STAYA AQUA — ночной аквапарк под куполом.
 // Камера скатывается по прозрачной горке, вылетает над бассейном к сцене и ныряет в воду.
+import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
 export function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M, V } = kit;
   const scene = new THREE.Scene();
@@ -49,9 +50,9 @@ export function build({ THREE, kit, font, renderer }) {
   b.add(G.box(18, 0.06, 0.06), CYAN, 'neon', M([0, top + 0.15, SZ + 3.27]));
   const ST = top + 1.6;
   kit.djBooth(b, [0, ST, SZ + 1.2], 0, { w: 3.4 });
-  kit.figure(b, { p: [0, ST, SZ + 0.3], pose: 'dj', top: '#0b0b0f', bottom: '#0b0b0f', hair: '#0b0a0a', cap: '#0b0b0f', glasses: true, i: 2 });
-  kit.figure(b, { p: [-1.6, ST, SZ - 0.2], pose: 'up', top: '#ffe14a', bottom: '#222', hair: '#f3d38a', longHair: 2, i: 3 });
-  kit.figure(b, { p: [1.7, ST, SZ - 0.1], pose: 'wave', top: '#ff7ad1', bottom: '#2a2a33', hair: '#2a1710', longHair: 1, i: 0 });
+  human(b, RESIDENTS.pronto, { p: [0, ST, SZ + 0.3], pose: 'dj' });
+  human(b, RESIDENTS.dierouzze, { p: [-1.6, ST, SZ - 0.2], pose: 'up' });
+  human(b, RESIDENTS.gulidic, { p: [1.7, ST, SZ - 0.1], pose: 'wave' });
   // ферма над сценой
   const TY = 11.5, x0 = -9, x1 = 9, zf = SZ + 3, zb = SZ - 2.6;
   for (const x of [x0, x1]) for (const z of [zf, zb]) kit.truss(b, [x, ST, z], [x, TY, z], 0.5);
@@ -122,7 +123,7 @@ export function build({ THREE, kit, font, renderer }) {
   spots.forEach(([x, z], i) => {
     if (Math.abs(x - 2.5) < 2 && Math.abs(z - 1) < 2.5) return; // место для нырка камеры
     const ry = i % 3 === 0 ? Math.PI : -0.6 + R() * 1.2;
-    kit.figure(b, { p: [x, -0.85, z], ry, pose: i % 4 === 1 ? 'wave' : 'up', swim: true, top: kit.pick(swim, i), hair: kit.pick(hairs, i), longHair: i % 2 ? 2 : 1, i });
+    human(b, castGuest(i), { p: [x, -0.85, z], ry, pose: i % 4 === 1 ? 'wave' : 'up', barefoot: true });
     if (i % 2 === 0) kit.ring(b, [x, 0.12, z], kit.pick(['#ff5fc0', '#ffd23f', '#2fe6ff', '#ffffff'], i), 0.5, 0.17);
   });
   kit.flamingo(b, [-5.5, 0, -0.5], 0.9, 0.7);
@@ -131,7 +132,7 @@ export function build({ THREE, kit, font, renderer }) {
   for (let i = 0; i < 5; i++) b.add(G.sph(0.4, 14, 10), kit.pick(['#ffffff', '#ff5fc0', '#ffd23f'], i), 'gloss', M([-10 + i * 5, 0.25, -6 + (i % 3) * 5]));
   // люди на бортике
   const deckSpots = [[-17, -6, 1.2], [-17.5, 3, 1.8], [17, -5, -1.4], [17.5, 4, -2], [-8, 11, 3.1], [6, 11.2, 3.3], [-12, -11, 0], [11, -11, 0], [13.5, -11.5, 0.3]];
-  deckSpots.forEach(([x, z, ry], i) => kit.figure(b, { p: [x, top, z], ry, pose: kit.pick(['up', 'wave', 'hips', 'up'], i), swim: i % 3 !== 2, top: kit.pick(swim, i + 3), hair: kit.pick(hairs, i + 2), longHair: i % 2 ? 2 : 0, i: i + 1 }));
+  deckSpots.forEach(([x, z, ry], i) => human(b, castGuest(i + 7), { p: [x, top, z], ry, pose: kit.pick(['up', 'wave', 'hips', 'peace'], i) }));
   for (let i = 0; i < 10; i++) kit.lounger(b, [-24 + (i % 5) * 2.4 + (i > 4 ? 40 : 0), top, 12 + (i % 2)], Math.PI, kit.pick(['#ffffff', '#ff8ad8', '#8ef0ff'], i));
   // пальмы под куполом
   [[-22, -12], [22, -12], [-26, 4], [24, 22], [-14, 22], [14, 24], [30, -2]].forEach(([x, z], i) => kit.palm(b, [x, top, z], 8 + (i % 3), [0.6 * (i % 2 ? 1 : -1), 0.3], { seed: i, leaf: '#1f6a48' }));

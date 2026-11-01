@@ -11,8 +11,7 @@ const SCENES = [
   { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.5, out: 'black' },
   { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black' },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut' },
-  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 1.15, out: 'black' },
-  { id: 'office', load: () => import('./scenes/office.js'), track: 'music/05-phuket.mp3', w: 0.8, out: null },
+  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.2, out: null, final: 0.95 },
 ];
 // Кнопки финала. Пустой href — кнопка не показывается.
 const LINKS = [
@@ -46,7 +45,7 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.setClearColor(0x000000, 1);
-const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 900);
+const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
 
 let VH = innerHeight, lastW = innerWidth, glowScale = 600, dirty = true;
 const totalW = SCENES.reduce((a, s) => a + s.w, 0);
@@ -94,7 +93,7 @@ function renderPreview(owner, next) {
   if (owner.previewDone) return;
   const { mesh, t = 0 } = owner.preview, w = mobile ? 768 : 1024, h = w;
   const rt = new THREE.WebGLRenderTarget(w, h, { colorSpace: THREE.SRGBColorSpace, samples: mobile ? 0 : 4 });
-  const cam = new THREE.PerspectiveCamera(fovFor(w / h), w / h, 0.05, 900);
+  const cam = new THREE.PerspectiveCamera(fovFor(w / h), w / h, 0.05, 2000);
   const c = next.cam(t); cam.position.copy(c.p); cam.lookAt(c.l);
   const keep = [...kit.glowMats].map((m) => m.uniforms.uScale.value);
   kit.glowMats.forEach((m) => (m.uniforms.uScale.value = h / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2))));
@@ -146,7 +145,7 @@ function apply(g) {
   // соседей собираем заранее — для склеек 'cut' это обязательно
   if (t > 0.3 && i < N - 1 && !built.has(i + 1)) idle(() => buildScene(i + 1));
   if (t < 0.25 && i > 0 && !built.has(i - 1)) idle(() => buildScene(i - 1));
-  finalEl.classList.toggle('on', i === N - 1 && t > 0.72);
+  finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
   return true;
 }
 const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 500 }) : setTimeout(fn, 50));
@@ -178,7 +177,7 @@ const audio = {
   init() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC || this.ctx) return;
     this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination);
-    // одна дорожка на файл: если у соседних сцен один трек (вилла → офис), музыка не прерывается
+    // одна дорожка на файл: если у соседних сцен один трек (когда трек повторяется), музыка не прерывается
     const bySrc = {};
     this.tracks = SCENES.map((s) => {
       if (bySrc[s.track]) return bySrc[s.track];

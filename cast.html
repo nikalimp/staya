@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><title>STAYA cast</title>
+<style>html,body{margin:0;background:#1a1626;overflow:hidden}</style>
+<script type="importmap">{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }</script></head>
+<body><script type="module">
+// Витрина персонажей: 5 резидентов и 20 гостей. Только для разработки, в сборку не попадает.
+import * as kit from './js/kit.js';
+import { person, RESIDENTS, GUESTS, POSES } from './js/people.js';
+const { THREE } = kit;
+const q = new URLSearchParams(location.search), which = q.get('set') || 'res';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+const sc = new THREE.Scene(); sc.background = new THREE.Color('#2a2238');
+sc.environment = kit.env(r, ['#ff8ad8', '#2fe6ff', '#ffd28a', '#b45cff', '#ffffff'], '#3a2a48');
+sc.add(new THREE.HemisphereLight('#ffe6f4', '#3a2a48', 1.2));
+const dl = new THREE.DirectionalLight('#ffffff', 2.2); dl.position.set(3, 6, 8); sc.add(dl);
+const b = new kit.Builder();
+const looks = which === 'res' ? Object.values(RESIDENTS) : which === 'f' ? GUESTS.slice(0, 10) : GUESTS.slice(10);
+const poses = which === 'res' ? ['peace', 'cross', 'stand', 'hips', 'phone'] : POSES;
+looks.forEach((L, i) => person(b, L, { p: [(i - (looks.length - 1) / 2) * 0.75, 0, 0], ry: 0, pose: q.get('pose') || poses[i % poses.length], lo: q.has('lo') }));
+b.add(kit.G.cyl(9, 9, 0.05, 48), '#3a3048', 'plastic', kit.M([0, -0.025, 0]));
+sc.add(b.build());
+const n = looks.length, cam = new THREE.PerspectiveCamera(30, innerWidth / innerHeight, 0.1, 100);
+const ry = +(q.get('ry') || 0); cam.position.set(Math.sin(ry) * (n * 0.75 + 1.5), 1.6, Math.cos(ry) * (n * 0.75 + 1.5)); cam.lookAt(0, 0.95, 0);
+r.render(sc, cam); window.__done = true;
+</script></body></html>

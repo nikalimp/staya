@@ -5,6 +5,7 @@
 const BASE = 'world/pool/';
 const T = 0.3, SZ = -12.2, EX = 43, EZ = -4, HZ = 19;
 
+import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
 export async function build({ THREE, kit, renderer, mobile }) {
   const { Builder } = kit;
   const scene = new THREE.Scene();
@@ -63,11 +64,9 @@ export async function build({ THREE, kit, renderer, mobile }) {
 
   /* --- люди: толпа у главной сцены, у электро-сцены, пловцы --- */
   const b = new Builder(), R = kit.rng(11);
-  const tops = ['#ff2f8f', '#2fe6ff', '#ffe14a', '#b45cff', '#ffffff', '#ff7a3a', '#39ff9a', '#111111'];
-  const hairs = ['#1a1210', '#3a2216', '#e9c27a', '#0e0e12', '#ff8ad8'];
   let k = 0;
   const guest = (x, y, z, ry, o = {}) => {
-    kit.figure(b, { p: [x, y, z], ry, pose: kit.pick(['up', 'wave', 'up', 'hips', 'phone', 'up'], k), swim: k % 3 !== 2, top: kit.pick(tops, k), bottom: kit.pick(['#22222a', '#5a5f7a', '#111', '#ffffff'], k), hair: kit.pick(hairs, k), longHair: k % 2 ? 2 : 0, cap: k % 5 === 1 ? '#f4f4f4' : null, glasses: k % 4 === 0, s: 0.95 + R() * 0.1, lo: true, i: k, ...o });
+    human(b, castGuest(k), { p: [x, y, z], ry, pose: kit.pick(['up', 'wave', 'up', 'hips', 'phone', 'peace'], k), s: 0.95 + R() * 0.1, lo: true, barefoot: y < 0, ...o });
     k++;
   };
   for (let z = -6.2; z > -9.2; z -= 0.95) for (let x = -6.6; x <= 6.6; x += 1.05) {
@@ -76,11 +75,11 @@ export async function build({ THREE, kit, renderer, mobile }) {
   }
   for (let x = 33.5; x < 38.4; x += 1.0) for (let z = EZ - 5.5; z <= EZ + 5.5; z += 1.0) {
     if (R() < 0.25) continue;
-    guest(x + (R() - 0.5) * 0.4, 0.06, z + (R() - 0.5) * 0.4, Math.PI / 2 + (R() - 0.5) * 0.8, { swim: false });
+    guest(x + (R() - 0.5) * 0.4, 0.06, z + (R() - 0.5) * 0.4, Math.PI / 2 + (R() - 0.5) * 0.8);
   }
   // пловцы — в стороне от пути камеры (камера идёт от центра к лестнице справа)
   [[-6, -2], [-3, -3.6], [-8.4, 2.6], [5.5, 3.6], [7.4, -3.7], [-4.6, 3.4]].forEach(([x, z], i) => {
-    guest(x, -0.85, z, Math.PI + (i % 2 ? 0.5 : -0.5), { pose: i % 3 ? 'up' : 'wave', swim: true });
+    guest(x, -0.85, z, Math.PI + (i % 2 ? 0.5 : -0.5), { pose: i % 3 ? 'up' : 'wave' });
     if (i % 2 === 0) kit.ring(b, [x, 0.12, z], kit.pick(['#ff5fc0', '#ffd23f', '#2fe6ff'], i), 0.5, 0.17);
   });
   // лазеры электро-сцены веером над толпой
