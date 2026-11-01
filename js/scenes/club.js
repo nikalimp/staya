@@ -2,6 +2,7 @@
 // Камера едет вправо вдоль стены с надписью STAYA 2K17 → вылетает на лестницу вниз →
 // низко протискивается через толпу → разворачивается и замирает на луне под потолком (арт-объект STAYA).
 // Конец сцены — кадр на луну. Следующая сцена (POOL) начинается с такого же кадра, но луна уже настоящая.
+import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
 export function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M } = kit;
   const scene = new THREE.Scene();
@@ -43,8 +44,8 @@ export function build({ THREE, kit, font, renderer }) {
   });
   scene.add(kit.texPlane(13.6, 6, graf, [0, 9.3, 40.98], [0, Math.PI, 0], { rough: 0.85 }));
   kit.spinner(b, [-6.95, 9.6, 36.5], [0, Math.PI / 2, 0.4], 0.9, '#2f7bff');
-  kit.figure(b, { p: [5.2, 6, 37.2], ry: -2.2, pose: 'phone', top: '#ff8ac8', bottom: '#22222a', hair: '#e9c27a', longHair: 2, i: 0 });
-  kit.figure(b, { p: [4.4, 6, 36.2], ry: -2.6, pose: 'hips', top: '#111', bottom: '#5a5f7a', cap: '#f4f4f4', hair: '#1a1210', i: 3 });
+  human(b, castGuest(3), { p: [5.2, 6, 37.2], ry: -2.2, pose: 'phone' });
+  human(b, castGuest(13), { p: [4.4, 6, 36.2], ry: -2.6, pose: 'hips' });
 
   /* --- лестница вниз: от z=34 (y=6) до z=16 (y=0) --- */
   for (let i = 0; i < 30; i++) {
@@ -122,7 +123,7 @@ export function build({ THREE, kit, font, renderer }) {
   b.add(G.rbox(14, 1, 4.4, 0.08), '#0e0a16', 'gloss', M([0, 0.5, -13.4]));
   b.add(G.box(14, 0.07, 0.07), PINK, 'neon', M([0, 1.0, -11.2]));
   kit.djBooth(b, [0, 1, -12.4], 0, { w: 3.2, front: VIO, front2: PINK });
-  kit.figure(b, { p: [0, 1, -13.3], pose: 'dj', top: '#e8e8ee', bottom: '#111', cap: '#ff2fd0', capBack: true, hair: '#1a1210', i: 1 });
+  human(b, RESIDENTS.sixphrases, { p: [0, 1, -13.3], pose: 'dj' });
   for (const sx of [-1, 1]) { kit.speaker(b, [sx * 6, 1, -13], 0, 1.8, 1.3); kit.speaker(b, [sx * 6, 2.8, -13], 0, 1.4, 1.1); }
   const scr = kit.canvasTex(1024, 384, (x, w, h) => {
     const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#16002e'); g.addColorStop(1, '#4a0060'); x.fillStyle = g; x.fillRect(0, 0, w, h);
@@ -150,13 +151,13 @@ export function build({ THREE, kit, font, renderer }) {
   let k = 0;
   const person = (x, z, ry, lo = false) => {
     const g = k % 2 === 0;
-    kit.figure(b, { p: [x, 0.05, z], ry, pose: kit.pick(['up', 'wave', 'up', 'phone', 'hips', 'up'], k), top: kit.pick(tops, k), bottom: kit.pick(['#22222a', '#5a5f7a', '#111', '#3a3a52'], k), hoodie: k % 3 === 0, sleeves: k % 3 === 0, hair: kit.pick(hairs, k), longHair: g ? 2 : 0, cap: !g && k % 4 === 1 ? kit.pick(['#111', '#ff2fd0', '#f4f4f4'], k) : null, capBack: true, glasses: k % 5 === 0, s: 0.95 + R() * 0.12, lo, i: k });
+    human(b, castGuest(k), { p: [x, 0.05, z], ry, pose: kit.pick(['up', 'wave', 'up', 'phone', 'peace', 'up'], k), s: 0.95 + R() * 0.12, lo });
     k++;
   };
   for (let z = 5.6; z > -8.5; z -= 1.1) for (let x = -7.4; x <= 7.4; x += 1.1) {
     const xx = x + (R() - 0.5) * 0.5, zz = z + (R() - 0.5) * 0.5, d = Math.abs(xx - lane(zz));
-    if (d < 0.75 || (d > 3 && R() < 0.35) || (xx > 1.1 && zz < -6.2 && zz > -8.9)) continue;
-    person(xx, zz, Math.PI + (R() - 0.5) * 1.2, d > 2.2);
+    if (d < 0.75 || (d > 3 && R() < 0.5) || (xx > 1.1 && zz < -6.2 && zz > -8.9)) continue;
+    person(xx, zz, Math.PI + (R() - 0.5) * 1.2, d > 1.3);
   }
   // «тесные» соседи по краям коридора — камера протискивается между ними
   for (let z = 5; z > -8; z -= 1.3) for (const sx of [-1, 1]) if (!(sx > 0 && z < -5.8)) person(lane(z) + sx * (0.52 + R() * 0.08), z + (R() - 0.5) * 0.3, Math.PI + sx * 0.6 + (R() - 0.5) * 0.6);
@@ -164,8 +165,8 @@ export function build({ THREE, kit, font, renderer }) {
   /* --- парочки в коридоре: обнимаются у стен --- */
   [[18.2, -1, 'hug', 'neck'], [20.6, 1, 'neck', 'hug'], [23.4, -1, 'hug', 'hug'], [26.2, 1, 'neck', 'hug'], [28.3, -1, 'hug', 'neck']].forEach(([x, sz, a1, a2], i) => {
     const z = CZ + sz * 0.78;
-    kit.figure(b, { p: [x - 0.21, 0.02, z], ry: Math.PI / 2, pose: a1, top: kit.pick(tops, i + 2), bottom: '#22222a', hair: kit.pick(hairs, i), longHair: 0, cap: i % 2 ? '#111' : null, capBack: true, s: 1.03, lo: true, i });
-    kit.figure(b, { p: [x + 0.21, 0.02, z], ry: -Math.PI / 2, pose: a2, top: kit.pick(tops, i + 5), bottom: kit.pick(['#111', '#5a5f7a'], i), hair: kit.pick(hairs, i + 2), longHair: 2, s: 0.95, lo: true, i: i + 3 });
+    human(b, castGuest(10 + i * 2), { p: [x - 0.21, 0.02, z], ry: Math.PI / 2, pose: a1, s: 1.02, lo: true });
+    human(b, castGuest(i * 2 + 1), { p: [x + 0.21, 0.02, z], ry: -Math.PI / 2, pose: a2, lo: true });
   });
 
   /* --- 2017: спиннеры, кальяны, розовое вино, лайк --- */

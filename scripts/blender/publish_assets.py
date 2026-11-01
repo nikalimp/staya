@@ -3,7 +3,7 @@ import sys, os, shutil
 from PIL import Image
 src, dst = sys.argv[1], sys.argv[2]
 os.makedirs(dst, exist_ok=True)
-shutil.copy(os.path.join(src, 'pool-pack.glb'), os.path.join(dst, 'pool.glb'))
+shutil.copy(os.path.join(src, sys.argv[3] + '-pack.glb'), os.path.join(dst, sys.argv[3] + '.glb'))
 for f in sorted(os.listdir(os.path.join(src, 'tex'))):
     im = Image.open(os.path.join(src, 'tex', f)); name = f[:-5]
     im.save(os.path.join(dst, name + '.webp'), 'WEBP', quality=86, method=6)
