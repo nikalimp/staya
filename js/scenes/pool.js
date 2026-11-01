@@ -33,7 +33,7 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     kit.loadGLB(BASE + 'pool.glb'),
     tex('ground'), tex('near_albedo'), tex('near_light'), tex('far_albedo'), tex('far_light'), tex('gloss'),
   ]);
-  const LM = Math.PI * 2; // свет запечён как L·0.5, а базовый материал делит lightMap на π
+  const LM = Math.PI * 1.6; // свет запечён как L·0.5, а базовый материал делит lightMap на π
   const lit = (map, light) => { light.channel = 0; return new THREE.MeshBasicMaterial({ map, lightMap: light, lightMapIntensity: LM }); };
   const MAT = {
     bake_ground: new THREE.MeshBasicMaterial({ map: groundT }),
