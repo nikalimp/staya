@@ -1,0 +1,10 @@
+{
+  "name": "staya",
+  "private": true,
+  "version": "1.0.0",
+  "description": "STAYA — иммерсивный сайт на Three.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "dev": "python3 -m http.server 8080"
+  }
+}

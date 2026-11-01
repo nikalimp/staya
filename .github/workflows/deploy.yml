@@ -1,0 +1,23 @@
+# Выкладка сайта — вызов общего сценария nikalimp/deploy-kit (стандарт «Публикация — стандарт»).
+# Порядок: SSH (rsync) → если не прошёл, FTP → если упали оба, сборка в артефакте site-build.
+# Секреты (Settings → Secrets and variables → Actions): FTP_HOST, FTP_USER, FTP_PASS, FTP_DIR (www/staya.nikalimp.ru/),
+# NOTIFY_BOT_TOKEN, NOTIFY_CHAT_ID. REG.RU: порт 22 для GitHub закрыт — SSH-секреты не нужны.
+name: Deploy
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["specs/**", "*.md"]
+  workflow_dispatch: {}
+concurrency: { group: deploy, cancel-in-progress: false }
+jobs:
+  site:
+    permissions: { contents: write }
+    uses: nikalimp/deploy-kit/.github/workflows/site.yml@main
+    with:
+      adapter: ssh-ftp
+      site_dir: "."
+      out_dir: out
+      app_path: ""
+      rsync_exclude: ""
+      url: https://staya.nikalimp.ru
+    secrets: inherit
