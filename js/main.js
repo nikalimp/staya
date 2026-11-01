@@ -73,7 +73,7 @@ async function buildScene(i) {
   const p = (async () => {
     const mod = await SCENES[i].load();
     const t0 = performance.now();
-    const res = mod.build({ THREE, kit, font, renderer, mobile });
+    const res = await mod.build({ THREE, kit, font, renderer, mobile });
     res.scene.traverse((o) => { if ((o.isMesh || o.isPoints) && !o.userData.dynamic) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
     res.scene.updateMatrixWorld(true);
     kit.glowMats.forEach((m) => (m.uniforms.uScale.value = glowScale));
@@ -261,4 +261,5 @@ window.__staya = {
   },
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, built: [...built.keys()] }),
   ready: () => real >= 100,
+  scene: (i) => built.get(i)?.scene,
 };
