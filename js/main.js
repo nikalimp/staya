@@ -7,9 +7,9 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import * as kit from './kit.js';
 
 const SCENES = [
-  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.35, out: 'black' },
-  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.4, out: 'cut' },
-  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.4, out: 'black' },
+  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.35, out: 'water' },
+  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.5, out: 'black' },
+  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black' },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut' },
   { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 1.15, out: 'black' },
   { id: 'office', load: () => import('./scenes/office.js'), track: 'music/05-phuket.mp3', w: 0.8, out: null },
@@ -120,11 +120,14 @@ function scrollToG(y) {
 function gToScroll(g) { const i = Math.min(N - 1, Math.floor(g)); return (cum[i] + (g - i) * SCENES[i].w) * VH_PER_UNIT * VH; }
 
 let cur = 0, target = 0, lastG = -1, curIdx = -1, started = false, jumping = false;
+// Стык 'black' уходит в чёрный, 'water' — в синеву воды (нырок AQUA → выныривание в POOL), 'cut' — склейка без затемнения
+const FADE_COLOR = { black: '#000', water: '#0a5f8f' };
 function blackAt(i, t) {
-  let k = 0;
+  let k = 0, c = '#000';
   const inT = i === 0 ? 'black' : SCENES[i - 1].out, outT = SCENES[i].out;
-  if (inT === 'black' && t < FADE) k = 1 - t / FADE;
-  if (outT === 'black' && t > 1 - FADE) k = (t - (1 - FADE)) / FADE;
+  if (FADE_COLOR[inT] && t < FADE) { k = 1 - t / FADE; c = FADE_COLOR[inT]; }
+  if (FADE_COLOR[outT] && t > 1 - FADE) { k = (t - (1 - FADE)) / FADE; c = FADE_COLOR[outT]; }
+  if (fadeEl.dataset.c !== c) { fadeEl.style.background = c; fadeEl.dataset.c = c; }
   return Math.max(0, Math.min(1, k));
 }
 function apply(g) {
@@ -133,6 +136,8 @@ function apply(g) {
   if (!s) { fadeEl.style.opacity = 1; buildScene(i).then(() => (dirty = true)); return false; }
   fadeEl.style.opacity = blackAt(i, t).toFixed(3);
   s.update?.(t);
+  const nr = s.near?.(t) ?? 0.05;
+  if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); }
   const c = s.cam(t);
   camera.position.copy(c.p); camera.lookAt(c.l);
   if (s.roll) camera.rotateZ(s.roll(t));

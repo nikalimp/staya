@@ -136,109 +136,86 @@ N_WARM = neon('warm', '#ffcf7a', 5); N_PINK = neon('pink', '#ff6fd0', 5); N_VIO 
 N_PAR = {c: neon('par_' + c, h, 18) for c, h in [('pink', '#ff3fb4'), ('cyan', '#2fe6ff'), ('green', '#39ff6a'), ('red', '#ff2a2a')]}
 N_LOGO = neon('logo', '#ffffff', 8); N_POOLL = neon('pool_light', '#bff6ff', 12)
 
-# ---------- двор: газон, патио, бассейн ----------
-# газон с вырезом под бассейн
+
+# ================= ПЛАНИРОВКА =================
+# Бассейн в центре (x ±11, z ±5). Камера выныривает и смотрит на -Z:
+#   главная сцена (хиты) за бассейном, z ≈ -12, на её крыше — надувной осьминог;
+#   электро-сцена справа вдали, x ≈ 43, смотрит на бассейн (-X);
+#   дом с дверями — позади камеры, фасад на z = 19 смотрит на -Z.
+T = 0.3
+
+# ---------- газон, патио, бассейн ----------
 for c, sz in [((0, -0.15, -52.6), (200, 0.3, 94.8)), ((0, -0.15, 52.6), (200, 0.3, 94.8)), ((-55.6, -0.15, 0), (88.8, 0.3, 10.4)), ((55.6, -0.15, 0), (88.8, 0.3, 10.4))]:
     box(c, sz, GRASS, 'ground')
-T = 0.3
-for w, d, x, z in [[40, 8, 0, -9], [40, 9, 0, 9.5], [9, 10, -15.5, 0], [9, 10, 15.5, 0]]:
+for w, d, x, z in [[44, 12, 0, -11], [44, 12, 0, 11], [11, 10, -16.5, 0], [11, 10, 16.5, 0]]:
     box((x, T / 2, z), (w, T, d), WHITE, 'near')
 for w, d, x, z in [[22.6, 0.4, 0, -5.2], [22.6, 0.4, 0, 5.2], [0.4, 10.8, -11.2, 0], [0.4, 10.8, 11.2, 0]]:
     box((x, T + 0.06, z), (w, 0.12, d), COPING, 'near', bevel=0.04)
 box((0, -1.8, 0), (22, 0.2, 10), POOLT, 'near')
 for w, d, x, z in [[22, 0.2, 0, -5.05], [22, 0.2, 0, 5.05], [0.2, 10, -11.05, 0], [0.2, 10, 11.05, 0]]:
     box((x, -0.8, z), (w, 2, d), POOLT, 'near')
-# лестница в бассейн
-for zz in [3.2, 4.0]:
+for zz in [-1.2, -2.0]:
     tube([(10.2, 1.3, zz), (10.7, 1.3, zz), (10.95, 0.9, zz), (10.95, -0.6, zz)], 0.045, METAL, 'near')
-# подводные фонари
 for x in range(-9, 10, 3):
-    for z in (-4.92, 4.92):
-        sph((x, -0.55, z), 0.18, N_POOLL, 'neon', s=(1, 1, 0.3))
+    for z in (-4.92, 4.92): sph((x, -0.55, z), 0.18, N_POOLL, 'neon', s=(1, 1, 0.3))
 
-# ---------- дом ----------
-box((0, 4, -24), (32, 8, 10), STUCCO, 'far')
-box((-3, 10, -24.5), (22, 4, 9), STUCCO, 'far')
-box((0, 8.1, -24), (33, 0.4, 11), ROOF, 'far'); box((-3, 12.1, -24.5), (23, 0.4, 10), ROOF, 'far')
-box((0, 0.25, -17), (26, 0.5, 4), WOOD, 'far')
-for i, x in enumerate([-11, -5.2, 5.2, 11]):
-    box((x, 2.1, -18.97), (4.4, 3.2, 0.06), N_WARM if i % 2 else N_PINK, 'neon')
-    box((x, 2.1, -18.92), (0.15, 3.2, 0.12), ROOF, 'far')
-for i in range(5): box((-12 + i * 6, 6, -18.97), (3.4, 2, 0.06), N_VIO if i == 2 else N_WARM, 'neon')
-for i in range(3): box((-10 + i * 7, 10, -19.97), (4.5, 2.2, 0.06), N_WARM, 'neon')
-for sx in (-1, 1):
-    box((sx * 0.8, 2.4, -18.9), (1.55, 3.8, 0.16), DOOR, 'far', bevel=0.03)
-    box((sx * 0.15, 2.4, -18.78), (0.05, 0.6, 0.08), METAL, 'far')
-box((0, 4.42, -18.9), (3.6, 0.25, 0.3), ROOF, 'far')
-for sx in (-1, 1): sph((sx * 2.2, 3.6, -18.7), 0.16, N_BULB, 'neon')
-
-# ---------- надувной осьминог ----------
-OC = (5, 21, -42)
-sph(OC, 10, INF_OCTO, 'gloss', s=(1, 1.2, 0.95), seg=48)
-for sx in (-1, 1):
-    sph((OC[0] + sx * 3.8, OC[1] - 1.5, OC[2] + 8.6), 2.6, INF_EYE, 'gloss')
-    sph((OC[0] + sx * 3.6 - 0.3, OC[1] - 1.6, OC[2] + 10.7), 1.35, INF_PUPIL, 'gloss')
-    sph((OC[0] + sx * 3.6 - 0.7, OC[1] - 1.1, OC[2] + 11.75), 0.4, INF_EYE, 'gloss')
-    sph((OC[0] + sx * 6.4, OC[1] - 4.6, OC[2] + 7.4), 1.1, INF_FLAM, 'gloss', s=(1.2, 0.6, 0.4))
-TENT = [
-    [(-1, 12, -36), (-7, 13, -30), (-12, 12.5, -26), (-16, 9, -22), (-18, 4, -19), (-19, 1.4, -15), (-17.5, 1.3, -12), (-15.5, 2.6, -10.5)],
-    [(0, 11, -34), (-3, 13.6, -28), (-5, 12.8, -22), (-6.5, 10, -18.6), (-7, 7.2, -18.2), (-7.4, 5.8, -17.6), (-6.6, 5.6, -16.6)],
-    [(10, 11, -34), (14, 12.5, -28), (18, 9, -24), (21, 4, -20), (22, 1.4, -14), (20.5, 1.3, -9), (18.6, 2.6, -7.4)],
-    [(13, 13, -38), (20, 16, -36), (27, 13, -32), (31, 6, -28), (32, 1.5, -22), (30, 1.6, -18)],
-    [(-1, 13, -39), (-8, 17, -38), (-16, 15, -35), (-22, 8, -31), (-25, 2, -27), (-28, 1.6, -23)],
-    [(12, 15, -38), (17, 21, -36), (19, 28, -35), (17, 32, -34), (14, 31, -33)],
-    [(4, 13, -44), (1, 19, -48), (2, 25, -48), (5, 28, -46)],
-    [(9, 12, -46), (15, 8, -52), (19, 3, -55), (22, 1.6, -54)],
-]
-for pts in TENT:
-    tube(pts, 1.0, INF_OCTO, 'gloss', taper=(1.9, 0.35), res=10)
-
-# ---------- сцена сбоку: ферма, пульт с логотипом, колонки ----------
-SX = 16
-def truss(a, b, w=0.5):
+# ---------- ферма ----------
+def truss(a, b, w=0.5, g='far'):
     a, b = Vector(a), Vector(b); d = b - a; L = d.length; n = max(2, round(L / w))
     up = Vector((1, 0, 0)) if abs(d.normalized().y) > 0.9 else Vector((0, 1, 0))
     s1 = d.cross(up).normalized() * w / 2; s2 = d.cross(s1).normalized() * w / 2
     cs = [s1 + s2, s1 - s2, -s1 - s2, -s1 + s2]
-    for c in cs: cyl(tuple(a + c), tuple(b + c), 0.035, METAL, 'far', seg=8)
+    for c in cs: cyl(tuple(a + c), tuple(b + c), 0.035, METAL, g, seg=6)
     for i in range(n):
         p0 = a + d * (i / n); p1 = a + d * ((i + 1) / n)
-        for k in range(4): cyl(tuple(p0 + cs[k]), tuple(p1 + cs[(k + 1) % 4]), 0.018, METAL, 'far', seg=6)
-for z in (-5, 5): truss((SX, T, z), (SX, 7.5, z))
-truss((SX, 7.5, -5), (SX, 7.5, 5))
-pars = ['pink', 'green', 'red', 'cyan', 'red']
-for i, c in enumerate(pars):
-    z = -4 + i * 2
-    cyl((SX, 7.25, z), (SX - 0.35, 6.85, z), 0.22, DARK, 'far', seg=14, r2=0.26)
-    sph((SX - 0.38, 6.82, z), 0.17, N_PAR[c], 'neon', s=(1, 1, 1))
-# пульт
-box((SX - 0.6, T + 0.55, 0), (0.9, 1.1, 3.2), DARK, 'far', bevel=0.03)
-box((SX - 0.6, T + 1.15, 0), (0.6, 0.08, 2.9), SPEAK, 'far')
-# колонки
-for sz in (-1, 1):
-    for k, hgt in enumerate([1.8, 1.3]):
-        y0 = T + (0 if k == 0 else 1.8)
-        box((SX - 0.2, y0 + hgt / 2, sz * 3.6), (1.2, hgt, 1.3), SPEAK, 'far', bevel=0.04)
-        cyl((SX - 0.81, y0 + hgt * 0.35, sz * 3.6), (SX - 0.86, y0 + hgt * 0.35, sz * 3.6), 0.42, CONE, 'far', seg=24)
-        cyl((SX - 0.81, y0 + hgt * 0.78, sz * 3.6), (SX - 0.86, y0 + hgt * 0.78, sz * 3.6), 0.22, CONE, 'far', seg=20)
-# логотип СТАЯ на пульте (SVG)
-before = set(bpy.data.objects)
-bpy.ops.preferences.addon_enable(module='io_curve_svg')
-bpy.ops.import_curve.svg(filepath=os.path.join(D, 'Logo.svg'))
-logo = [o for o in bpy.data.objects if o not in before and o.type == 'CURVE']
-for o in logo: o.select_set(True)
-bpy.context.view_layer.objects.active = logo[0]
-bpy.ops.object.join(); lg = bpy.context.object
-lg.data.extrude = 0.0006
-bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
-bpy.ops.object.convert(target='MESH'); lg = bpy.context.object
-w = lg.dimensions.x; k = 2.2 / w
-lg.scale = (k, k, k); lg.rotation_euler = (math.radians(90), 0, math.radians(-90))
-lg.location = P(SX - 1.07, T + 0.6, 0)
-bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
-done(lg, N_LOGO, 'neon')
+        for k in range(2): cyl(tuple(p0 + cs[k * 2]), tuple(p1 + cs[(k * 2 + 1) % 4]), 0.018, METAL, g, seg=4)
 
-# ---------- надувные буквы STAYA / POOL ----------
+def logo(center, size, rz):
+    before = set(bpy.data.objects)
+    bpy.ops.import_curve.svg(filepath=os.path.join(D, 'Logo.svg'))
+    parts = [o for o in bpy.data.objects if o not in before and o.type == 'CURVE']
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in parts: o.select_set(True)
+    bpy.context.view_layer.objects.active = parts[0]
+    bpy.ops.object.join(); lg = bpy.context.object; lg.data.extrude = 0.0006
+    bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
+    bpy.ops.object.convert(target='MESH'); lg = bpy.context.object
+    k = size / lg.dimensions.x
+    lg.scale = (k, k, k); lg.rotation_euler = (math.radians(90), 0, rz); lg.location = P(*center)
+    bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    return done(lg, N_LOGO, 'neon')
+bpy.ops.preferences.addon_enable(module='io_curve_svg')
+
+def speaker(x, y, z, h, ry):
+    box((x, y + h / 2, z), (1.2, h, 1.3), SPEAK, 'far', bevel=0.04, rz=ry)
+    dx, dz = math.sin(ry) * 0.62, math.cos(ry) * 0.62  # лицевая сторона
+    for f, r in [(0.35, 0.42), (0.78, 0.22)]:
+        cyl((x + dx, y + h * f, z + dz), (x + dx * 1.08, y + h * f, z + dz * 1.08), r, CONE, 'far', seg=20)
+
+# ---------- главная сцена: хиты, осьминог на крыше ----------
+SZ = -12.2; ST = T + 1.0
+box((0, T + 0.5, SZ), (16, 1.0, 5.4), DARK, 'far', bevel=0.04)
+box((0, ST + 0.02, SZ + 2.72), (16, 0.04, 0.06), N_PAR['pink'], 'neon')
+for x in (-8, 8):
+    for z in (SZ + 2.4, SZ - 2.4): truss((x, ST, z), (x, 9.2, z))
+for z in (SZ + 2.4, SZ - 2.4): truss((-8, 9.2, z), (8, 9.2, z))
+for x in (-8, 8): truss((x, 9.2, SZ + 2.4), (x, 9.2, SZ - 2.4))
+box((0, 9.75, SZ), (17.2, 0.5, 5.6), ROOF, 'far', bevel=0.05)
+box((0, ST + 3.4, SZ - 2.55), (15.6, 6.6, 0.2), DARK, 'far')  # задник
+for i in range(9):
+    c = ['#ff3fb4', '#8a3dff', '#2fe6ff'][i % 3]
+    box((-6.4 + i * 1.6, ST + 3.6, SZ - 2.42), (0.5, 5.6, 0.06), neon('strip_' + c[1:], c, 7), 'neon')
+pars = ['pink', 'green', 'red', 'cyan', 'red', 'green', 'pink']
+for i, c in enumerate(pars):
+    x = -6 + i * 2
+    cyl((x, 8.95, SZ + 2.4), (x, 8.55, SZ + 2.75), 0.22, DARK, 'far', seg=12, r2=0.26)
+    sph((x, 8.5, SZ + 2.8), 0.17, N_PAR[c], 'neon')
+box((0, ST + 0.55, SZ + 1.0), (3.4, 1.1, 0.9), DARK, 'far', bevel=0.03)
+box((0, ST + 1.13, SZ + 1.0), (2.9, 0.08, 0.6), SPEAK, 'far')
+logo((0, ST + 0.6, SZ + 1.47), 2.4, 0)
+for sx in (-1, 1):
+    speaker(sx * 6.6, ST, SZ + 0.6, 1.8, 0); speaker(sx * 6.6, ST + 1.8, SZ + 0.6, 1.3, 0)
+# надувные буквы на краю крыши
 FONT = bpy.data.fonts.load(os.path.join(D, 'fonts', 'unbounded-latin-900.ttf'))
 def inflated(word, m, center, size, ry=0.0, pressure=16):
     bpy.ops.object.text_add(location=(0, 0, 0)); t = bpy.context.object
@@ -247,14 +224,14 @@ def inflated(word, m, center, size, ry=0.0, pressure=16):
     t.rotation_euler = (math.radians(90), 0, 0)
     bpy.ops.object.convert(target='MESH'); o = bpy.context.object
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=False)
-    rm = o.modifiers.new('r', 'REMESH'); rm.mode = 'VOXEL'; rm.voxel_size = 0.028; bpy.ops.object.modifier_apply(modifier='r')
+    rm = o.modifiers.new('r', 'REMESH'); rm.mode = 'VOXEL'; rm.voxel_size = 0.03; bpy.ops.object.modifier_apply(modifier='r')
     cl = o.modifiers.new('cloth', 'CLOTH'); s = cl.settings
     s.quality = 6; s.mass = 0.3; s.use_pressure = True; s.uniform_pressure_force = pressure
     s.tension_stiffness = 6; s.compression_stiffness = 6; s.shear_stiffness = 4; s.bending_stiffness = 0.3; s.effector_weights.gravity = 0
     cl.point_cache.frame_start = 1; cl.point_cache.frame_end = 30
     for f in range(1, 31): sc.frame_set(f)
     bpy.ops.object.modifier_apply(modifier='cloth'); sc.frame_set(1)
-    dc = o.modifiers.new('d', 'DECIMATE'); dc.ratio = 0.55; bpy.ops.object.modifier_apply(modifier='d')
+    dc = o.modifiers.new('d', 'DECIMATE'); dc.ratio = 0.4; bpy.ops.object.modifier_apply(modifier='d')
     bpy.ops.object.origin_set(type='ORIGIN_GEOMETRY', center='BOUNDS')
     bb = o.dimensions
     o.scale = (size, size, size); o.rotation_euler = (0, 0, ry)
@@ -262,45 +239,103 @@ def inflated(word, m, center, size, ry=0.0, pressure=16):
     bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
     o.name = 'letters_' + word
     return done(o, m, 'gloss', smooth=True)
-inflated('STAYA', INF_PINK, (-7.2, T, -9.4), 3.0, ry=0.16)
-inflated('POOL', INF_CYAN, (6.8, T, -9.4), 3.2, ry=-0.16)
-# спасательный круг на букве L и мяч у буквы S
-torus((11.2, 2.6, -8.9), 0.6, 0.22, INF_WHITE, rot=(math.radians(70), 0, math.radians(-20)))
-sph((-11.6, T + 0.45, -7.6), 0.45, BALL, 'gloss')
+inflated('STAYA', INF_PINK, (-3.9, 10.0, SZ + 2.2), 1.75, ry=0.05)
+inflated('POOL', INF_CYAN, (4.4, 10.0, SZ + 2.2), 1.85, ry=-0.05)
+# осьминог сидит на крыше, щупальца свисают по ферме
+OC = (0, 15.2, SZ - 1.2)
+sph(OC, 4.6, INF_OCTO, 'gloss', s=(1, 1.18, 0.95), seg=48)
+for sx in (-1, 1):
+    sph((sx * 1.75, OC[1] - 0.6, OC[2] + 3.9), 1.2, INF_EYE, 'gloss')
+    sph((sx * 1.65 - 0.12, OC[1] - 0.65, OC[2] + 4.85), 0.62, INF_PUPIL, 'gloss')
+    sph((sx * 1.65 - 0.3, OC[1] - 0.4, OC[2] + 5.35), 0.18, INF_EYE, 'gloss')
+    sph((sx * 2.9, OC[1] - 2.1, OC[2] + 3.4), 0.5, INF_FLAM, 'gloss', s=(1.2, 0.6, 0.4))
+TENT = [
+    [(-3, 11, SZ), (-6.5, 10.6, SZ + 1.6), (-8.4, 8.6, SZ + 2.8), (-8.9, 5.5, SZ + 3.0), (-8.6, 3.2, SZ + 3.2), (-7.6, 2.6, SZ + 3.6)],
+    [(3, 11, SZ), (6.5, 10.6, SZ + 1.6), (8.4, 8.6, SZ + 2.8), (8.9, 5.0, SZ + 3.0), (8.6, 2.8, SZ + 3.2), (9.6, 2.4, SZ + 3.9)],
+    [(-3.5, 11, SZ - 2.4), (-8, 10.4, SZ - 3.4), (-10.5, 7, SZ - 3.6), (-11, 3, SZ - 3.2), (-10, 1.2, SZ - 2.2)],
+    [(3.5, 11, SZ - 2.4), (8, 10.4, SZ - 3.4), (10.5, 7, SZ - 3.6), (11, 3, SZ - 3.2), (10, 1.2, SZ - 2.2)],
+    [(-2, 11.5, SZ - 3), (-4, 14, SZ - 6.5), (-3, 18, SZ - 7.5), (-0.5, 20, SZ - 6.5)],
+    [(2.5, 12, SZ - 2.8), (6, 15.5, SZ - 3.5), (7.2, 19.5, SZ - 3.2), (5.6, 21.5, SZ - 2.4), (4.4, 20.8, SZ - 2)],
+]
+for pts in TENT: tube(pts, 1.0, INF_OCTO, 'gloss', taper=(1.05, 0.22), res=10)
+
+# ---------- электро-сцена вдали справа ----------
+EX, EZ = 43.0, -4.0
+box((EX, 0.6, EZ), (8, 1.2, 14), DARK, 'far', bevel=0.04)
+box((EX, 0.03, EZ), (22, 0.06, 24), mat('asphalt', srgb('#15131c'), 0.7), 'far')
+for z in (EZ - 7, EZ + 7):
+    for x in (EX - 3.4, EX + 3.4): truss((x, 1.2, z), (x, 10, z))
+for x in (EX - 3.4, EX + 3.4): truss((x, 10, EZ - 7), (x, 10, EZ + 7))
+truss((EX - 3.4, 10, EZ - 7), (EX + 3.4, 10, EZ - 7)); truss((EX - 3.4, 10, EZ + 7), (EX + 3.4, 10, EZ + 7))
+# LED-стена из квадратов
+LED = {c: neon('led_' + c[1:], c, 9) for c in ('#2f6bff', '#2fe6ff', '#ffffff', '#8a3dff')}
+rnd = random.Random(3)
+for iy in range(7):
+    for iz in range(13):
+        r = rnd.random(); c = '#2f6bff' if r < 0.45 else '#2fe6ff' if r < 0.75 else '#8a3dff' if r < 0.93 else '#ffffff'
+        if r > 0.97: continue
+        box((EX + 3.7, 1.9 + iy * 1.05, EZ - 6.3 + iz * 1.05), (0.06, 0.9, 0.9), LED[c], 'neon')
+box((EX + 3.85, 5.6, EZ), (0.2, 8, 14), DARK, 'far')
+box((EX - 1.2, 1.2 + 0.55, EZ), (0.9, 1.1, 3.2), DARK, 'far', bevel=0.03)
+box((EX - 1.66, 1.2 + 0.85, EZ), (0.03, 0.06, 3.0), N_PAR['cyan'], 'neon')
+logo((EX - 1.67, 1.2 + 0.55, EZ), 2.2, math.radians(-90))
+for sz in (-1, 1):
+    speaker(EX - 2.4, 1.2, EZ + sz * 5.2, 2.2, math.radians(-90)); speaker(EX - 2.4, 3.4, EZ + sz * 5.2, 1.6, math.radians(-90))
+for i in range(6):
+    z = EZ - 5 + i * 2
+    cyl((EX - 3.4, 9.75, z), (EX - 3.8, 9.35, z), 0.2, DARK, 'far', seg=12, r2=0.24)
+    sph((EX - 3.86, 9.3, z), 0.16, N_PAR['cyan' if i % 2 else 'pink'], 'neon')
+# надувной шлем робота на крыше электро-сцены
+HB = mat('inf_helmet', srgb('#14141c'), 0.12, coat=1)
+RC = (EX + 0.5, 13.2, EZ)
+sph(RC, 3.2, HB, 'gloss', s=(1, 1.08, 1.05), seg=48)
+cu = sph((RC[0] - 2.25, RC[1] + 0.1, RC[2]), 1.0, neon('visor', '#2fe6ff', 12), 'neon', s=(0.45, 0.85, 2.7), seg=32)
+for sz in (-1, 1): cyl((RC[0], RC[1], RC[2] + sz * 3.2), (RC[0], RC[1], RC[2] + sz * 3.6), 0.9, METAL, 'gloss', seg=24)
+inflated('ELECTRO', mat('inf_blue', srgb('#2f5bff'), 0.16, coat=1), (EX - 6.4, 0.05, EZ), 1.35, ry=math.radians(-90))
+
+# ---------- дом позади камеры: фасад на z = 19 ----------
+HZ = 19.0
+box((0, 4, HZ + 5), (32, 8, 10), STUCCO, 'far')
+box((-3, 10, HZ + 5.5), (22, 4, 9), STUCCO, 'far')
+box((0, 8.1, HZ + 5), (33, 0.4, 11), ROOF, 'far'); box((-3, 12.1, HZ + 5.5), (23, 0.4, 10), ROOF, 'far')
+box((0, 0.25, HZ - 2), (26, 0.5, 4), WOOD, 'far')
+for i, x in enumerate([-11, -5.2, 5.2, 11]):
+    box((x, 2.1, HZ - 0.03), (4.4, 3.2, 0.06), N_WARM if i % 2 else N_PINK, 'neon')
+    box((x, 2.1, HZ - 0.08), (0.15, 3.2, 0.12), ROOF, 'far')
+for i in range(5): box((-12 + i * 6, 6, HZ - 0.03), (3.4, 2, 0.06), N_VIO if i == 2 else N_WARM, 'neon')
+for i in range(3): box((-10 + i * 7, 10, HZ + 0.97), (4.5, 2.2, 0.06), N_WARM, 'neon')
+for sx in (-1, 1):
+    box((sx * 0.8, 2.4, HZ - 0.1), (1.55, 3.8, 0.16), DOOR, 'far', bevel=0.03)
+    box((sx * 0.15, 2.4, HZ - 0.22), (0.05, 0.6, 0.08), METAL, 'far')
+box((0, 4.42, HZ - 0.1), (3.6, 0.25, 0.3), ROOF, 'far')
+for sx in (-1, 1): sph((sx * 2.2, 3.6, HZ - 0.3), 0.16, N_BULB, 'neon')
 
 # ---------- реквизит у бассейна ----------
 def lounger(x, z, ry):
     m = Matrix.Translation(P(x, 0, z)) @ Matrix.Rotation(ry, 4, 'Z')
-    parts = []
-    parts.append(box((0, 0.42, 0.2), (0.72, 0.1, 1.5), STRIPE, 'near', bevel=0.02))
-    parts.append(box((0, 0.7, -0.8), (0.72, 0.1, 0.85), STRIPE, 'near', bevel=0.02))
+    parts = [box((0, 0.42, 0.2), (0.72, 0.1, 1.5), STRIPE, 'near', bevel=0.02), box((0, 0.7, -0.8), (0.72, 0.1, 0.85), STRIPE, 'near', bevel=0.02)]
     parts[-1].rotation_euler = (math.radians(-35), 0, 0)
     for sxx in (-1, 1):
         for zz in (-0.6, 0.85): parts.append(box((sxx * 0.32, 0.2, zz), (0.04, 0.4, 0.04), METAL, 'near'))
-    for o in parts:
-        o.matrix_world = m @ o.matrix_world
-for i in range(6): lounger(-9 + i * 3.6, 7.4, math.pi)
-for i in range(3): lounger(-14.2, -3 + i * 2.6, math.pi / 2)
-# красные стаканы, шлёпанцы
-for i in range(36):
-    a = random.random() * math.tau; rr = 13 + random.random() * 5
-    x, z = math.cos(a) * rr, math.sin(a) * rr * 0.55 + 1
-    if random.random() < 0.25:
-        o = cyl((x, T + 0.05, z - 0.065), (x, T + 0.05, z + 0.065), 0.05, RED, 'near', seg=12, r2=0.04)
-    else:
-        cyl((x, T, z), (x, T + 0.13, z), 0.04, RED, 'near', seg=12, r2=0.055)
+    for o in parts: o.matrix_world = m @ o.matrix_world
+for i in range(5): lounger(-9 + i * 3.4, 7.2, math.pi)
+for i in range(4): lounger(-14.5, -3.6 + i * 2.4, math.pi / 2)
+for i in range(40):
+    a = random.random() * math.tau; rr = 13 + random.random() * 6
+    x, z = math.cos(a) * rr, math.sin(a) * rr * 0.55
+    if 11.5 < x < 15.5: continue
+    cyl((x, T, z), (x, T + 0.13, z), 0.04, RED, 'near', seg=12, r2=0.055)
 for x, z, c in [(3, 6.4, '#2fe6ff'), (3.4, 6.5, '#2fe6ff'), (-4.5, -6.6, '#ff3fb4'), (-4.1, -6.4, '#ff3fb4')]:
     box((x, T + 0.02, z), (0.12, 0.03, 0.3), mat('flip' + c, srgb(c), 0.4), 'near', bevel=0.01)
-# надувной фламинго и круги на воде (вода на уровне 0.1)
 def flamingo(x, z, s, ry, mm):
     objs = [torus((0, 0.2, 0), 0.75, 0.32, mm, rot=(math.radians(90), 0, 0)), sph((0, 0.55, -0.55), 0.55, mm, 'gloss', s=(0.8, 0.7, 1.2)),
             tube([(0, 0.7, 0.55), (0, 1.4, 0.75), (0, 2.0, 0.45), (0, 2.2, 0.1)], 0.16, mm, 'gloss'), sph((0, 2.25, 0.15), 0.25, mm, 'gloss')]
     m = Matrix.Translation(P(x, 0.0, z)) @ Matrix.Rotation(ry, 4, 'Z') @ Matrix.Scale(s, 4)
     for o in objs: o.matrix_world = m @ o.matrix_world
 flamingo(-7, 1, 1.1, 0.5, INF_FLAM)
-torus((7.5, 0.15, 2.5), 0.75, 0.3, INF_YEL, rot=(math.radians(90), 0, 0))
-for (x, z), mm in zip([(-3.5, 3), (3.5, -1), (8, -3.5), (-8.5, -3)], [INF_PINK, INF_WHITE, INF_CYAN, INF_YEL]):
+for (x, z), mm in zip([(-4, 3.2), (5, -2.6), (8, 2.8), (-8.5, -3)], [INF_PINK, INF_WHITE, INF_CYAN, INF_YEL]):
     torus((x, 0.15, z), 0.6, 0.22, mm, rot=(math.radians(90), 0, 0))
+sph((6.5, 0.35, -1), 0.4, BALL, 'gloss')
 
 # ---------- пальмы, деревья, забор, гирлянды ----------
 def palm(x, z, h, lean, seed):
@@ -309,30 +344,29 @@ def palm(x, z, h, lean, seed):
     tube(pts, 1.0, TRUNK, 'far', taper=(0.24, 0.14), res=4)
     top = Vector(pts[-1])
     for i in range(10):
-        a = i / 10 * math.tau + rnd.random() * 0.3; L = 3.2 + rnd.random()
-        dx, dz = math.cos(a), math.sin(a)
-        fr = [(top.x, top.y, top.z), (top.x + dx * L * 0.45, top.y + 0.5, top.z + dz * L * 0.45), (top.x + dx * L, top.y - 1.2, top.z + dz * L)]
-        o = tube(fr, 1.0, LEAF, 'far', taper=(0.12, 0.02), res=6)
-        o.scale = (1, 1, 1)
-for i, (x, z) in enumerate([(-24, -6), (-30, 6), (-26, 16), (24, -8), (30, 4), (27, 15), (-20, -14), (22, -15)]):
+        a = i / 10 * math.tau + rnd.random() * 0.3; L = 3.2 + rnd.random(); dx, dz = math.cos(a), math.sin(a)
+        tube([(top.x, top.y, top.z), (top.x + dx * L * 0.45, top.y + 0.5, top.z + dz * L * 0.45), (top.x + dx * L, top.y - 1.2, top.z + dz * L)], 1.0, LEAF, 'far', taper=(0.12, 0.02), res=6)
+for i, (x, z) in enumerate([(-24, -8), (-30, 6), (-26, 15), (26, -18), (24, 12), (-20, -18), (34, 10), (52, 8), (52, -16)]):
     palm(x, z, 9 + (i % 3) * 1.6, (0.6 if i % 2 else -0.6, 0.3), i)
-for i in range(18):
-    sx = 1 if i % 2 else -1; x = sx * (34 + random.random() * 8); z = -30 + random.random() * 54; h = 6 + random.random() * 6
+for i in range(16):
+    sx = -1 if i % 3 else 1; x = sx * (36 + random.random() * 10) if sx < 0 else 60 + random.random() * 8; z = -30 + random.random() * 60; h = 6 + random.random() * 6
     cyl((x, 0, z), (x, h * 0.4, z), 0.3, TRUNK, 'far', seg=8)
     sph((x, h * 0.75, z), 2.4 + random.random(), TREE, 'far', s=(1, 1.3, 1), seg=12)
-for x in range(-40, 41, 2): box((x, 1.2, 24), (1.85, 2.4, 0.12), FENCE, 'far')
-for sx in (-1, 1):
-    for z in range(-30, 25, 2): box((sx * 40, 1.2, z), (0.12, 2.4, 1.85), FENCE, 'far')
-for x, z in [(-18, 12), (-4, 15), (18, 12)]: cyl((x, 0, z), (x, 6.5, z), 0.08, METAL, 'far', seg=8)
-strings = [((-16, 7.5, -19), (-18, 6.5, 12)), ((-6, 7.5, -19), (-4, 6.5, 15)), ((6, 7.5, -19), (-4, 6.5, 15)), ((16, 7.5, -19), (18, 6.5, 12)), ((-18, 6.5, 12), (-4, 6.5, 15)), ((-4, 6.5, 15), (18, 6.5, 12))]
+for x in range(-40, 66, 2): box((x, 1.2, -32), (1.85, 2.4, 0.12), FENCE, 'far')
+for z in range(-30, 34, 2): box((-40, 1.2, z), (0.12, 2.4, 1.85), FENCE, 'far')
+for x, z in [(-19, -6), (19, -7)]: cyl((x, 0, z), (x, 6.5, z), 0.08, METAL, 'far', seg=8)
+strings = [((-16, 7.5, HZ), (-19, 6.5, -6)), ((-6, 7.5, HZ), (-8, 9.0, SZ + 2.4)), ((6, 7.5, HZ), (8, 9.0, SZ + 2.4)), ((16, 7.5, HZ), (19, 6.5, -7)),
+           ((-19, 6.5, -6), (-8, 9.0, SZ + 2.4)), ((19, 6.5, -7), (8, 9.0, SZ + 2.4))]
 BULBS = []
 for a, c in strings:
     n = 22; pts = []
     for i in range(n + 1):
-        t = i / n; sag = math.sin(t * math.pi) * 2.2
+        t = i / n; sag = math.sin(t * math.pi) * 2.0
         q = (a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t - sag, a[2] + (c[2] - a[2]) * t); pts.append(q)
         if 0 < i < n: BULBS.append(q); sph((q[0], q[1] - 0.12, q[2]), 0.09, N_BULB if i % 3 else N_PAR['pink'], 'neon', seg=10)
     tube(pts, 0.012, DARK, 'far', res=2)
+import json
+json.dump({'bulbs': BULBS}, open(os.path.join(D, 'pool_points.json'), 'w'))
 
 # ---------- свет ----------
 w = bpy.data.worlds.new('night'); sc.world = w; w.use_nodes = True
@@ -347,16 +381,18 @@ def light(kind, loc, color, energy, size=1.0, target=None, spot=None):
         e = bpy.data.objects.new('t', None); e.location = P(*target); G['helpers'].objects.link(e)
         c = L.constraints.new('TRACK_TO'); c.target = e; c.track_axis = 'TRACK_NEGATIVE_Z'; c.up_axis = 'UP_Y'
     return link(L, 'lights')
-# луна — со стороны +Z (луна в сцене висит над въездом)
-sun = light('SUN', (0, 58, 95), srgb('#a9b8ff'), 2.6, target=(0, 0, 0)); sun.data.angle = math.radians(2)
+sun = light('SUN', (-25, 40, -110), srgb('#a9b8ff'), 2.4, target=(0, 0, 0)); sun.data.angle = math.radians(2)
 for x in range(-8, 9, 4): light('POINT', (x, -0.9, 0), srgb('#2fe6ff'), 700, size=0.4)
-light('AREA', (0, 9, -10), srgb('#ff4fb8'), 2600, size=6, target=(0, 1, -9))
+cols = {'pink': '#ff3fb4', 'green': '#39ff6a', 'red': '#ff2a2a', 'cyan': '#2fe6ff'}
 for i, c in enumerate(pars):
-    col = {'pink': '#ff3fb4', 'green': '#39ff6a', 'red': '#ff2a2a', 'cyan': '#2fe6ff'}[c]
-    light('SPOT', (SX - 0.45, 6.75, -4 + i * 2), srgb(col), 2200, size=0.2, target=(6 - i, 0.3, (-4 + i * 2) * 1.6), spot=math.radians(32))
-light('AREA', (6, 22, -26), srgb('#b04dff'), 26000, size=14, target=OC)
-light('AREA', (0, 4, -16), srgb('#ffb36b'), 1400, size=8, target=(0, 2, -19))
-for i, q in enumerate(BULBS[::6]): light('POINT', (q[0], q[1] - 0.3, q[2]), srgb('#ffd28a'), 60, size=0.2)
+    x = -6 + i * 2
+    light('SPOT', (x, 8.45, SZ + 2.85), srgb(cols[c]), 1800, size=0.2, target=(x * 1.4, 0.3, -1 + (i % 3) * 2), spot=math.radians(30))
+light('AREA', (0, 6, SZ + 6), srgb('#ff4fb8'), 2200, size=8, target=(0, 4, SZ))
+light('AREA', (0, 22, SZ + 10), srgb('#b04dff'), 9000, size=10, target=OC)
+light('AREA', (EX - 10, 8, EZ), srgb('#2f6bff'), 9000, size=10, target=(EX, 4, EZ))
+light('AREA', (EX - 6, 18, EZ), srgb('#2fe6ff'), 3000, size=6, target=RC)
+light('AREA', (0, 4, HZ - 4), srgb('#ffb36b'), 1400, size=8, target=(0, 2, HZ))
+for q in BULBS[::6]: light('POINT', (q[0], q[1] - 0.3, q[2]), srgb('#ffd28a'), 60, size=0.2)
 
 sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'
 sc.view_settings.view_transform = 'AgX'; sc.view_settings.look = 'AgX - Punchy'

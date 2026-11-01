@@ -4,7 +4,7 @@ D = os.path.dirname(os.path.abspath(__file__))
 bpy.ops.wm.open_mainfile(filepath=os.path.join(D, 'pool.blend'))
 sc = bpy.context.scene
 def P(x, y, z): return Vector((x, -z, y))
-shots = {'pool': ((0, 4.2, 13), (0, 1.8, -10)), 'high': ((0, 24, 76), (0, 4, 0)), 'stage': ((-2, 3.5, 6), (14, 3, 0))}
+shots = {'letters': ((30, 2.2, -4), (37, 1.2, -4)), 'emerge': ((0, 1.7, 4.6), (0, 7.5, -12)), 'electro': ((13.8, 1.8, 1), (40, 3.5, -4)), 'house': ((8, 2.0, 12), (0, 2.3, 19)), 'wide': ((-20, 18, 30), (5, 3, -6))}
 cam = bpy.data.objects.new('cam', bpy.data.cameras.new('cam')); sc.collection.objects.link(cam); sc.camera = cam
 cam.data.sensor_fit = 'VERTICAL'; cam.data.angle_y = math.radians(72)
 sc.render.resolution_x = 540; sc.render.resolution_y = 960
