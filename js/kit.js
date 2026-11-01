@@ -5,6 +5,8 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 
 export { THREE };
 
@@ -565,4 +567,11 @@ export function moonMesh(radius, lightDir = null, o = {}) {
     }`,
   });
   return new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 40), mat);
+}
+
+/* ---------- GLB из Blender (сжатие meshopt через gltfpack) ---------- */
+let _gltf;
+export function loadGLB(url) {
+  if (!_gltf) { _gltf = new GLTFLoader(); _gltf.setMeshoptDecoder(MeshoptDecoder); }
+  return _gltf.loadAsync(url);
 }
