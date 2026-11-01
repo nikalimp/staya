@@ -12,7 +12,7 @@ const SCENES = [
   { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.4, out: 'black' },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut' },
   { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 1.15, out: 'black' },
-  { id: 'office', load: () => import('./scenes/office.js'), track: 'music/06-office.mp3', w: 0.8, out: null },
+  { id: 'office', load: () => import('./scenes/office.js'), track: 'music/05-phuket.mp3', w: 0.8, out: null },
 ];
 // Кнопки финала. Пустой href — кнопка не показывается.
 const LINKS = [
@@ -173,10 +173,13 @@ const audio = {
   init() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC || this.ctx) return;
     this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination);
+    // одна дорожка на файл: если у соседних сцен один трек (вилла → офис), музыка не прерывается
+    const bySrc = {};
     this.tracks = SCENES.map((s) => {
+      if (bySrc[s.track]) return bySrc[s.track];
       const el = new Audio(); el.src = s.track; el.loop = true; el.preload = 'none';
       const tr = { el, gain: null, ok: true }; el.addEventListener('error', () => (tr.ok = false));
-      return tr;
+      return (bySrc[s.track] = tr);
     });
   },
   wire(tr) {
@@ -187,23 +190,24 @@ const audio = {
   go(i) {
     this.idx = i; if (!this.ctx || !this.on) return;
     const now = this.ctx.currentTime;
-    this.tracks.forEach((tr, k) => {
-      if (k === i) {
+    const curTr = this.tracks[i];
+    [...new Set(this.tracks)].forEach((tr) => {
+      if (tr === curTr) {
         if (!tr.ok) return; this.wire(tr);
         if (tr.el.preload === 'none') { tr.el.preload = 'auto'; tr.el.load(); }
         tr.el.play().catch(() => {});
         tr.gain.gain.cancelScheduledValues(now); tr.gain.gain.setTargetAtTime(1, now, 0.6);
       } else if (tr.gain) {
         tr.gain.gain.cancelScheduledValues(now); tr.gain.gain.setTargetAtTime(0, now, 0.4);
-        setTimeout(() => { if (this.idx !== k) tr.el.pause(); }, 2500);
+        setTimeout(() => { if (this.tracks[this.idx] !== tr) tr.el.pause(); }, 2500);
       }
     });
-    const nx = this.tracks[i + 1]; if (nx && nx.ok && nx.el.preload === 'none') { nx.el.preload = 'auto'; nx.el.load(); }
+    const nx = this.tracks[i + 1]; if (nx && nx !== curTr && nx.ok && nx.el.preload === 'none') { nx.el.preload = 'auto'; nx.el.load(); }
   },
   setOn(v) {
     this.on = v; if (!this.ctx) return;
     if (v) { this.ctx.resume(); this.master.gain.setTargetAtTime(1, this.ctx.currentTime, 0.2); this.go(this.idx < 0 ? 0 : this.idx); }
-    else { this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15); setTimeout(() => !this.on && this.tracks.forEach((t) => t.el.pause()), 600); }
+    else { this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15); setTimeout(() => !this.on && new Set(this.tracks).forEach((t) => t.el.pause()), 600); }
   },
 };
 // вкладка скрыта — музыка на паузе
