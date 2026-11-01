@@ -155,18 +155,87 @@ export function build({ THREE, kit, font, renderer }) {
   scene.add(new THREE.HemisphereLight('#ff6a4a', '#1a0505', 0.45));
   const L = (c, i, p, d = 60) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
   L('#ff2a14', 650, [0, 12, 8]); L('#ff8a2a', 420, [0, 9, -13]); L('#ffb15a', 260, [0, 15, 3], 30); L('#4a5cff', 160, [-17, 12, 0], 30); L('#4a5cff', 160, [17, 12, 0], 30);
+  /* --- парадный вход: стена и двери, которые открываются скроллом --- */
+  const FZ = 24.6;
+  b.add(G.box(17.8, 26, 0.8), WALL, 'matte', M([-12.1, 13, FZ])); b.add(G.box(17.8, 26, 0.8), WALL, 'matte', M([12.1, 13, FZ]));
+  b.add(G.box(6.4, 17.5, 0.8), WALL, 'matte', M([0, 17.25, FZ]));
+  b.add(G.tor(3.4, 0.3, 8, 28, Math.PI), GOLD, 'metal', M([0, 8.5, FZ - 0.45]));
+  for (const sx of [-1, 1]) b.add(G.box(0.5, 8.5, 0.9), GOLD, 'metal', M([sx * 3.35, 4.25, FZ - 0.45]));
+  const doorMat = new THREE.MeshPhysicalMaterial({ color: '#2a0d06', roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 });
+  const panelMat = new THREE.MeshPhysicalMaterial({ color: '#4a1608', roughness: 0.35, clearcoat: 1 });
+  const goldMat = new THREE.MeshStandardMaterial({ color: GOLD, metalness: 1, roughness: 0.25 });
+  const leaves = [-1, 1].map((sx) => {
+    const g = new THREE.Group(); g.position.set(sx * 3.1, 0, FZ);
+    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.userData.dynamic = true; g.add(m); };
+    add(kit.G.rbox(3.1, 8.4, 0.25, 0.04), doorMat, -sx * 1.55, 4.2, 0);
+    for (const y of [1.8, 4.6, 7.2]) for (const zz of [-0.14, 0.14]) add(new THREE.BoxGeometry(2.3, 1.9, 0.04), panelMat, -sx * 1.55, y, zz);
+    for (const zz of [-0.2, 0.2]) add(new THREE.SphereGeometry(0.13, 12, 8), goldMat, -sx * 2.75, 4.2, zz);
+    scene.add(g); return { g, sx };
+  });
+  // свет из-под дверей, пока закрыто
+  b.add(G.box(6, 0.04, 0.1), '#ff8a2a', 'neon', M([0, 0.03, FZ - 0.3]));
+
+  /* --- телефон на галерее 2-го этажа: пост с фото следующей сцены --- */
+  const PH = [14.5, 13.1, 0.3], phRy = -2.18, nx = Math.sin(phRy), nz = Math.cos(phRy);
+  b.push(M(PH, [0, phRy, 0]));
+  b.add(G.rbox(2.7, 5.4, 0.3, 0.34, 3), '#0b0b10', 'gloss');
+  b.add(G.rbox(2.76, 5.46, 0.18, 0.35, 3), '#d8c8a8', 'metal', M([0, 0, -0.08]));
+  b.add(G.box(0.4, 2.7, 0.4), '#0b0b10', 'plastic', M([0, -2.6 - 0.2, -0.6], [0.2, 0, 0]));
+  b.pop();
+  glows.push([PH[0] + nx * 1.2, PH[1], PH[2] + nz * 1.2, '#ffb36b', 6, 0.3]);
+  const ui = kit.canvasTex(512, 1024, (x, w, h) => {
+    x.fillStyle = '#0d0d10'; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#ff3fb4'; x.beginPath(); x.arc(52, 70, 28, 0, 7); x.fill();
+    x.fillStyle = '#0d0d10'; x.beginPath(); x.arc(52, 70, 23, 0, 7); x.fill();
+    x.fillStyle = '#fff'; x.beginPath(); x.arc(52, 70, 19, 0, 7); x.fill();
+    x.font = '800 26px Manrope, sans-serif'; x.fillStyle = '#fff'; x.textAlign = 'left'; x.textBaseline = 'middle';
+    x.fillText('stayaekb', 96, 62); x.font = '600 19px Manrope, sans-serif'; x.fillStyle = '#9a9aa4'; x.fillText('Phuket, Thailand', 96, 90);
+    x.fillStyle = '#fff'; x.font = '700 30px Manrope, sans-serif'; x.fillText('•••', 440, 66);
+    // иконки под фото
+    const y0 = 760;
+    x.fillStyle = '#ff2a55'; x.beginPath(); x.moveTo(52, y0 + 14); x.bezierCurveTo(22, y0 - 6, 30, y0 - 30, 52, y0 - 14); x.bezierCurveTo(74, y0 - 30, 82, y0 - 6, 52, y0 + 14); x.fill();
+    x.strokeStyle = '#fff'; x.lineWidth = 4;
+    x.beginPath(); x.arc(122, y0 - 6, 18, 0.6, 7.1); x.stroke();
+    x.beginPath(); x.moveTo(170, y0 - 22); x.lineTo(206, y0 - 6); x.lineTo(170, y0 + 10); x.closePath(); x.stroke();
+    x.font = '800 26px Manrope, sans-serif'; x.fillStyle = '#fff'; x.fillText('12 847 отметок «Нравится»', 26, y0 + 56);
+    x.font = '600 23px Manrope, sans-serif'; x.fillText('stayaekb', 26, y0 + 96); x.fillStyle = '#d8d8e0'; x.fillText('Следующая остановка — Пхукет 🌴', 140, y0 + 96);
+    x.fillStyle = '#7a7a84'; x.font = '600 20px Manrope, sans-serif'; x.fillText('Посмотреть все комментарии (318)', 26, y0 + 134);
+  });
+  const uiM = kit.screen(2.45, 5.1, ui, [PH[0] + nx * 0.16, PH[1], PH[2] + nz * 0.16], [0, phRy, 0]);
+  scene.add(uiM);
+  const ph = kit.canvasTex(256, 256, (x, w, h) => { const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#2a1a5a'); g.addColorStop(0.5, '#ff6a8a'); g.addColorStop(1, '#ffb36b'); x.fillStyle = g; x.fillRect(0, 0, w, h); });
+  const PY = 0.35, photoC = [PH[0] + nx * 0.17, PH[1] + PY, PH[2] + nz * 0.17];
+  const photo = kit.screen(2.45, 2.45, ph, photoC, [0, phRy, 0]);
+  scene.add(photo);
+
   scene.add(kit.glowPoints(glows));
   scene.add(b.build());
 
+  const P = (k) => [photoC[0] + nx * k, photoC[1], photoC[2] + nz * k];
   const keys = [
-    { p: [0, 2.2, 22.5], l: [0, 4.5, 0], t: 0 },
-    { p: [0, 3, 14.5], l: [0, 5.5, -10] },
-    { p: [-1.5, 3.4, 5.5], l: [0, 7, -16] },
-    { p: [0, 3.6, -0.8], l: [0, 8.5, -20], t: 0.5 },
-    { p: [0, 4.4, -6], l: [0, 9, -20] },
-    { p: [0, 6.3, -10.5], l: [0, 10, -21] },
-    { p: [0, 8.6, -15.2], l: [0, 10.2, -22], t: 0.86 },
-    { p: [0, 10.2, -19.3], l: [0, 10.4, -26], t: 1 },
+    // перед закрытыми дверями — двери открываются
+    { p: [0, 3.6, 29.2], l: [0, 3.6, 20], t: 0 },
+    { p: [0, 3.6, 28.6], l: [0, 3.8, 20], t: 0.13 },
+    { p: [0, 3.2, 22], l: [0, 4.8, 0], t: 0.24 },
+    { p: [0, 3.2, 12], l: [0, 6, -10] },
+    { p: [0, 3.6, 0.5], l: [0, 8, -16], t: 0.42 },
+    // вверх по центральному маршу, на площадке — вправо
+    { p: [0, 4.6, -6], l: [0, 8.5, -16] },
+    { p: [0, 7, -11], l: [2, 8.5, -16] },
+    { p: [1.2, 8.3, -15.2], l: [8, 9, -14], t: 0.6 },
+    // по правому маршу на второй этаж
+    { p: [6.6, 8.6, -14.6], l: [8.6, 10.5, -8] },
+    { p: [8.6, 9.6, -12], l: [8.8, 11.6, -4] },
+    { p: [8.8, 11.6, -7.6], l: [11, 12.8, -1.5], t: 0.78 },
+    { p: [10, 12.8, -3.8], l: photoC },
+    // к экрану телефона и внутрь фотографии
+    { p: P(2.6), l: photoC, t: 0.9 },
+    { p: P(1.1), l: photoC, t: 0.96 },
+    { p: P(0.42), l: photoC, t: 1 },
   ];
-  return { scene, cam: kit.camPath(keys) };
+  const update = (t) => {
+    const k = Math.min(1, Math.max(0, (t - 0.02) / 0.13)), a = (k * k * (3 - 2 * k)) * 1.75;
+    leaves.forEach(({ g, sx }) => (g.rotation.y = sx < 0 ? a : -a));
+  };
+  return { scene, cam: kit.camPath(keys), update, preview: { mesh: photo, w: 512, h: 512 } };
 }

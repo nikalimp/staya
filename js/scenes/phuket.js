@@ -52,6 +52,15 @@ export function build({ THREE, kit, font, renderer }) {
   for (let i = 0; i < 5; i++) { b.add(G.box(4.6, 5, 0.1), '#ffcf8a', 'neon', M([-11 + i * 5.5, 2.8, 8.95])); b.add(G.box(0.15, 5.4, 0.2), '#3a2e2a', 'plastic', M([-13.75 + i * 5.5, 2.8, 8.95])); }
   for (let i = 0; i < 3; i++) b.add(G.box(5.4, 3, 0.1), i === 1 ? '#ff7ac8' : '#ffd8a0', 'neon', M([-9 + i * 6, 8.5, 6.95]));
   glows.push([0, 3, 8.6, '#ffb36b', 16, 0.25]);
+  // обратная и боковые стороны виллы: окна, сад, пальмы — для облёта
+  for (let i = 0; i < 5; i++) b.add(G.box(4, 3.6, 0.1), i % 2 ? '#ffcf8a' : '#ff8ad0', 'neon', M([-11 + i * 5.5, 2.8, 21.05]));
+  for (let i = 0; i < 3; i++) b.add(G.box(4.4, 2.2, 0.1), '#ffd8a0', 'neon', M([-9 + i * 6, 8.5, 20.05]));
+  for (const sx of [-1, 1]) for (let i = 0; i < 2; i++) b.add(G.box(0.1, 3.4, 3.6), '#ffcf8a', 'neon', M([sx * 14.05, 2.8, 11.5 + i * 6]));
+  b.add(G.box(70, 0.3, 34), '#1f4a2e', 'plastic', M([0, -0.1, 38]));
+  b.add(G.box(8, 0.35, 3), '#8a6a50', 'plastic', M([0, 0, 22.8]));
+  [[-20, 28], [-8, 34], [6, 30], [18, 36], [26, 24], [-28, 40], [12, 44]].forEach(([x, z], i) => kit.palm(b, [x, 0, z], 9 + (i % 3) * 2, [(i % 2 ? 0.6 : -0.6), 0.3], { seed: i * 1.3, leaf: '#1a4a34', scale: 1.1 }));
+  for (let i = 0; i < 18; i++) { const a2 = (i / 18) * Math.PI * 2; glows.push([Math.cos(a2) * 9, 0.4, 36 + Math.sin(a2) * 6, i % 2 ? '#ffb36b' : '#ff6fd0', 0.8, 1.6]); }
+
   kit.text3d(b, font, 'PHUKET', { size: 0.9, color: '#ff4fb8', p: [8.6, 7.6, 7.1], kind: 'neon', bevel: 0.0, depth: 0.08 });
   glows.push([8.6, 8, 7.3, '#ff4fb8', 6, 0.5]);
   // павильон с фиолетовой LED-крышей
@@ -88,16 +97,20 @@ export function build({ THREE, kit, font, renderer }) {
   const w = kit.water(24, 12, '#2bb6e8', { tile: 4, ei: 0.45, emissive: '#1a8fd0', opacity: 0.88 });
   w.position.set(0, -0.06, -4); scene.add(w);
 
-  const keys = [
-    { p: [-31, 9, 9], l: [-6, 1, -8], t: 0 },
-    { p: [-20, 7.4, 8.5], l: [0, 1, -10] },
-    { p: [-6, 4.4, 4.5], l: [2, 1, -20] },
-    { p: [5, 3, -2], l: [0, 1.5, -40], t: 0.48 },
-    { p: [1, 2, -9.2], l: [0, 2, -80] },
-    { p: [0, 1.2, -22], l: [0, 6, -220], t: 0.72 },
-    { p: [0, 4.5, -70], l: [0, 12, -330] },
-    { p: [0, 10, -170], l: SUN, t: 0.94 },
-    { p: [0, 12.5, -280], l: SUN, t: 1 },
-  ];
+  /* --- камера: облёт виллы по кругу и влёт в дом --- */
+  const C = [0, 4, 8], RR = 40, a0 = -0.55, a1 = Math.PI * 2;
+  const orb = (a, h) => [C[0] + Math.sin(a) * RR, h, C[2] - Math.cos(a) * RR];
+  const keys = [];
+  const n = 11;
+  for (let k = 0; k <= n; k++) {
+    const u = k / n, a = a0 + (a1 - a0) * u;
+    keys.push({ p: orb(a, 21 - 7 * u), l: [C[0], C[1] + 1 - u, C[2]], t: k === 0 ? 0 : k === n ? 0.72 : undefined });
+  }
+  keys.push(
+    { p: [0, 6, -14], l: [0, 3, 9] },
+    { p: [0, 3, -3], l: [0, 2.8, 9], t: 0.88 },
+    { p: [0, 2.8, 5.5], l: [0, 2.8, 12] },
+    { p: [0, 2.8, 8.6], l: [0, 2.8, 12], t: 1 },
+  );
   return { scene, cam: kit.camPath(keys) };
 }
