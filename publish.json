@@ -1,0 +1,15 @@
+{
+  "project": "STAYA",
+  "repo": "nikalimp/staya",
+  "site_dir": ".",
+  "url": "https://staya.nikalimp.ru",
+  "adapter": "ssh-ftp",
+  "mode": "approval",
+  "content_dir": "content",
+  "version": 1,
+  "notes": "Статичный сайт на Three.js без бандлера: npm run build копирует файлы в out/. Хостинг REG.RU — из Actions работает FTP, FTP_DIR = www/staya.nikalimp.ru/. Контент-завода нет.",
+  "out_dir": "out",
+  "app_path": "",
+  "rsync_exclude": "",
+  "manual_script": ""
+}
