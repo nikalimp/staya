@@ -17,7 +17,7 @@ const SCENES = [
 // Кнопки финала. Пустой href — кнопка не показывается.
 const LINKS = [
   { label: 'Instagram', href: 'https://www.instagram.com/stayaekb/', cls: 'main' },
-  { label: 'Telegram', href: '' },
+  { label: 'Telegram', href: 'https://t.me/+JP1gsoNXGpkzZDIy' },
   { label: 'VK', href: '' },
   { label: 'Почта', href: '' },          // mailto:…
   { label: 'Сайт — Nik Alimp', href: 'https://nikalimp.ru', cls: 'dev' },
