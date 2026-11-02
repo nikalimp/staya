@@ -1,16 +1,17 @@
 // 02 · STAYA POOL — двор коттеджа: бассейн, главная сцена с хитами и осьминогом, электро-сцена вдали, дом.
 // Геометрия и свет собраны в Blender и запечены в текстуры (Cycles): scripts/blender/pool_build.py, pool_bake.py.
 // Здесь: загрузка GLB, материалы по группам, живая вода, люди, свечение и путь камеры.
-// Путь: выныриваем в бассейне лицом к сцене → вылезаем по лестнице → поворот к электро-сцене → к дверям дома.
+// Путь от первого лица: короткий заплыв под водой → выныриваем лицом к сцене → плывём к лестнице →
+// пешком вдоль бассейна, взгляд на электро-сцену → бар: герой берёт стакан и подносит ко рту → темнота.
 const BASE = 'world/pool/';
 const T = 0.3, SZ = -12.2, EX = 43, EZ = -4, HZ = 19;
 
 import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
-export async function build({ THREE, kit, renderer, mobile }) {
+export async function build({ THREE, kit, font, renderer, mobile }) {
   const { Builder } = kit;
   const scene = new THREE.Scene();
   const NIGHT = new THREE.Color('#0d0b2a'), DEEP = new THREE.Color('#0a5f8f');
-  scene.fog = new THREE.FogExp2(DEEP.clone(), 0.3);
+  scene.fog = new THREE.FogExp2(DEEP.clone(), 0.12);
   scene.environment = kit.env(renderer, ['#5b4dff', '#2fe6ff', '#ff3fb4', '#ffd28a', '#9fb2ff'], '#070818');
   scene.add(kit.sky(['#2a1a5e', '#120f3c', '#04061a', 0.05]));
   scene.add(kit.stars(1200, 400, 0.12, 3));
@@ -87,6 +88,27 @@ export async function build({ THREE, kit, renderer, mobile }) {
     const a = -0.75 + i * 0.166;
     kit.laser(b, [EX - 3.6, 9.4, EZ + (i - 4.5) * 0.9], [EX - 34, 3 + (i % 3) * 3, EZ + Math.sin(a) * 30], i % 2 ? '#2fe6ff' : '#8a3dff');
   }
+  /* --- бар у дома: стойка, бутылки, неон, стаканы --- */
+  const BX = 12.6, BZ = 12.3, BT = T + 1.1;
+  b.add(kit.G.rbox(4.2, 1.1, 1.0, 0.06), '#f4eef8', 'gloss', kit.M([BX, T + 0.55, BZ]));
+  b.add(kit.G.rbox(4.5, 0.08, 1.25, 0.03), '#1a1422', 'gloss', kit.M([BX, BT + 0.04, BZ]));
+  b.add(kit.G.box(4.2, 0.06, 0.06), '#ff3fb4', 'neon', kit.M([BX, T + 0.12, BZ - 0.53]));
+  b.add(kit.G.box(4.4, 2.6, 0.3), '#2a1a3a', 'plastic', kit.M([BX, T + 1.3, BZ + 1.9]));
+  for (const y of [1.6, 2.3]) b.add(kit.G.box(4.0, 0.05, 0.3), '#f4eef8', 'gloss', kit.M([BX, T + y, BZ + 1.65]));
+  for (let i = 0; i < 18; i++) {
+    const x = BX - 1.8 + (i % 9) * 0.45, y = T + (i < 9 ? 1.63 : 2.33), c = kit.pick(['#2fe6ff', '#ff3fb4', '#ffd23f', '#39ff9a', '#b45cff'], i * 7);
+    b.add(kit.G.cyl(0.06, 0.07, 0.3, 10), c, 'glass', kit.M([x, y + 0.15, BZ + 1.65]));
+    b.add(kit.G.cyl(0.02, 0.03, 0.1, 8), c, 'glass', kit.M([x, y + 0.35, BZ + 1.65]));
+  }
+  kit.text3d(b, font, 'BAR', { size: 0.55, color: '#ff3fb4', kind: 'neon', p: [BX, T + 2.75, BZ + 1.72], r: [0, Math.PI, 0], bevel: 0.01, depth: 0.04 });
+  glows.push([BX, T + 3, BZ + 1.5, '#ff3fb4', 3.4, 0.6], [BX, T + 0.12, BZ - 0.6, '#ff3fb4', 2, 0.6]);
+  // стаканы на стойке; один (ближний) — тот, что возьмёт герой
+  const GL = [BX - 0.15, BT + 0.08, BZ - 0.32];
+  [[-1.2, 0.1], [-0.7, -0.2], [0.5, -0.1], [0.9, 0.2], [1.4, -0.25], [-1.6, -0.3]].forEach(([dx, dz], i) => {
+    b.add(kit.G.cyl(0.042, 0.034, 0.12, 16, true), '#dff6ff', 'glass', kit.M([BX + dx, BT + 0.14, BZ + dz]));
+    b.add(kit.G.cyl(0.038, 0.034, 0.08, 14), kit.pick(['#ff3fb4', '#2fe6ff', '#ffb23f', '#2a0812'], i), 'gloss', kit.M([BX + dx, BT + 0.12, BZ + dz]));
+  });
+  const hero = kit.drink(); scene.add(hero.group);
   scene.add(b.build());
 
   /* --- свет для людей (запечённый двор от него не зависит) --- */
@@ -112,29 +134,43 @@ export async function build({ THREE, kit, renderer, mobile }) {
   }
   scene.add(kit.glowPoints(glows));
 
-  /* --- камера --- */
-  const STAGE = [0, 6.5, SZ];
+  /* --- камера: от первого лица --- */
+  const STAGE = [0, 6.5, SZ], EYE = T + 1.62;
   const keys = [
-    // под водой → выныриваем лицом к сцене
-    { p: [0, -1.25, 4.4], l: [0, 1.5, -6], t: 0 },
-    { p: [0, -0.5, 4.2], l: [0, 3, -8] },
-    { p: [0, 0.55, 4.1], l: [0, 5.5, -12], t: 0.1 },
-    { p: [0, 0.6, 4.0], l: [0, 7, -12] },
-    { p: [0.4, 0.62, 3.7], l: STAGE, t: 0.24 },
-    // плывём к лестнице справа и вылезаем
-    { p: [5.5, 0.6, 0.2], l: [8, 3, -8] },
-    { p: [9.6, 0.75, -1.6], l: [13, 1.6, -1.6], t: 0.4 },
-    { p: [12.4, 1.8, -1.4], l: [20, 2, -2.5] },
-    // поворот: вдалеке электро-сцена
-    { p: [13.6, 1.8, -0.2], l: [EX, 4, EZ], t: 0.52 },
-    { p: [14.1, 1.8, 1.8], l: [EX, 5, EZ + 1], t: 0.64 },
-    // обходим бассейн к дому
-    { p: [14.2, 1.8, 6.4], l: [6, 1.9, 14] },
-    { p: [10.6, 1.9, 11.5], l: [0, 2.3, HZ], t: 0.8 },
-    { p: [4, 2.1, 15.2], l: [0, 2.35, HZ + 2] },
-    { p: [0, 2.35, 17.6], l: [0, 2.35, HZ + 6], t: 0.95 },
-    { p: [0, 2.35, 18.6], l: [0, 2.35, HZ + 6], t: 1 },
+    // короткий заплыв под водой → выныриваем лицом к сцене
+    { p: [-6.2, -1.15, 3.4], l: [0, -1.2, 1.5], t: 0 },
+    { p: [-2.6, -1.0, 3.3], l: [1, -0.6, 0], t: 0.06 },
+    { p: [-0.6, -0.4, 3.4], l: [0, 2, -8] },
+    { p: [0, 0.55, 3.6], l: [0, 5.5, -12], t: 0.12 },
+    { p: [0, 0.6, 3.5], l: [0, 7, -12] },
+    { p: [0.4, 0.6, 3.3], l: STAGE, t: 0.24 },
+    // плывём к лестнице справа и выбираемся
+    { p: [5.5, 0.58, 0.4], l: [9, 0.9, -1.6] },
+    { p: [9.7, 0.75, -1.6], l: [13, 1.6, -1.6], t: 0.36 },
+    { p: [11.9, EYE, -1.5], l: [18, EYE, -2], t: 0.41 },
+    // пешком: поворот головы к электро-сцене
+    { p: [13.2, EYE, -0.6], l: [EX, 4, EZ], t: 0.47 },
+    { p: [13.8, EYE, 1.4], l: [EX, 4.5, EZ + 1], t: 0.57 },
+    // вдоль бассейна к бару
+    { p: [14.1, EYE, 5.2], l: [12.8, 1.3, 12.3], t: 0.68 },
+    { p: [13.1, EYE, 8.8], l: [12.5, 1.25, 12.2], t: 0.78 },
+    { p: [12.5, EYE, 10.9], l: [12.45, 1.2, 12.1], t: 0.83 },
+    { p: [12.5, EYE, 11.0], l: [12.45, 1.1, 11.9], t: 1 },
   ];
+  const path = kit.humanize(kit.camPath(keys), { walk: [[0.41, 0.83]], swim: [[0.24, 0.36]] });
+  // стакан: со стойки в руку (0.84–0.89), затем ко рту (до 0.97) — кадр тонет в тёмном напитке
+  const ease = (x) => x * x * (3 - 2 * x), cl = (x) => Math.min(1, Math.max(0, x));
+  const placeGlass = (t) => {
+    if (t < 0.84) { hero.group.position.set(...GL); hero.group.quaternion.identity(); hero.hand.visible = false; return; }
+    const c = path(t); hero.hand.visible = t > 0.865;
+    const a = ease(cl((t - 0.84) / 0.05)), m = ease(cl((t - 0.89) / 0.08));
+    if (a < 1) {
+      hero.at(c, [0.16, -0.32, -0.55], 0);
+      const p1 = hero.group.position.clone();
+      hero.group.position.set(...GL).lerp(p1, a);
+    } else hero.at(c, [0.16 * (1 - m), -0.32 + 0.29 * m, -0.55 + 0.425 * m], 1.25 * m);
+  };
+  const cam = (t) => path(t);
   // надписи надуваются по очереди: STAYA и POOL при выныривании, ELECTRO при повороте
   const blow = (g, a, d, t) => {
     if (!g) return;
@@ -144,9 +180,11 @@ export async function build({ THREE, kit, renderer, mobile }) {
   };
   const update = (t) => {
     // синяя толща воды рассеивается, когда голова выходит на поверхность
-    const u = Math.min(1, Math.max(0, (t - 0.03) / 0.06));
-    scene.fog.color.copy(DEEP).lerp(NIGHT, u); scene.fog.density = 0.3 + (0.004 - 0.3) * u;
-    blow(pv.STAYA, 0.08, 0.1, t); blow(pv.POOL, 0.12, 0.1, t); blow(pv.ELECTRO, 0.46, 0.1, t);
+    const u = Math.min(1, Math.max(0, (t - 0.07) / 0.05));
+    scene.fog.color.copy(DEEP).lerp(NIGHT, u); scene.fog.density = 0.12 + (0.004 - 0.12) * u;
+    blow(pv.STAYA, 0.1, 0.1, t); blow(pv.POOL, 0.14, 0.1, t); blow(pv.ELECTRO, 0.45, 0.1, t);
+    placeGlass(t);
   };
-  return { scene, cam: kit.camPath(keys), update };
+  const near = (t) => (t > 0.84 ? 0.01 : 0.05);
+  return { scene, cam, update, near };
 }
