@@ -608,3 +608,26 @@ export function drink({ skin = '#ecbf9f', liquid = '#2a0812' } = {}) {
     },
   };
 }
+
+/* ---------- готовые модели из библиотек (world/assets/*.glb, CC0) ---------- */
+const _assets = new Map();
+export function loadAsset(name) {
+  if (!_assets.has(name)) _assets.set(name, loadGLB(`world/assets/${name}.glb`).then((g) => g.scene));
+  return _assets.get(name);
+}
+// Ставит копию модели в сцену. o: { p, ry, s, tint } — tint слегка подкрашивает материалы под палитру сцены
+export async function prop(scene, name, o = {}) {
+  const src = await loadAsset(name), m = src.clone(true);
+  m.position.set(...(o.p ?? [0, 0, 0])); m.rotation.y = o.ry ?? 0; m.scale.setScalar(o.s ?? 1);
+  if (o.tint || o.emissive) m.traverse((c) => {
+    if (!c.isMesh) return;
+    c.material = c.material.clone();
+    if (o.tint) c.material.color.multiply(new THREE.Color(o.tint));
+    if (o.emissive) { c.material.emissive = new THREE.Color(o.emissive); c.material.emissiveIntensity = o.ei ?? 0.4; }
+  });
+  // anchor: 'top' — верх модели на высоте p.y (люстры), 'bottom' — низ на p.y (по умолчанию)
+  const bb = new THREE.Box3().setFromObject(m), c = bb.getCenter(new THREE.Vector3());
+  m.position.x += m.position.x - c.x; m.position.z += m.position.z - c.z;
+  m.position.y += o.anchor === 'top' ? o.p[1] - bb.max.y : (o.p?.[1] ?? 0) - bb.min.y;
+  scene.add(m); return m;
+}

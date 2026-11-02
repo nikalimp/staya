@@ -146,7 +146,7 @@ export async function build({ THREE, kit, renderer, mobile }) {
   ski(at(js[1][0], js[1][1], SEA - 0.05), hd + 0.15, '#2fe6ff', 13);
   scene.add(jb.build());
   // титры — большой «щит» вдали по центру, поднимается из-за горизонта
-  const CW = 1024, CH = 3900, links = []; let yEnd = CH;
+  const CW = 1024, CH = 2400 + CREDITS.length * 112 + 420, links = []; let yEnd = CH;
   const credT = kit.canvasTex(CW, CH, (x, w, h) => {
     x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = 'rgba(120,40,0,.55)'; x.shadowBlur = 30;
     let y = 150;
