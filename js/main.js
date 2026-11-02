@@ -15,8 +15,8 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const SCENES = [
-  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.15, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.95, 'splash']] },
-  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.5, out: 'black', sfx: [[0.0, 'bubbles'], [0.1, 'bubbles'], [0.36, 'splash'], [0.86, 'clink'], [0.95, 'gulp']] },
+  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.4, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.95, 'splash']] },
+  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.95, out: 'black', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.9, 'clink'], [0.96, 'gulp']] },
   { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black', sfx: [[0.03, 'clink'], [0.97, 'door']] },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.03, 'door'], [0.9, 'whoosh']] },
   { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975, sfx: [[0.7, 'whoosh'], [0.81, 'chime']] },

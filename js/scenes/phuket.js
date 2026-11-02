@@ -76,8 +76,16 @@ export async function build({ THREE, kit, renderer, mobile }) {
   roof.position.set(-8.8, Y2 + 0.72, 1.0); scene.add(roof);
   /* --- второй этаж: пульт Pioneer и экран с видео; пальмы у виллы и на террасе (Sketchfab, CC BY) --- */
   const props = [kit.decks(scene, [0, Y2 + 1.1, 6.0], Math.PI, 1.6)];
-  const vt = kit.canvasTex(1024, 512, (x, w, h) => { const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#ff9a6a'); g.addColorStop(1, '#5a6ab8'); x.fillStyle = g; x.fillRect(0, 0, w, h); kit.gradText(x, 'STAYA PHUKET', w / 2, h / 2, 110, '#ffffff', '#ffe2c4', { glow: '#ff8a5a' }); });
-  kit.videoScreen(scene, 'video/phuket.mp4', 7.6, 3.2, [0, Y2 + 1.95, 7.78], [0, Math.PI, 0], vt);
+  kit.vScreen(scene, 'video/phuket2.mp4', [0, Y2 + 0.25, 7.74], Math.PI, 3.1, { edge: '#ffb070', stand: false });
+  /* --- видео с вечеринок в гостиной: картина в раме над камином и холст на мольберте у кухни --- */
+  props.push(kit.painting(scene, 'video/phuket2.mp4', { video: true, p: [-13.2, 3.25, 7], ry: Math.PI / 2, h: 2.5 }));
+  const EP = [4.4, 0.02, 3.6], ery = -0.98;
+  props.push(kit.prop(scene, 'sf_easel', { p: EP, ry: ery, h: 2.2 }).then((m) => m.traverse((c) => { if (c.isMesh && /LOD1/.test(c.name + (c.parent?.name ?? ''))) c.visible = false; })));
+  { const fw = 0.86, fh = fw * 16 / 9, off = new THREE.Vector3(0, 1.62, 0.12).applyAxisAngle(new THREE.Vector3(0, 1, 0), ery);
+    const cv = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.06, fh + 0.06, 0.03), new THREE.MeshStandardMaterial({ color: '#f2ede4', roughness: 0.8 }));
+    cv.position.set(EP[0] + off.x, EP[1] + off.y, EP[2] + off.z); cv.rotation.set(-0.1, ery, 0, 'YXZ'); scene.add(cv);
+    const front = new THREE.Vector3(0, 0, 0.02).applyEuler(cv.rotation);
+    kit.videoScreen(scene, 'video/phuket.mp4', fw, fh, cv.position.clone().add(front).toArray(), [-0.1, ery, 0]); }
   for (const [x, y, z, h, ry] of [[-13.6, Y2 + 0.8, 6.6, 6, 0.3], [13.4, Y2 + 0.8, 6.6, 6.5, 2.2], [4.6, Y2 + 0.8, -3.0, 5.5, 4.0],
     [-24, 0, -12, 10, 0.5], [-23, 0, 6, 9, 1.7], [-25, 0, -18, 11, 3.1], [22, 0, -3, 10, 2.4], [23, 0, -17, 9.5, 0.9], [20, 0, 20, 10, 5.0], [-19, 0, 22, 9, 4.2], [26, 0, 8, 11, 1.1], [-30, 0, -4, 10, 2.8]])
     props.push(kit.prop(scene, 'sf_palm', { p: [x, y, z], ry, h }));
@@ -154,8 +162,8 @@ export async function build({ THREE, kit, renderer, mobile }) {
     { p: [0, 1.8, 20], l: [0, 1.8, 4], t: 0.168 },
     { p: [0, 1.8, 14], l: [0, 1.7, 0], t: 0.21 },
     // гостиная: взгляд на камин и диваны, затем на кухню
-    { p: [-1, 1.8, 9.6], l: [-8, 1.3, 5.5], t: 0.277 },
-    { p: [1.4, 1.8, 5.6], l: [8, 1.3, 6.5], t: 0.336 },
+    { p: [-1, 1.8, 9.6], l: [-13, 3.0, 7], t: 0.277 },
+    { p: [1.2, 1.75, 5.8], l: [4.4, 1.5, 3.6], t: 0.336 },
     { p: [0, 1.8, 1.6], l: [0, 1.4, -14], t: 0.386 },
     // на террасу через раздвинутое стекло и над бассейном к краю утёса
     { p: [0.4, 2.0, -3], l: [0, 1.4, -30], t: 0.437 },

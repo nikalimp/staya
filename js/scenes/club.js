@@ -140,15 +140,8 @@ export async function build({ THREE, kit, font, renderer }) {
   b.add(G.box(14, 0.07, 0.07), PINK, 'neon', M([0, 1.0, -11.2]));
   kit.djBooth(b, [0, 1, -12.4], 0, { w: 3.2, front: VIO, front2: PINK, decks: false });
   for (const sx of [-1, 1]) { kit.speaker(b, [sx * 6, 1, -13], 0, 1.8, 1.3); kit.speaker(b, [sx * 6, 2.8, -13], 0, 1.4, 1.1); }
-  const scr = kit.canvasTex(1024, 384, (x, w, h) => {
-    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#16002e'); g.addColorStop(1, '#4a0060'); x.fillStyle = g; x.fillRect(0, 0, w, h);
-    x.strokeStyle = 'rgba(255,47,208,.6)'; x.lineWidth = 2;
-    for (let i = 0; i < 14; i++) { x.beginPath(); x.moveTo(w / 2, h * 0.55); x.lineTo((i / 13) * w * 1.6 - w * 0.3, h); x.stroke(); }
-    for (let i = 0; i < 6; i++) { const y = h * 0.6 + i * i * 6; x.beginPath(); x.moveTo(0, y); x.lineTo(w, y); x.stroke(); }
-    kit.gradText(x, '2K17', w / 2, h * 0.38, 200, '#ffffff', '#ff7af0', { glow: '#ff2fd0' });
-    x.font = `700 30px ${kit.FONT}`; x.fillStyle = '#21e0ff'; x.textAlign = 'center'; x.fillText('ВОЗВРАЩАЕМ ТЕБЯ В 2017', w / 2, h * 0.86);
-  });
-  kit.videoScreen(scene, 'video/club.mp4', 15, 5.6, [0, 5.2, -15.75], [0, 0, 0], scr);
+  // три вертикальных видео с вечеринки рядом друг с другом на сцене
+  [['video/2k17-v.mp4', -4.2], ['video/2k17-v2.mp4', 0], ['video/2k17-v3.mp4', 4.2]].forEach(([src, x], i) => kit.vScreen(scene, src, [x, 2.3, -15.55], 0, 5.6, { edge: [PINK, CY, PINK][i] }));
   kit.text3d(b, font, 'STAYA', { size: 1.3, color: '#ff4fe0', p: [0, 8.3, -14.6] });
   for (let i = 0; i < 9; i++) { const a = -0.9 + i * 0.22; kit.laser(b, [(i % 2 ? 1 : -1) * 6.5, 3.6, -12.6], [Math.sin(a) * 30, 6 + (i % 3), -12.6 + Math.cos(a) * 30], i % 2 ? '#39ff6a' : PINK); }
 

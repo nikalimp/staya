@@ -36,6 +36,7 @@ export const CREDITS = [
   { what: 'Angel (old marble version)', who: 'SebastianSosnowski · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/angel-old-marble-version-2c879fc654b44f5e8d12527948535b51' },
   { what: 'Girl With Amphora - Statue', who: '3dhdscan · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/girl-with-amphora-statue-71edd9efc26548758924ec455ac4a197' },
   { what: 'Fountain with three putts, Brno Lužánky', who: '3dhdscan · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/fountain-with-three-putts-brno-luzanky-430b9e5354484860b8b41505e9b63298' },
+  { what: 'Wooden Easel Stand - Game asset', who: 'filipp.aronovits · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/wooden-easel-stand-game-asset-f6a4467f137141209b6c585a8c5a3ad6' },
   { what: 'Fancy Picture Frame 01', who: 'Rob Tuytel · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/fancy_picture_frame_01' },
   // картины во дворце — открытая коллекция Cleveland Museum of Art (CC0)
   { what: 'Scenes of Witchcraft: Night', who: 'Salvator Rosa · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1977.37.4' },
