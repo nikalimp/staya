@@ -33,10 +33,12 @@ export async function build({ THREE, kit, font, renderer }) {
     b.add(G.tor(r, 0.32, 6, 96), '#d6d0ff', 'metal', M([DC[0], h, DC[2]], [Math.PI / 2, 0, 0]));
     if (h === 10) for (let a = 0; a < 64; a++) { const t = (a / 64) * Math.PI * 2; glows.push([DC[0] + Math.cos(t) * (r - 0.5), h - 0.4, DC[2] + Math.sin(t) * (r - 0.5), a % 2 ? PINK : '#ffd2a1', 0.9, 1.2]); }
   }
+  const TW = [-26, 0, 14];   // вышка горки
   // римские колонны по кругу
   for (let i = 0; i < 22; i++) {
     const a = (i / 22) * Math.PI * 2, x = Math.cos(a) * 32, z = DC[2] + Math.sin(a) * 32;
     if (z < -12 && Math.abs(x) < 12) continue; // за сценой не ставим
+    if (Math.hypot(x - TW[0], z - TW[2]) < 9) continue; // и у вышки горки: колонна протыкала трубу
     b.add(G.cyl(0.65, 0.75, 10, 18), '#efe3cc', 'gloss', M([x, top + 5, z]));
     b.add(G.box(1.9, 0.5, 1.9), '#efe3cc', 'gloss', M([x, top + 10.2, z]));
     b.add(G.box(1.9, 0.5, 1.9), '#efe3cc', 'gloss', M([x, top + 0.25, z]));
@@ -83,16 +85,17 @@ export async function build({ THREE, kit, font, renderer }) {
   for (const sx of [-1, 1]) { kit.speaker(b, [sx * 10.6, top, SZ + 1], 0, 1.7, 1.5); kit.speaker(b, [sx * 10.6, top + 1.7, SZ + 1], 0, 1.7, 1.5); }
 
   /* --- горки --- */
-  const TW = [-26, 0, 14];
   // опоры вышки — внутри витка горки (радиус витка 6, труба 1.5), чтобы не протыкать трубу
   for (const dx of [-2.4, 2.4]) for (const dz of [-2.4, 2.4]) b.add(G.cyl(0.32, 0.32, 19, 10), '#e8e2f6', 'metal', M([TW[0] + dx, 9.5, TW[2] + dz]));
   b.add(G.rbox(6.6, 0.5, 6.6, 0.1), '#e8e2f6', 'gloss', M([TW[0], 19.6, TW[2]]));
   b.add(G.box(6.6, 0.08, 0.08), CYAN, 'neon', M([TW[0], 19.9, TW[2] + 3.3]));
   // горка камеры (прозрачная, с неоновыми кольцами)
   const S = [];
-  // короткая горка: один виток с вышки и сразу к бассейну
-  for (let i = 0; i <= 10; i++) { const a = (i / 10) * Math.PI * 2; S.push(V(TW[0] + 6 * Math.cos(a), 18 - (i / 10) * 13, TW[2] + 6 * Math.sin(a))); }
-  S.push(V(-19, 3.2, 6.6), V(-14.6, 1.7, 5.0), V(-12.6, 1.35, 4.4));
+  // короткая горка: ровно один виток с вышки; виток кончается там, где его касательная уже смотрит к бассейну,
+  // поэтому выход идёт по прямой без разворота (раньше конец витка смотрел от бассейна и давал петлю)
+  const A1 = Math.atan2(-0.97, -0.25) + Math.PI * 2, A0 = A1 - Math.PI * 2;   // касательная (−sin a, cos a) ≈ (0.97, −0.25)
+  for (let i = 0; i <= 12; i++) { const a = A0 + (i / 12) * (A1 - A0); S.push(V(TW[0] + 6 * Math.cos(a), 18 - (i / 12) * 13, TW[2] + 6 * Math.sin(a))); }
+  S.push(V(-22.6, 3.9, 7.4), V(-17.6, 2.4, 6.0), V(-14.6, 1.7, 5.0), V(-12.6, 1.35, 4.4));
   const slide = new THREE.CatmullRomCurve3(S, false, 'centripetal');
   // труба непрозрачная; несколько коротких «окон» — спойлер того, что снаружи
   const TS = 260, RS = 18, tubeGeo = new THREE.TubeGeometry(slide, TS, 1.5, RS, false);
