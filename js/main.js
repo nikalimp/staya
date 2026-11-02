@@ -137,7 +137,16 @@ function renderPreview(owner, next) {
   mesh.material.map = rt.texture; mesh.material.needsUpdate = true;
   owner.scene.userData.rt = rt; owner.previewDone = true; dirty = true;
 }
-// Все сцены собираются во время прелоадера и остаются в памяти — при скролле ничего не догружается.
+// Подгрузка по ходу: на прелоадере — первые две сцены; в сцене i готовятся i+1 и i+2.
+// Сцены на две и больше позади (и дальше двух впереди при скролле назад) выгружаются из памяти и при возврате собираются снова.
+const AHEAD = 2;
+function prefetch(i) { for (let k = 1; k <= AHEAD; k++) if (i + k < N && !built.has(i + k)) idle(() => buildScene(i + k)); }
+function dropBehind(i) {
+  for (const [j, s] of built) if (j <= i - 2 || j > i + AHEAD) {
+    s.scene.userData.rt?.dispose(); kit.disposeScene(s.scene); built.delete(j);
+    if (DEBUG) console.log('[staya] dropped', SCENES[j].id);
+  }
+}
 
 /* ---------- скролл → позиция ---------- */
 function scrollToG(y) {
@@ -182,8 +191,7 @@ function apply(g) {
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
   if (composer) { renderPass.scene = s.scene; bloomPass.strength = s.bloom ?? 0.42; composer.render(); } else renderer.render(s.scene, camera);
-  if (i !== curIdx) { curIdx = i; audio.go(i); }
-  if (t > 0.3 && i < N - 1 && !built.has(i + 1)) idle(() => buildScene(i + 1));
+  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); dropBehind(i); }
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
   return true;
 }
@@ -338,7 +346,7 @@ async function boot() {
   });
   await Promise.all([fontP, cssFontP, loadPeople().then(() => setReal(45))]);
   // все сцены — сразу, пока крутится кольцо: дальше путешествие идёт без подгрузок
-  for (let i = 0; i < N; i++) { await buildScene(i); setReal(45 + (50 * (i + 1)) / N); await new Promise((r) => setTimeout(r, 0)); }
+  for (let i = 0; i < Math.min(N, AHEAD); i++) { await buildScene(i); setReal(45 + (50 * (i + 1)) / AHEAD); await new Promise((r) => setTimeout(r, 0)); }
   await firstTrack;
   setReal(100);
 }
