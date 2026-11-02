@@ -4,7 +4,9 @@
 // Путь от первого лица: выныриваем в центре бассейна, взгляд с неба вниз на осьминога → плывём к лестнице →
 // пешком вдоль бассейна, «прищур» на электро-сцену → бар: нырок в коктейль на стойке → темнота.
 const BASE = 'world/pool/';
-const T = 0.3, SZ = -12.2, EX = 43, EZ = -4, HZ = 19;
+// стойка модели бара: высота столешницы (доля высоты модели) и место стакана относительно центра бара
+const BAR_TOP = 0.40, BAR_GLASS = [0.48, -0.33];
+const T = 0.3, SZ = -12.2, EX = 60, EZ = -4, HZ = 19;
 
 export async function build({ THREE, kit, font, renderer, mobile }) {
   const { Builder } = kit;
@@ -68,47 +70,39 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     const a = -0.75 + i * 0.166;
     kit.laser(b, [EX - 3.6, 9.4, EZ + (i - 4.5) * 0.9], [EX - 34, 3 + (i % 3) * 3, EZ + Math.sin(a) * 30], i % 2 ? '#2fe6ff' : '#8a3dff');
   }
-  /* --- бар у дома: стойка, бутылки, неон, стаканы --- */
-  const BX = 12.6, BZ = 12.3, BT = T + 1.1;
-  b.add(kit.G.rbox(4.2, 1.1, 1.0, 0.06), '#f4eef8', 'gloss', kit.M([BX, T + 0.55, BZ]));
-  b.add(kit.G.rbox(4.5, 0.08, 1.25, 0.03), '#1a1422', 'gloss', kit.M([BX, BT + 0.04, BZ]));
-  b.add(kit.G.box(4.2, 0.06, 0.06), '#ff3fb4', 'neon', kit.M([BX, T + 0.12, BZ - 0.53]));
-  b.add(kit.G.box(4.4, 2.6, 0.3), '#2a1a3a', 'plastic', kit.M([BX, T + 1.3, BZ + 1.9]));
-  for (const y of [1.6, 2.3]) b.add(kit.G.box(4.0, 0.05, 0.3), '#f4eef8', 'gloss', kit.M([BX, T + y, BZ + 1.65]));
-  for (let i = 0; i < 18; i++) {
-    const x = BX - 1.8 + (i % 9) * 0.45, y = T + (i < 9 ? 1.63 : 2.33), c = kit.pick(['#2fe6ff', '#ff3fb4', '#ffd23f', '#39ff9a', '#b45cff'], i * 7);
-    b.add(kit.G.cyl(0.06, 0.07, 0.3, 10), c, 'glass', kit.M([x, y + 0.15, BZ + 1.65]));
-    b.add(kit.G.cyl(0.02, 0.03, 0.1, 8), c, 'glass', kit.M([x, y + 0.35, BZ + 1.65]));
-  }
-  kit.text3d(b, font, 'BAR', { size: 0.55, color: '#ff3fb4', kind: 'neon', p: [BX, T + 2.75, BZ + 1.72], r: [0, Math.PI, 0], bevel: 0.01, depth: 0.04 });
-  glows.push([BX, T + 3, BZ + 1.5, '#ff3fb4', 3.4, 0.6], [BX, T + 0.12, BZ - 0.6, '#ff3fb4', 2, 0.6]);
-  // стаканы на стойке; один (ближний) — тот, что возьмёт герой
-  const GL = [BX - 0.15, BT + 0.08, BZ - 0.32];
-  [[-1.2, 0.1], [-0.7, -0.2], [0.5, -0.1], [0.9, 0.2], [1.4, -0.25], [-1.6, -0.3]].forEach(([dx, dz], i) => {
-    b.add(kit.G.cyl(0.042, 0.034, 0.12, 16, true), '#dff6ff', 'glass', kit.M([BX + dx, BT + 0.14, BZ + dz]));
-    b.add(kit.G.cyl(0.038, 0.034, 0.08, 14), kit.pick(['#ff3fb4', '#2fe6ff', '#ffb23f', '#2a0812'], i), 'gloss', kit.M([BX + dx, BT + 0.12, BZ + dz]));
-  });
-  const hero = kit.drink(); scene.add(hero.group);
-  // барные стулья (Poly Haven, CC0) — по краям стойки, центр свободен для героя
-  await Promise.all([-2.0, -1.3, 1.3, 2.0].map((dx, i) => kit.prop(scene, 'bar_chair_round_01', { p: [BX + dx, T, BZ - 1.05], ry: (i % 2 ? 0.3 : -0.4), s: 1.05 })));
+  /* --- бар (Sketchfab «Bar bar», CC BY) и коктейль на стойке («Malibu sunset», CC BY) --- */
+  const BX = 12.6, BZ = 12.7, BH = 2.6;                     // высота модели бара вместе с полкой бутылок
+  const props = [kit.prop(scene, 'sf_barbar', { p: [BX, T + 0.012, BZ], ry: Math.PI, h: BH })];
+  const CT = T + BH * BAR_TOP, GL = [BX + BAR_GLASS[0], CT, BZ + BAR_GLASS[1]];   // стакан — на краю стойки, ближе к камере
+  props.push(kit.prop(scene, 'sf_malibu', { p: GL, h: 0.22, ry: 0.4 + Math.PI }));
+  // у модели бара свой плиточный пол — на патио он не нужен
+  props[0].then((m) => m.traverse((c) => { if (!c.isMesh) return; const sz = new THREE.Box3().setFromObject(c).getSize(new THREE.Vector3()); if (sz.y < 0.1 && Math.max(sz.x, sz.z) > 2.5) c.visible = false; }));
+  glows.push([BX, T + 2.9, BZ + 0.6, '#ff3fb4', 3.4, 0.4]);
+  /* --- пульты Pioneer и экраны с видео на обеих сценах --- */
+  props.push(kit.decks(scene, [0, T + 2.1, SZ + 1.0], 0, 1.7), kit.decks(scene, [EX - 1.2, 2.3, EZ], -Math.PI / 2, 1.9));
+  const vidTex = kit.canvasTex(512, 256, (x, w, h) => { const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#2a0f5c'); g.addColorStop(1, '#0b6c9c'); x.fillStyle = g; x.fillRect(0, 0, w, h); kit.gradText(x, 'STAYA POOL', w / 2, h / 2, 60, '#fff', '#7ff2ff', { glow: '#2fe6ff' }); });
+  kit.videoScreen(scene, 'video/pool.mp4', 15.2, 6.4, [0, T + 1.0 + 3.4, SZ - 2.42], [0, 0, 0], vidTex);
+  kit.videoScreen(scene, 'video/pool.mp4', 13.6, 7.8, [EX + 3.72, 5.6, EZ], [0, -Math.PI / 2, 0], vidTex);
+  /* --- Луна — арт-объект STAYA — над электро-сценой --- */
+  const moonArt = kit.moonMesh(4.6, kit.MOON_DIR); moonArt.position.set(EX + 0.5, 16.2, EZ); scene.add(moonArt);
+  scene.add(kit.halo([EX + 0.5, 16.2, EZ], 26, '#cfd8ff', 0.35));
+  /* --- пальмы (Sketchfab «Coconut Palm», CC BY) --- */
+  for (const [x, z, ry, h] of [[-24, -8, 0.4, 10], [-30, 6, 2.0, 11], [-26, 15, 4.1, 10], [26, -18, 1.1, 11], [24, 12, 3.0, 10], [-20, -18, 5.0, 11], [36, 10, 2.5, 10], [70, 9, 0.9, 11], [70, -17, 3.6, 10]])
+    props.push(kit.prop(scene, 'sf_palm', { p: [x, T - 0.3, z], ry, h }));
+  await Promise.all(props);
   scene.add(b.build());
 
   /* --- свет для людей (запечённый двор от него не зависит) --- */
   scene.add(new THREE.HemisphereLight('#5b4bdf', '#12061f', 0.6));
   const L = (c, i, p, d = 40) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
   L('#ff3fb4', 260, [-4, 8, SZ + 4]); L('#2fe6ff', 260, [4, 8, SZ + 4]); L('#ffd28a', 120, [0, 4, 2], 25);
-  L('#2f6bff', 320, [EX - 2, 7, EZ]); L('#8a3dff', 160, [EX - 8, 5, EZ + 4], 25); L('#ffcf7a', 100, [0, 4, HZ - 3], 20);
+  L('#2f6bff', 320, [EX - 2, 7, EZ]); L('#8a3dff', 160, [EX - 8, 5, EZ + 4], 25); L('#ffcf7a', 60, [BX, 3.6, BZ - 1.5], 9);
 
   /* --- свечение: подводные фонари, прожекторы, LED, окна, гирлянды --- */
   for (let x = -9; x <= 9; x += 3) glows.push([x, -0.55, -4.85, '#2fe6ff', 1.8, 1.4], [x, -0.55, 4.85, '#2fe6ff', 1.8, 1.4]);
   const PAR = { pink: '#ff3fb4', green: '#39ff6a', red: '#ff2a2a', cyan: '#2fe6ff' };
   ['pink', 'green', 'red', 'cyan', 'red', 'green', 'pink'].forEach((c, i) => glows.push([-6 + i * 2, 8.45, SZ + 2.85, PAR[c], 2, 2]));
-  for (let i = 0; i < 9; i++) glows.push([-6.4 + i * 1.6, T + 4.6, SZ - 2.3, ['#ff3fb4', '#8a3dff', '#2fe6ff'][i % 3], 2.4, 0.5]);
   for (let i = 0; i < 6; i++) glows.push([EX - 3.9, 9.25, EZ - 5 + i * 2, i % 2 ? PAR.cyan : PAR.pink, 1.8, 2]);
-  for (let y = 2.5; y < 8.5; y += 2) for (let z = EZ - 5; z <= EZ + 5; z += 2.5) glows.push([EX + 3.4, y, z, '#2f6bff', 3.2, 0.45]);
-  glows.push([EX - 1.9, 13.3, EZ, '#2fe6ff', 6, 0.6]);
-  [-11, -5.2, 5.2, 11].forEach((x, i) => glows.push([x, 2.1, HZ - 0.4, i % 2 ? '#ffcf7a' : '#ff6fd0', 4.5, 0.35]));
-  for (const sx of [-1, 1]) glows.push([sx * 2.2, 3.6, HZ - 0.4, '#ffcf7a', 1.4, 1.5]);
   const strings = [[[-16, 7.5, HZ], [-19, 6.5, -6]], [[-6, 7.5, HZ], [-8, 9, SZ + 2.4]], [[6, 7.5, HZ], [8, 9, SZ + 2.4]], [[16, 7.5, HZ], [19, 6.5, -7]], [[-19, 6.5, -6], [-8, 9, SZ + 2.4]], [[19, 6.5, -7], [8, 9, SZ + 2.4]]];
   for (const [a, c] of strings) for (let i = 1; i < 22; i++) {
     const t = i / 22, sag = Math.sin(t * Math.PI) * 2;
@@ -133,19 +127,17 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     { p: [9.7, 0.75, -1.6], l: [13, 1.6, -1.6], t: 0.36 },
     { p: [11.9, EYE, -1.5], l: [18, EYE, -2], t: 0.41 },
     // пешком: поворот головы к электро-сцене
-    { p: [13.2, EYE, -0.6], l: [EX, 4, EZ], t: 0.47 },
-    { p: [13.8, EYE, 1.4], l: [EX, 4.5, EZ + 1], t: 0.57 },
+    { p: [13.2, EYE, -0.6], l: [EX, 8.2, EZ], t: 0.47 },
+    { p: [13.8, EYE, 1.4], l: [EX, 8.6, EZ + 1], t: 0.57 },
     // вдоль бассейна к бару и нырок в коктейль на стойке
     { p: [14.1, EYE, 5.2], l: [12.8, 1.3, 12.3], t: 0.66 },
     { p: [13.1, EYE, 8.8], l: [GL[0], GL[1] + 0.06, GL[2]], t: 0.75 },
     { p: [12.6, EYE - 0.1, 10.6], l: [GL[0], GL[1] + 0.06, GL[2]], t: 0.83 },
-    { p: [GL[0], GL[1] + 0.55, GL[2] - 0.3], l: [GL[0], GL[1], GL[2] + 0.02], t: 0.9 },
-    { p: [GL[0], GL[1] + 0.22, GL[2] - 0.05], l: [GL[0], GL[1] - 0.3, GL[2] + 0.01], t: 0.95 },
-    { p: [GL[0], GL[1] + 0.108, GL[2]], l: [GL[0], GL[1] - 0.5, GL[2] + 0.004], t: 1 },
+    { p: [GL[0], GL[1] + 0.75, GL[2] - 0.35], l: [GL[0], GL[1] + 0.1, GL[2]], t: 0.9 },
+    { p: [GL[0], GL[1] + 0.38, GL[2] - 0.06], l: [GL[0], GL[1], GL[2] + 0.01], t: 0.95 },
+    { p: [GL[0], GL[1] + 0.17, GL[2]], l: [GL[0], GL[1] - 0.5, GL[2] + 0.004], t: 1 },
   ];
   const path = kit.camPath(keys);
-  // коктейль стоит на стойке, камера ныряет в него сверху
-  hero.group.position.set(...GL); hero.hand.visible = false;
   const cam = (t) => path(t);
   // надписи надуваются по очереди: STAYA и POOL при выныривании, ELECTRO при повороте
   const blow = (g, a, d, t) => {

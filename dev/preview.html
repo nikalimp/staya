@@ -1,0 +1,20 @@
+<!doctype html><meta charset="utf-8"><title>preview</title><style>body{margin:0;background:#888}</style>
+<script type="importmap">{"imports":{"three":"../vendor/three.module.js","three/addons/":"../vendor/addons/"}}</script>
+<script type="module">
+// Просмотр ассетов: ?a=name1,name2 — ставит модели в ряд, пишет габариты в window.__dims
+import * as THREE from 'three'; import * as kit from '../js/kit.js';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(1200, 700); document.body.appendChild(r.domElement);
+r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping;
+const s = new THREE.Scene(); s.background = new THREE.Color('#9a9aa0');
+s.add(new THREE.HemisphereLight('#fff', '#556', 2)); const d = new THREE.DirectionalLight('#fff', 2.5); d.position.set(3, 5, 4); s.add(d);
+const names = new URLSearchParams(location.search).get('a').split(','), dims = {};
+let x = 0; const gap = [];
+for (const n of names) {
+  const g = (await kit.loadGLB(`../world/assets/${n}.glb`)).scene; const bb = new THREE.Box3().setFromObject(g), sz = bb.getSize(new THREE.Vector3());
+  dims[n] = { size: sz.toArray().map((v) => +v.toFixed(3)), min: bb.min.toArray().map((v) => +v.toFixed(3)) };
+  const k = 1 / Math.max(sz.x, sz.y, sz.z); const w = new THREE.Group(); w.add(g); g.position.sub(bb.getCenter(new THREE.Vector3())); w.scale.setScalar(k);
+  w.position.set(x, 0, 0); x += 1.25; s.add(w);
+}
+const c = new THREE.PerspectiveCamera(30, 12 / 7, 0.01, 100); c.position.set((x - 1.25) / 2, 1.2, 3.6 + x * 0.6); c.lookAt((x - 1.25) / 2, 0, 0);
+r.render(s, c); window.__dims = dims;
+</script>

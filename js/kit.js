@@ -280,11 +280,12 @@ export function djBooth(b, p, ry = 0, o = {}) {
   b.add(G.rbox(w, 1.05, 0.9, 0.05), o.body ?? '#0e0c14', 'gloss', M([0, 0.525, 0]));
   b.add(G.box(w * 0.96, 0.06, 0.02), front, 'neon', M([0, 0.85, 0.46]));
   b.add(G.box(w * 0.96, 0.04, 0.02), o.front2 ?? '#2fe6ff', 'neon', M([0, 0.2, 0.46]));
-  for (const sx of [-1, 1]) {
+  for (const sx of (o.decks === false ? [] : [-1, 1])) {
     b.add(G.rbox(0.62, 0.08, 0.5, 0.02), '#1b1a22', 'plastic', M([sx * w * 0.27, 1.09, 0]));
     b.add(G.cyl(0.19, 0.19, 0.03, 24), '#3a3946', 'metal', M([sx * w * 0.27, 1.14, 0.02]));
     b.add(G.cyl(0.05, 0.05, 0.035, 12), sx < 0 ? '#2fe6ff' : '#ff2fb0', 'neon', M([sx * w * 0.27, 1.15, 0.02]));
   }
+  if (o.decks === false) { b.pop(); return; }
   b.add(G.rbox(0.5, 0.09, 0.45, 0.02), '#22202a', 'plastic', M([0, 1.09, 0]));
   for (let i = 0; i < 4; i++) b.add(G.box(0.05, 0.02, 0.05), pick(['#ff2fb0', '#2fe6ff', '#ffe14a', '#8a4dff'], i), 'neon', M([-0.15 + i * 0.1, 1.15, 0.12]));
   b.pop();
@@ -620,18 +621,106 @@ export function loadAsset(name) {
 // Ставит копию модели в сцену. o: { p, ry, s, tint } — tint слегка подкрашивает материалы под палитру сцены
 export async function prop(scene, name, o = {}) {
   const src = await loadAsset(name), m = src.clone(true);
-  m.position.set(...(o.p ?? [0, 0, 0])); m.rotation.y = o.ry ?? 0; m.scale.setScalar(o.s ?? 1);
+  m.position.set(...(o.p ?? [0, 0, 0])); m.rotation.set(o.rx ?? 0, o.ry ?? 0, o.rz ?? 0, 'YXZ'); m.scale.setScalar(o.s ?? 1);
+  // o.h — нужная высота, o.w — нужная ширина по большей горизонтали (модели из библиотек приходят в разных единицах)
+  if (o.h || o.w) {
+    const sz = new THREE.Box3().setFromObject(src).getSize(new THREE.Vector3());
+    m.scale.setScalar(o.h ? o.h / sz.y : o.w / Math.max(sz.x, sz.z));
+  }
   if (o.tint || o.emissive) m.traverse((c) => {
     if (!c.isMesh) return;
     c.material = c.material.clone();
     if (o.tint) c.material.color.multiply(new THREE.Color(o.tint));
-    if (o.emissive) { c.material.emissive = new THREE.Color(o.emissive); c.material.emissiveIntensity = o.ei ?? 0.4; }
+    if (o.emissive && c.material.emissive) { c.material.emissive = new THREE.Color(o.emissive); c.material.emissiveIntensity = o.ei ?? 0.4; }
   });
   // anchor: 'top' — верх модели на высоте p.y (люстры), 'bottom' — низ на p.y (по умолчанию)
   const bb = new THREE.Box3().setFromObject(m), c = bb.getCenter(new THREE.Vector3());
   m.position.x += m.position.x - c.x; m.position.z += m.position.z - c.z;
   m.position.y += o.anchor === 'top' ? o.p[1] - bb.max.y : (o.p?.[1] ?? 0) - bb.min.y;
   scene.add(m); return m;
+}
+
+/* ---------- картина в золотой раме: рама Poly Haven (CC0), полотно — Cleveland Museum of Art (CC0) ---------- */
+// img — world/art/<file>.webp; h — высота рамы; рама растягивается под пропорции картины
+const _artTex = new Map();
+export async function painting(scene, img, o = {}) {
+  if (!_artTex.has(img)) _artTex.set(img, new THREE.TextureLoader().loadAsync(img).then((t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }));
+  const [src, tex] = await Promise.all([loadAsset('fancy_picture_frame_01'), _artTex.get(img)]);
+  const m = src.clone(true), bb = new THREE.Box3().setFromObject(src), sz = bb.getSize(new THREE.Vector3());
+  const aspect = tex.image.width / tex.image.height, h = o.h ?? 3, w = h * aspect * 1.08;
+  const thin = sz.z < sz.x ? 'z' : 'x';                       // ось толщины рамы
+  const kh = h / sz.y, kw = w / (thin === 'z' ? sz.x : sz.z);
+  m.scale.set(thin === 'z' ? kw : kh, kh, thin === 'z' ? kh : kw);
+  m.traverse((c) => {
+    if (!c.isMesh || !/canvas/.test(c.material.name)) return;
+    c.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55 });
+    // UV полотна рамы растягиваем на всю картину
+    const uv = c.geometry.attributes.uv; if (!uv) return;
+    let u0 = 1, u1 = 0, v0 = 1, v1 = 0;
+    for (let i = 0; i < uv.count; i++) { u0 = Math.min(u0, uv.getX(i)); u1 = Math.max(u1, uv.getX(i)); v0 = Math.min(v0, uv.getY(i)); v1 = Math.max(v1, uv.getY(i)); }
+    c.geometry = c.geometry.clone(); const u2 = c.geometry.attributes.uv;
+    for (let i = 0; i < u2.count; i++) u2.setXY(i, (u2.getX(i) - u0) / (u1 - u0 || 1), (u2.getY(i) - v0) / (v1 - v0 || 1));
+    u2.needsUpdate = true;
+  });
+  const g = new THREE.Group(); g.add(m);
+  const c = new THREE.Box3().setFromObject(m).getCenter(new THREE.Vector3()); m.position.sub(c);
+  g.position.set(...(o.p ?? [0, 0, 0])); g.rotation.y = (o.ry ?? 0) + (thin === 'x' ? -Math.PI / 2 : 0);
+  scene.add(g); return g;
+}
+
+/* ---------- парадная двустворчатая дверь (как во дворце): створки открываются на петлях ---------- */
+// p — центр низа проёма, ry — поворот (дверь смотрит в +Z при ry = 0), s — масштаб (1 = 6.2 × 8.4 м)
+export function grandDoor(scene, b, p, ry = 0, s = 1, o = {}) {
+  const GOLD = o.gold ?? '#c9a24a';
+  const doorMat = new THREE.MeshPhysicalMaterial({ color: o.color ?? '#2a0d06', roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.1 });
+  const panelMat = new THREE.MeshPhysicalMaterial({ color: o.panel ?? '#4a1608', roughness: 0.35, clearcoat: 1 });
+  const goldMat = new THREE.MeshStandardMaterial({ color: GOLD, metalness: 1, roughness: 0.25 });
+  const root = new THREE.Group(); root.position.set(...p); root.rotation.y = ry; root.scale.setScalar(s); scene.add(root);
+  // арка и пилястры из золота
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(3.4, 0.3, 8, 28, Math.PI), goldMat); arch.position.set(0, 8.5, -0.45); root.add(arch);
+  for (const sx of [-1, 1]) { const pl = new THREE.Mesh(new THREE.BoxGeometry(0.5, 8.5, 0.9), goldMat); pl.position.set(sx * 3.35, 4.25, -0.45); root.add(pl); }
+  const leaves = [-1, 1].map((sx) => {
+    const g = new THREE.Group(); g.position.set(sx * 3.1, 0, 0); root.add(g);
+    const add = (geo, mat, x, y, z) => { const m = new THREE.Mesh(geo, mat); m.position.set(x, y, z); m.userData.dynamic = true; g.add(m); };
+    add(G.rbox(3.1, 8.4, 0.25, 0.04), doorMat, -sx * 1.55, 4.2, 0);
+    for (const y of [1.8, 4.6, 7.2]) for (const zz of [-0.14, 0.14]) add(new THREE.BoxGeometry(2.3, 1.9, 0.04), panelMat, -sx * 1.55, y, zz);
+    for (const zz of [-0.2, 0.2]) add(new THREE.SphereGeometry(0.13, 12, 8), goldMat, -sx * 2.75, 4.2, zz);
+    return { g, sx };
+  });
+  root.traverse((c) => { if (c.isMesh) c.userData.dynamic = true; });
+  // a: 0 — закрыто, 1 — распахнуто
+  return { root, open(a) { const r = a * 1.75; leaves.forEach(({ g, sx }) => (g.rotation.y = sx < 0 ? r : -r)); } };
+}
+
+/* ---------- сцена с диджейским пультом: пульт Pioneer (Sketchfab, CC BY) на стойке ---------- */
+export function decks(scene, p, ry = 0, w = 1.6) {
+  return prop(scene, 'sf_cdj', { p, ry, w });
+}
+
+/* ---------- экран с видео вечеринки: пока видео нет или оно грузится — картинка-заглушка ---------- */
+// Видео лежат в video/<id>.mp4. Играет только видео текущей сцены (main.js → playVideos).
+const _videos = [];
+export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null) {
+  const m = screen(w, h, fallback, p, r);
+  const v = document.createElement('video');
+  Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'metadata', crossOrigin: 'anonymous' });
+  v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
+  v.addEventListener('loadeddata', () => {
+    const t = new THREE.VideoTexture(v); t.colorSpace = THREE.SRGBColorSpace;
+    m.material.map = t; m.material.needsUpdate = true;
+    // кадр видео вписывается в экран по ширине или высоте (без растяжения)
+    const a = v.videoWidth / v.videoHeight, s = w / h;
+    if (a > s) { t.repeat.set(s / a, 1); t.offset.set((1 - s / a) / 2, 0); } else { t.repeat.set(1, a / s); t.offset.set(0, (1 - a / s) / 2); }
+  }, { once: true });
+  v.addEventListener('error', () => {}, { once: true });
+  v.src = src; _videos.push({ scene, v });
+  scene.add(m); return m;
+}
+export function playVideos(scene) {
+  for (const x of _videos) {
+    if (x.scene === scene) { if (x.v.paused && x.v.readyState >= 1) x.v.play().catch(() => {}); else if (x.v.readyState < 1) { x.v.preload = 'auto'; x.v.play().catch(() => {}); } }
+    else if (!x.v.paused) x.v.pause();
+  }
 }
 
 /* ---------- запечённый свет для сцен, собранных в коде (AQUA, клуб) ---------- */
