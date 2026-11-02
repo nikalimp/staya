@@ -1,6 +1,6 @@
 // Слежение за головой через веб-камеру (только десктоп, по желанию пользователя).
 // Видео обрабатывается на устройстве (MediaPipe Face Detector), никуда не отправляется.
-// Отдаёт сглаженное смещение головы от исходного положения: x, y в диапазоне примерно −1…1.
+// Отдаёт сглаженные смещение (x, y) и поворот (yaw, pitch) головы от исходного положения, примерно −1…1.
 const VER = '0.10.14';
 const CDN = `https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${VER}`;
 const MODEL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
@@ -14,8 +14,8 @@ export async function startHeadTrack(onMove) {
   const opts = (delegate) => ({ baseOptions: { modelAssetPath: MODEL, delegate }, runningMode: 'VIDEO', minDetectionConfidence: 0.5 });
   let det;
   try { det = await FaceDetector.createFromOptions(files, opts('GPU')); } catch { det = await FaceDetector.createFromOptions(files, opts('CPU')); }
-  let run = true, last = -1, base = null, n = 0, sx = 0, sy = 0;
-  const cal = { x: 0, y: 0 };
+  let run = true, last = -1, base = null, n = 0;
+  const sm = { x: 0, y: 0, yaw: 0, pitch: 0 }, cal = { x: 0, y: 0, yaw: 0, pitch: 0 };
   const tick = () => {
     if (!run) return;
     const now = performance.now();
@@ -24,17 +24,29 @@ export async function startHeadTrack(onMove) {
       const d = det.detectForVideo(video, now).detections[0];
       if (d) {
         const b = d.boundingBox, w = video.videoWidth || 320, h = video.videoHeight || 240;
-        // центр лица в кадре, −1…1; по X зеркалим (как в зеркале)
-        const x = -((b.originX + b.width / 2) / w * 2 - 1), y = -((b.originY + b.height / 2) / h * 2 - 1);
-        if (n < 12) { cal.x += x; cal.y += y; n++; if (n === 12) base = { x: cal.x / 12, y: cal.y / 12 }; }
+        // положение: центр лица в кадре, −1…1; по X зеркалим, +x — зритель сдвинулся вправо, +y — вверх
+        const v = { x: -((b.originX + b.width / 2) / w * 2 - 1), y: -((b.originY + b.height / 2) / h * 2 - 1), yaw: 0, pitch: 0 };
+        // поворот: нос относительно середины глаз (ключевые точки: глаз П, глаз Л, нос, рот, уши)
+        const k = d.keypoints;
+        if (k && k.length >= 4) {
+          const ex = (k[0].x + k[1].x) / 2, ey = (k[0].y + k[1].y) / 2, ed = Math.hypot(k[0].x - k[1].x, k[0].y - k[1].y) || 1;
+          v.yaw = -(k[2].x - ex) / ed;                      // + зритель повернул голову вправо
+          v.pitch = -((k[2].y - ey) / ((k[3].y - ey) || 1)); // + зритель поднял взгляд
+        }
+        if (n < 12) { for (const q in cal) cal[q] += v[q]; n++; if (n === 12) { base = {}; for (const q in cal) base[q] = cal[q] / 12; } }
         else {
-          sx += ((x - base.x) * 2.2 - sx) * 0.35; sy += ((y - base.y) * 2.2 - sy) * 0.35;
-          onMove(Math.max(-1, Math.min(1, sx)), Math.max(-1, Math.min(1, sy)));
+          const g = { x: 2.2, y: 2.2, yaw: 3, pitch: 4 };
+          for (const q in sm) {
+            let d = (v[q] - base[q]) * g[q];
+            d = Math.sign(d) * Math.max(0, Math.abs(d) - 0.04);   // мёртвая зона: дрожь детектора не качает сцену
+            sm[q] += (Math.max(-1, Math.min(1, d)) - sm[q]) * 0.5;
+          }
+          onMove(sm);
         }
       }
     }
     requestAnimationFrame(tick);
   };
   tick();
-  return { stop() { run = false; stream.getTracks().forEach((t) => t.stop()); det.close?.(); onMove(0, 0); } };
+  return { stop() { run = false; stream.getTracks().forEach((t) => t.stop()); det.close?.(); onMove({ x: 0, y: 0, yaw: 0, pitch: 0 }); } };
 }

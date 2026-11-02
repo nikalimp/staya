@@ -580,28 +580,6 @@ export function loadGLB(url) {
   return _gltf.loadAsync(url);
 }
 
-/* ---------- человеческая камера: шаги и покачивание ---------- */
-// walk: [[t0, t1], ...] — участки пути, где герой идёт пешком (голова качается в такт шагам)
-export function humanize(cam, { walk = [], swim = [], step = 0.72, amp = 0.032 } = {}) {
-  // длина пути для фазы шагов
-  const N = 600, dist = new Float32Array(N + 1), prev = V(0, 0, 0);
-  let d = 0;
-  for (let i = 0; i <= N; i++) { const p = cam(i / N).p; if (i) d += p.distanceTo(prev); dist[i] = d; prev.copy(p); }
-  const w = (t, list, edge = 0.02) => list.reduce((m, [a, c]) => Math.max(m, Math.min(1, Math.max(0, Math.min(t - a, c - t) / edge))), 0);
-  const out = { p: V(0, 0, 0), l: V(0, 0, 0) }, fw = V(0, 0, 0), side = V(0, 0, 0), up = V(0, 1, 0);
-  return (t) => {
-    const c = cam(t); out.p.copy(c.p); out.l.copy(c.l);
-    const k = Math.min(N, Math.max(0, t * N)), i = Math.floor(k), dd = dist[i] + (dist[Math.min(N, i + 1)] - dist[i]) * (k - i);
-    const ph = (dd / step) * Math.PI;
-    const ww = w(t, walk), sw = w(t, swim);
-    const dy = ww * (Math.abs(Math.sin(ph)) - 0.5) * amp * 2 + sw * Math.sin(ph * 0.5) * 0.025;
-    fw.copy(out.l).sub(out.p).normalize(); side.crossVectors(fw, up).normalize();
-    const dx = ww * Math.sin(ph) * amp * 0.45;
-    out.p.y += dy; out.l.y += dy * 0.6; out.p.addScaledVector(side, dx); out.l.addScaledVector(side, dx * 0.5);
-    return out;
-  };
-}
-
 /* ---------- стакан в руке героя ---------- */
 // Стакан с тёмным напитком и кистью. at(c, local, tilt) ставит его в систему координат камеры.
 export function drink({ skin = '#ecbf9f', liquid = '#2a0812' } = {}) {
