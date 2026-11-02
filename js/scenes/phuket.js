@@ -214,5 +214,5 @@ export async function build({ THREE, kit, renderer, mobile }) {
   };
   // ссылки в титрах: доли высоты текстуры → v-координата плоскости
   const pick = { mesh: cred, links: links.map((l) => ({ v0: 1 - l.y1 / CH, v1: 1 - l.y0 / CH, href: l.href })), from: 0.9 };
-  return { scene, cam: kit.camPath(keys), update, pick };
+  return { scene, cam: kit.camPath(keys), update, pick, bloom: 0.12 };
 }

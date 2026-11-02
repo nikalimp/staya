@@ -53,12 +53,12 @@ renderer.toneMappingExposure = 1.05;
 renderer.setClearColor(0x000000, 1);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
 // десктоп: настоящее свечение неона и солнца (bloom); телефон — лёгкие ореолы-спрайты без постобработки
-let composer = null, renderPass = null;
+let composer = null, renderPass = null, bloomPass = null;
 if (!mobile) {
   composer = new EffectComposer(renderer);
   renderPass = new RenderPass(new THREE.Scene(), camera);
   composer.addPass(renderPass);
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(1024, 1024), 0.42, 0.5, 0.9));
+  composer.addPass(bloomPass = new UnrealBloomPass(new THREE.Vector2(1024, 1024), 0.42, 0.5, 0.9));
   composer.addPass(new OutputPass());
 }
 
@@ -160,7 +160,8 @@ function apply(g) {
     camera.translateX(head.x * 0.55); camera.translateY(head.y * 0.4);
     camera.rotateY(-head.x * 0.16 - head.yaw * 0.3); camera.rotateX(head.y * 0.12 + head.pitch * 0.2);
   }
-  if (composer) { renderPass.scene = s.scene; composer.render(); } else renderer.render(s.scene, camera);
+  // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
+  if (composer) { renderPass.scene = s.scene; bloomPass.strength = s.bloom ?? 0.42; composer.render(); } else renderer.render(s.scene, camera);
   if (i !== curIdx) { curIdx = i; audio.go(i); }
   if (t > 0.3 && i < N - 1 && !built.has(i + 1)) idle(() => buildScene(i + 1));
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
