@@ -64,7 +64,7 @@ export async function build({ THREE, kit, font, renderer }) {
     props.push(kit.prop(scene, 'lantern_chandelier_01', { p: [sx * 16.5, 9.6, z], s: 2.3, anchor: 'top', emissive: '#ffb15a', ei: 0.3 }));
     glows.push([sx * 16.5, 8.4, z, '#ffc27a', 2.2, 0.8]);
   }
-  for (const sx of [-1, 1]) for (const z of [-12, -1, 10]) props.push(kit.prop(scene, 'GothicCabinet_01', { p: [sx * 19.2, 0, z], ry: -sx * Math.PI / 2, s: 2.1 }));
+  for (const sx of [-1, 1]) for (const z of (sx < 0 ? [-14, 13] : [-12, -1, 10])) props.push(kit.prop(scene, 'GothicCabinet_01', { p: [sx * 19.2, 0, z], ry: -sx * Math.PI / 2, s: 2.1 }));
 
   /* --- гигантские статуи высотой во весь зал --- */
   // ангелы (Sketchfab «Angel (old marble version)», CC BY) по сторонам больших дверей
@@ -75,7 +75,9 @@ export async function build({ THREE, kit, font, renderer }) {
   /* --- картины: полотна Cleveland Museum of Art (CC0) в рамах Poly Haven --- */
   const ART = ['149108', '124089', '125247', '141549', '143206', '122349', '149104', '147479', '128842', '145148', '122347', '160885'];
   const art = (i, p, ry, h) => props.push(kit.painting(scene, `world/art/cma_${ART[i % ART.length]}.webp`, { p, ry, h }));
-  [[-1, -22], [-1, -8], [-1, 6], [-1, 19], [1, -15], [1, -1], [1, 13]].forEach(([sx, z], i) => art(i, [sx * 19.9, 4.6, z], sx < 0 ? Math.PI / 2 : -Math.PI / 2, 4.4));
+  // видео с вечеринки в золотой раме — на левой стене первого зала
+  props.push(kit.painting(scene, 'video/halloween-v.mp4', { video: true, p: [-19.85, 5.6, -1], ry: Math.PI / 2, h: 7.6 }));
+  [[-1, -22], [-1, -10], [-1, 8], [-1, 19], [1, -15], [1, -1], [1, 13]].forEach(([sx, z], i) => art(i, [sx * 19.9, 4.6, z], sx < 0 ? Math.PI / 2 : -Math.PI / 2, 4.4));
   [[-1, -39], [-1, -51], [-1, -63], [1, -45], [1, -57], [1, -69]].forEach(([sx, z], i) => art(i + 7, [sx * 19.9, 6, z], sx < 0 ? Math.PI / 2 : -Math.PI / 2, 6.5));
   for (const sx of [-1, 1]) art(sx < 0 ? 0 : 6, [sx * 13, 15.5, Z2 + 0.6], 0, 7);
 
@@ -109,8 +111,7 @@ export async function build({ THREE, kit, font, renderer }) {
   b.add(G.box(14, 0.06, 0.06), '#ff4a1a', 'neon', M([0, 1.2, SZ + 3]));
   kit.djBooth(b, [0, 1.2, SZ + 1.2], 0, { w: 3.2, decks: false, front: '#ff4a1a', front2: '#ffb15a', body: '#1a0606' });
   props.push(kit.decks(scene, [0, 2.25, SZ + 1.2], 0, 1.7));
-  const hv = kit.canvasTex(1024, 512, (x, w, h) => { const g = x.createRadialGradient(w / 2, h / 2, 0, w / 2, h / 2, w / 2); g.addColorStop(0, '#5a1206'); g.addColorStop(1, '#0a0202'); x.fillStyle = g; x.fillRect(0, 0, w, h); kit.gradText(x, 'HALLOWEEN', w / 2, h / 2, 120, '#ffd0a0', '#ff4a1a', { glow: '#ff4a1a' }); });
-  kit.videoScreen(scene, 'video/halloween.mp4', 22, 11, [0, 9.2, Z3 + 0.1], [0, 0, 0], hv);
+  kit.vScreen(scene, 'video/halloween-v2.mp4', [0, 2.2, Z3 + 0.3], 0, 13, { edge: '#ff4a1a', stand: false });
   for (const sx of [-1, 1]) { kit.speaker(b, [sx * 6, 1.2, SZ], 0, 1.8, 1.3); kit.speaker(b, [sx * 6, 3.0, SZ], 0, 1.4, 1.1); }
 
   /* --- стол у фонтана: напитки и забытый смартфон --- */
@@ -177,8 +178,9 @@ export async function build({ THREE, kit, font, renderer }) {
     { p: [0, 3.6, 29.2], l: [0, 3.6, 20], t: 0 },
     { p: [0, 3.6, 28.6], l: [0, 3.8, 20], t: 0.12 },
     // первый зал: колонны, картины, галереи, гигантские ангелы
-    { p: [0, 3.2, 20], l: [-6, 5.5, 0], t: 0.22 },
-    { p: [0.6, 3.1, 8], l: [8, 6, -8], t: 0.32 },
+    { p: [0, 3.2, 20], l: [-6, 5.5, 0], t: 0.2 },
+    { p: [-4.2, 3.3, 3], l: [-19.8, 5.8, -1.2], t: 0.27 },
+    { p: [0.2, 3.1, 1], l: [8, 6, -12], t: 0.34 },
     { p: [0, 3.2, -6], l: [0, 9, Z2], t: 0.42 },
     { p: [0, 3.3, -20], l: [0, 6.5, Z2], t: 0.5 },
     // большие двери распахиваются — второй зал

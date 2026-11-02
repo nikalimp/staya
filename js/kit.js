@@ -644,16 +644,26 @@ export async function prop(scene, name, o = {}) {
 // img — world/art/<file>.webp; h — высота рамы; рама растягивается под пропорции картины
 const _artTex = new Map();
 export async function painting(scene, img, o = {}) {
-  if (!_artTex.has(img)) _artTex.set(img, new THREE.TextureLoader().loadAsync(img).then((t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; }));
-  const [src, tex] = await Promise.all([loadAsset('fancy_picture_frame_01'), _artTex.get(img)]);
+  let tex;
+  if (o.video) {
+    // видео в золотой раме: кадр 9:16, играет вместе с остальными видео сцены
+    const v = document.createElement('video');
+    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'metadata', crossOrigin: 'anonymous' });
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.src = img; _videos.push({ scene, v });
+    tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex._aspect = 9 / 16;
+  } else {
+    if (!_artTex.has(img)) _artTex.set(img, new THREE.TextureLoader().loadAsync(img).then((t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.flipY = false; return t; }));
+    tex = await _artTex.get(img);
+  }
+  const src = await loadAsset('fancy_picture_frame_01');
   const m = src.clone(true), bb = new THREE.Box3().setFromObject(src), sz = bb.getSize(new THREE.Vector3());
-  const aspect = tex.image.width / tex.image.height, h = o.h ?? 3, w = h * aspect * 1.08;
+  const aspect = tex._aspect ?? tex.image.width / tex.image.height, h = o.h ?? 3, w = h * aspect * 1.08;
   const thin = sz.z < sz.x ? 'z' : 'x';                       // ось толщины рамы
   const kh = h / sz.y, kw = w / (thin === 'z' ? sz.x : sz.z);
   m.scale.set(thin === 'z' ? kw : kh, kh, thin === 'z' ? kh : kw);
   m.traverse((c) => {
     if (!c.isMesh || !/canvas/.test(c.material.name)) return;
-    c.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55 });
+    c.material = o.video ? new THREE.MeshBasicMaterial({ map: tex, toneMapped: false }) : new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55 });
     // UV полотна рамы растягиваем на всю картину
     const uv = c.geometry.attributes.uv; if (!uv) return;
     let u0 = 1, u1 = 0, v0 = 1, v1 = 0;
@@ -702,12 +712,13 @@ export function decks(scene, p, ry = 0, w = 1.6) {
 const _videos = [];
 export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null) {
   const m = screen(w, h, fallback, p, r);
+  if (!fallback) m.material.color.set('#050508');
   const v = document.createElement('video');
   Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'metadata', crossOrigin: 'anonymous' });
   v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
   v.addEventListener('loadeddata', () => {
     const t = new THREE.VideoTexture(v); t.colorSpace = THREE.SRGBColorSpace;
-    m.material.map = t; m.material.needsUpdate = true;
+    m.material.map = t; m.material.color.set('#ffffff'); m.material.needsUpdate = true;
     // кадр видео вписывается в экран по ширине или высоте (без растяжения)
     const a = v.videoWidth / v.videoHeight, s = w / h;
     if (a > s) { t.repeat.set(s / a, 1); t.offset.set((1 - s / a) / 2, 0); } else { t.repeat.set(1, a / s); t.offset.set(0, (1 - a / s) / 2); }
@@ -721,6 +732,26 @@ export function playVideos(scene) {
     if (x.scene === scene) { if (x.v.paused && x.v.readyState >= 1) x.v.play().catch(() => {}); else if (x.v.readyState < 1) { x.v.preload = 'auto'; x.v.play().catch(() => {}); } }
     else if (!x.v.paused) x.v.pause();
   }
+}
+
+/* ---------- вертикальный экран 9:16 в тёмной рамке с неоновым контуром ---------- */
+// p — центр низа экрана, ry — поворот (экран смотрит в +Z при ry = 0), h — высота кадра
+export function vScreen(scene, src, p, ry = 0, h = 6, o = {}) {
+  const w = h * 9 / 16, bz = o.bezel ?? 0.12, g = new THREE.Group();
+  g.position.set(...p); g.rotation.y = ry; scene.add(g);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(w + bz * 2, h + bz * 2, 0.16), new THREE.MeshStandardMaterial({ color: '#0b0a10', roughness: 0.35, metalness: 0.4 }));
+  frame.position.set(0, h / 2 + bz, -0.09); g.add(frame);
+  const edge = new THREE.MeshBasicMaterial({ color: o.edge ?? '#ff3fb4', toneMapped: false });
+  for (const [ew, eh, x, y] of [[w + bz * 2, 0.04, 0, h + bz * 2], [w + bz * 2, 0.04, 0, 0], [0.04, h + bz * 2, -(w / 2 + bz), h / 2 + bz], [0.04, h + bz * 2, w / 2 + bz, h / 2 + bz]]) {
+    const e = new THREE.Mesh(new THREE.BoxGeometry(ew, eh, 0.05), edge); e.position.set(x, y, 0.0); g.add(e);
+  }
+  if (o.stand !== false && p[1] > 0.05) {      // ножки-стойки до пола
+    for (const sx of [-1, 1]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.12, p[1], 0.12), frame.material); l.position.set(sx * w * 0.3, -p[1] / 2, -0.1); g.add(l); }
+  }
+  g.updateMatrixWorld(true);
+  const c = new THREE.Vector3(0, h / 2 + bz, 0.005).applyMatrix4(g.matrixWorld);
+  videoScreen(scene, src, w, h, c.toArray(), [0, ry, 0]);
+  return g;
 }
 
 /* ---------- запечённый свет для сцен, собранных в коде (AQUA, клуб) ---------- */
