@@ -5,13 +5,14 @@
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import * as kit from './kit.js';
+import { startHeadTrack } from './headtrack.js';
 
 const SCENES = [
   { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.35, out: 'water' },
   { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.5, out: 'black' },
   { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black' },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut' },
-  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.2, out: null, final: 0.95 },
+  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.965, credits: [0.83, 0.97] },
 ];
 // Кнопки финала. Пустой href — кнопка не показывается.
 const LINKS = [
@@ -19,7 +20,6 @@ const LINKS = [
   { label: 'Telegram', href: 'https://t.me/+JP1gsoNXGpkzZDIy' },
   { label: 'VK', href: '' },
   { label: 'Почта', href: '' },          // mailto:…
-  { label: 'Сайт — Nik Alimp', href: 'https://nikalimp.ru', cls: 'dev' },
 ];
 
 const N = SCENES.length;
@@ -32,11 +32,11 @@ const DEBUG = new URLSearchParams(location.search).has('debug');
 
 const $ = (s) => document.querySelector(s);
 const canvas = $('#gl'), fadeEl = $('#fade'), pctEl = $('#pct'), arc = $('#arc'), ring = $('#ring'), pre = $('#pre');
-const spacer = $('#spacer'), finalEl = $('#final');
+const spacer = $('#spacer'), finalEl = $('#final'), creditsEl = $('#credits'), sndBtn = $('#snd'), headBtn = $('#head'), hintEl = $('#hint');
 LINKS.filter((l) => l.href).forEach((l) => {
   const a = document.createElement('a'); a.href = l.href; a.textContent = l.label; if (l.cls) a.className = l.cls;
   if (l.href.startsWith('http')) { a.target = '_blank'; a.rel = 'noopener'; }
-  finalEl.appendChild(a);
+  finalEl.querySelector('.row').appendChild(a);
 });
 
 /* ---------- рендерер ---------- */
@@ -103,12 +103,7 @@ function renderPreview(owner, next) {
   mesh.material.map = rt.texture; mesh.material.needsUpdate = true;
   owner.scene.userData.rt = rt; owner.previewDone = true; dirty = true;
 }
-function dropFar(cur) {
-  for (const [i, s] of built) if (Math.abs(i - cur) > 1) {
-    s.scene.userData.rt?.dispose(); kit.disposeScene(s.scene); built.delete(i);
-    if (DEBUG) console.log('[staya] dropped', SCENES[i].id);
-  }
-}
+// Все сцены собираются во время прелоадера и остаются в памяти — при скролле ничего не догружается.
 
 /* ---------- скролл → позиция ---------- */
 function scrollToG(y) {
@@ -140,11 +135,18 @@ function apply(g) {
   const c = s.cam(t);
   camera.position.copy(c.p); camera.lookAt(c.l);
   if (s.roll) camera.rotateZ(s.roll(t));
+  // погружение: камера чуть поворачивается за головой зрителя, кивки в такт качают сцену
+  if (head.on) { camera.rotateY(-head.x * 0.13); camera.rotateX(head.y * 0.09); camera.translateY(head.y * 0.05); }
   renderer.render(s.scene, camera);
-  if (i !== curIdx) { curIdx = i; dropFar(i); audio.go(i); }
-  // соседей собираем заранее — для склеек 'cut' это обязательно
+  if (i !== curIdx) { curIdx = i; audio.go(i); }
   if (t > 0.3 && i < N - 1 && !built.has(i + 1)) idle(() => buildScene(i + 1));
-  if (t < 0.25 && i > 0 && !built.has(i - 1)) idle(() => buildScene(i - 1));
+  // финал: титры снизу вверх, затем кнопки
+  const cr = SCENES[i].credits;
+  if (cr) {
+    const k = (t - cr[0]) / (cr[1] - cr[0]), on = k > -0.02 && k < 1.05;
+    creditsEl.classList.toggle('on', on);
+    if (on) { const hh = creditsEl.offsetHeight; creditsEl.style.transform = `translateY(${(VH - (VH + hh) * Math.max(0, k)).toFixed(1)}px)`; }
+  } else creditsEl.classList.remove('on');
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
   return true;
 }
@@ -158,6 +160,7 @@ function loop() {
     cur += Math.sign(d) * Math.min(Math.abs(d) * 0.12, 0.02);
     if (Math.abs(target - cur) < 1e-5) cur = target;
   }
+  if (head.on && (Math.abs(head.x - head.dx) > 0.002 || Math.abs(head.y - head.dy) > 0.002)) { head.dx = head.x; head.dy = head.y; dirty = true; }
   if (started && (cur !== lastG || dirty)) { if (apply(cur)) { lastG = cur; dirty = false; } }
   requestAnimationFrame(loop);
 }
@@ -170,6 +173,29 @@ function tweenScroll(toY, ms = 1400) {
   };
   requestAnimationFrame(step);
 }
+
+/* ---------- погружение: слежение за головой (только десктоп) ---------- */
+const head = { on: false, x: 0, y: 0, dx: 0, dy: 0, ctl: null };
+if (!mobile && navigator.mediaDevices?.getUserMedia) headBtn.hidden = false;
+headBtn.addEventListener('click', async () => {
+  if (head.ctl) { head.ctl.stop(); head.ctl = null; head.on = false; dirty = true; headBtn.setAttribute('aria-pressed', 'false'); hintEl.textContent = ''; return; }
+  headBtn.classList.add('busy'); hintEl.textContent = 'Включаем камеру… видео остаётся на вашем устройстве';
+  try {
+    head.ctl = await startHeadTrack((x, y) => { head.x = x; head.y = y; });
+    head.on = true; headBtn.setAttribute('aria-pressed', 'true');
+    hintEl.textContent = 'Погружение включено: смотрите по сторонам и качайте головой в такт';
+  } catch (e) {
+    console.warn('[staya] head tracking', e); hintEl.textContent = 'Камера недоступна — путешествие будет без погружения';
+  }
+  headBtn.classList.remove('busy');
+});
+/* ---------- звук: выключатель на прелоадере ---------- */
+let soundOn = true;
+sndBtn.addEventListener('click', () => {
+  soundOn = !soundOn; sndBtn.setAttribute('aria-pressed', String(soundOn));
+  sndBtn.setAttribute('aria-label', soundOn ? 'Звук включён' : 'Звук выключен');
+  if (started) audio.setOn(soundOn);
+});
 
 /* ---------- звук: свой трек на каждую сцену, кроссфейд ---------- */
 const audio = {
@@ -215,7 +241,7 @@ const audio = {
   },
 };
 // вкладка скрыта — музыка на паузе
-document.addEventListener('visibilitychange', () => { if (started) audio.setOn(!document.hidden); });
+document.addEventListener('visibilitychange', () => { if (started && soundOn) audio.setOn(!document.hidden); });
 
 /* ---------- прелоадер: кольцо с процентом → кнопка Play ---------- */
 const C = 2 * Math.PI * 56;
@@ -240,14 +266,14 @@ async function boot() {
     a.addEventListener('canplaythrough', done, { once: true }); a.addEventListener('error', done, { once: true }); setTimeout(done, 4000);
   });
   await Promise.all([fontP, cssFontP]);
-  await buildScene(0); setReal(85);
+  // все сцены — сразу, пока крутится кольцо: дальше путешествие идёт без подгрузок
+  for (let i = 0; i < N; i++) { await buildScene(i); setReal(45 + (50 * (i + 1)) / N); await new Promise((r) => setTimeout(r, 0)); }
   await firstTrack;
-  idle(() => buildScene(1));
   setReal(100);
 }
 ring.addEventListener('click', () => {
   if (!ring.classList.contains('ready') || started) return;
-  audio.init(); audio.setOn(true);
+  audio.init(); audio.setOn(soundOn);
   pre.classList.add('out'); document.body.classList.remove('locked');
   scrollTo(0, 0); cur = target = 0; started = true; dirty = true;
   setTimeout(() => tweenScroll(gToScroll(FADE * 1.4), reduced ? 0 : 2600), 350);

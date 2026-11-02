@@ -579,3 +579,54 @@ export function loadGLB(url) {
   if (!_gltf) { _gltf = new GLTFLoader(); _gltf.setMeshoptDecoder(MeshoptDecoder); }
   return _gltf.loadAsync(url);
 }
+
+/* ---------- человеческая камера: шаги и покачивание ---------- */
+// walk: [[t0, t1], ...] — участки пути, где герой идёт пешком (голова качается в такт шагам)
+export function humanize(cam, { walk = [], swim = [], step = 0.72, amp = 0.032 } = {}) {
+  // длина пути для фазы шагов
+  const N = 600, dist = new Float32Array(N + 1), prev = V(0, 0, 0);
+  let d = 0;
+  for (let i = 0; i <= N; i++) { const p = cam(i / N).p; if (i) d += p.distanceTo(prev); dist[i] = d; prev.copy(p); }
+  const w = (t, list, edge = 0.02) => list.reduce((m, [a, c]) => Math.max(m, Math.min(1, Math.max(0, Math.min(t - a, c - t) / edge))), 0);
+  const out = { p: V(0, 0, 0), l: V(0, 0, 0) }, fw = V(0, 0, 0), side = V(0, 0, 0), up = V(0, 1, 0);
+  return (t) => {
+    const c = cam(t); out.p.copy(c.p); out.l.copy(c.l);
+    const k = Math.min(N, Math.max(0, t * N)), i = Math.floor(k), dd = dist[i] + (dist[Math.min(N, i + 1)] - dist[i]) * (k - i);
+    const ph = (dd / step) * Math.PI;
+    const ww = w(t, walk), sw = w(t, swim);
+    const dy = ww * (Math.abs(Math.sin(ph)) - 0.5) * amp * 2 + sw * Math.sin(ph * 0.5) * 0.025;
+    fw.copy(out.l).sub(out.p).normalize(); side.crossVectors(fw, up).normalize();
+    const dx = ww * Math.sin(ph) * amp * 0.45;
+    out.p.y += dy; out.l.y += dy * 0.6; out.p.addScaledVector(side, dx); out.l.addScaledVector(side, dx * 0.5);
+    return out;
+  };
+}
+
+/* ---------- стакан в руке героя ---------- */
+// Стакан с тёмным напитком и кистью. at(c, local, tilt) ставит его в систему координат камеры.
+export function drink({ skin = '#ecbf9f', liquid = '#2a0812' } = {}) {
+  const g = new THREE.Group();
+  const glass = new THREE.MeshPhysicalMaterial({ color: '#dff6ff', roughness: 0.04, transparent: true, opacity: 0.28, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false });
+  const add = (geo, mat, p = [0, 0, 0], r = [0, 0, 0]) => { const m = new THREE.Mesh(geo, mat); m.position.set(...p); m.rotation.set(...r); m.userData.dynamic = true; m.frustumCulled = false; g.add(m); return m; };
+  add(new THREE.CylinderGeometry(0.042, 0.034, 0.12, 28, 1, true), glass, [0, 0.06, 0]).renderOrder = 3;
+  add(new THREE.CylinderGeometry(0.034, 0.034, 0.012, 28), glass, [0, 0.006, 0]);
+  const liq = new THREE.MeshPhysicalMaterial({ color: liquid, roughness: 0.1, clearcoat: 1, emissive: '#1a0206', emissiveIntensity: 0.6 });
+  add(new THREE.CylinderGeometry(0.039, 0.034, 0.085, 28), liq, [0, 0.055, 0]);
+  add(new THREE.BoxGeometry(0.026, 0.026, 0.026), new THREE.MeshPhysicalMaterial({ color: '#e8f8ff', transparent: true, opacity: 0.6, roughness: 0.05 }), [0.012, 0.096, 0.006], [0.4, 0.6, 0.2]);
+  add(new THREE.CylinderGeometry(0.004, 0.004, 0.17, 8), new THREE.MeshStandardMaterial({ color: '#ff3fb4', roughness: 0.3 }), [-0.015, 0.12, -0.008], [0.2, 0, 0.25]);
+  // кисть: четыре пальца спереди, большой — сбоку
+  const sk = new THREE.MeshStandardMaterial({ color: skin, roughness: 0.45 });
+  const hand = new THREE.Group(); hand.visible = false; g.add(hand);
+  for (let i = 0; i < 4; i++) { const m = new THREE.Mesh(new THREE.CapsuleGeometry(0.011, 0.05, 3, 8), sk); m.position.set(0.0, 0.03 + i * 0.022, 0.043); m.rotation.z = Math.PI / 2; m.userData.dynamic = true; m.frustumCulled = false; hand.add(m); }
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.05, 16, 10), sk); palm.scale.set(0.9, 1.3, 0.55); palm.position.set(0.03, 0.06, 0.055); palm.userData.dynamic = true; palm.frustumCulled = false; hand.add(palm);
+  const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.32, 3, 10), sk); arm.position.set(0.09, -0.08, 0.16); arm.rotation.set(1.1, 0, 0.5); arm.userData.dynamic = true; arm.frustumCulled = false; hand.add(arm);
+  const dummy = new THREE.PerspectiveCamera(), _q = new THREE.Quaternion(), _e = new THREE.Euler();
+  return {
+    group: g, hand,
+    at(c, local, tilt = 0) {
+      dummy.position.copy(c.p); dummy.lookAt(c.l); dummy.updateMatrixWorld(true);
+      g.position.copy(dummy.localToWorld(V(local[0], local[1], local[2])));
+      g.quaternion.copy(dummy.quaternion).multiply(_q.setFromEuler(_e.set(tilt, 0, 0)));
+    },
+  };
+}
