@@ -4,8 +4,9 @@
 //   тело в позе (цвет вершин + область в альфе: кожа, бельё/бикини, глаза, волосы, майка, шорты), майка и шорты оболочками,
 //   упрощённая копия для толпы, якоря костей (голова, грудь, кисти) для причёсок и аксессуаров.
 // person(b, look, o) кладёт человека в Builder; при b.build() все люди сцены собираются в InstancedMesh — мало вызовов отрисовки.
+// Вид: тёмные силуэты с неоновым контровым светом (цвет — b.rim сцены) и огоньками телефонов в поднятых руках.
 //   o.p [x,y,z] — ноги; o.ry — поворот (лицо в +Z при ry=0); o.pose — поза; o.s — масштаб; o.lo — упрощённая копия для толпы.
-import { THREE, G, M, V, Builder, loadGLB } from './kit.js';
+import { THREE, G, M, V, Builder, loadGLB, glowPoints as kit_glow } from './kit.js';
 
 /* ---------- образы ---------- */
 const SK = { light: '#f3cdb2', fair: '#ecbf9f', tan: '#d9a07c', olive: '#c98f69', deep: '#8a5a3e' };
@@ -124,40 +125,30 @@ function accGeo(kind, S) {
   return (ACC[key] = merge(f));
 }
 
-/* ---------- материал тела: перекраска областей по атрибутам экземпляра ---------- */
+/* ---------- материал силуэта: почти чёрное тело + неоновый контур по краю (френель) ---------- */
 let BODY_MAT = null;
 function bodyMat() {
   if (BODY_MAT) return BODY_MAT;
-  const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.3, sheen: 0.3 });
+  const m = new THREE.MeshStandardMaterial({ color: 0x020203, roughness: 0.9, metalness: 0 });
   m.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
-      attribute vec3 iSkin; attribute vec3 iCloth; attribute vec3 iTop; attribute vec3 iShorts; attribute vec3 iHair;
-      varying vec3 vSkin; varying vec3 vCloth; varying vec3 vTop; varying vec3 vShorts; varying vec3 vHair;`)
-      .replace('#include <begin_vertex>', `#include <begin_vertex>
-      vSkin = iSkin; vCloth = iCloth; vTop = iTop; vShorts = iShorts; vHair = iHair;`);
+      attribute vec3 iRim; varying vec3 vRim;`).replace('#include <begin_vertex>', `#include <begin_vertex>
+      vRim = iRim;`);
     sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vSkin; varying vec3 vCloth; varying vec3 vTop; varying vec3 vShorts; varying vec3 vHair;`)
-      .replace('#include <color_fragment>', `
-      #if defined( USE_COLOR_ALPHA )
-        float rg = floor(vColor.a * 10.0 + 0.5); vec3 c = vColor.rgb;
-        if (rg < 0.5) c = c * vSkin;
-        else if (rg < 1.5) c = vCloth;
-        else if (rg < 2.5) c = c;
-        else if (rg < 3.5) c = vHair * (0.35 + 1.4 * dot(c, vec3(0.3, 0.59, 0.11)));
-        else if (rg < 4.5) c = vTop;
-        else c = vShorts;
-        diffuseColor.rgb *= c;
-      #endif`);
+      varying vec3 vRim;`).replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
+      float fr = 1.0 - abs(dot(normalize(vNormal), normalize(vViewPosition)));
+      totalEmissiveRadiance += vRim * pow(fr, 4.5) * 1.6;`);
   };
   return (BODY_MAT = m);
 }
-const ACC_MAT = { gloss: () => new THREE.MeshPhysicalMaterial({ roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05 }), plastic: () => new THREE.MeshStandardMaterial({ roughness: 0.55 }),
+const ACC_MAT = { gloss: () => new THREE.MeshPhysicalMaterial({ roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05 }), plastic: () => new THREE.MeshStandardMaterial({ color: 0x07060b, roughness: 0.55 }),
   metal: () => new THREE.MeshStandardMaterial({ roughness: 0.25, metalness: 1 }), lens: () => new THREE.MeshPhysicalMaterial({ roughness: 0.05, metalness: 0.3, clearcoat: 1, transparent: true, opacity: 0.85 }) };
 const ACC_KIND = { frame: 'gloss', lens: 'lens', cap: 'plastic', capBack: 'plastic', bucket: 'plastic', chain: 'metal' };
 
 /* ---------- сборка: все люди сцены → InstancedMesh по видам геометрии ---------- */
 const _m = new THREE.Matrix4(), _e = new THREE.Matrix4();
-Builder.peopleBuild = (list) => {
+Builder.peopleBuild = (list, builder) => {
+  const RIM = (builder?.rim ?? ['#ff3fb4', '#2fe6ff', '#8a5cff']).map((h) => col(h)), phones = [], _p = new THREE.Vector3();
   const group = new THREE.Group(); group.name = 'people';
   if (!DATA.M) { console.warn('[staya] people not loaded'); return group; }
   const buckets = new Map();
@@ -165,24 +156,28 @@ Builder.peopleBuild = (list) => {
     if (!buckets.has(key)) buckets.set(key, { geoFn, mat, mats: [], attrs: [] });
     const bk = buckets.get(key); bk.mats.push(matrix); bk.attrs.push(attrs);
   };
+  let n = 0;
   for (const { look, o, base } of list) {
+    const rim = RIM[n % RIM.length]; n++;
     const r = resolve(look, o), D = DATA[r.S], P = `${r.S}_${r.pose}`;
     const pm = base.clone().multiply(M(o.p ?? [0, 0, 0], [0, o.ry ?? 0, 0], (o.s ?? 1) * (r.S === 'F' ? 0.95 : 0.97)));
     // детализация: резиденты — полная, гости — средняя, толпа вдали (o.lo) — упрощённая
-    const lod = o.lo ? '_lo' : look.name ? '' : '_mid', lo = lod === '_lo';
-    const tint = { iSkin: r.skin, iCloth: r.cloth, iTop: r.top ?? r.cloth, iShorts: r.shorts ?? r.cloth, iHair: r.hairC };
+    const lod = o.lo ? '_lo' : '_mid', lo = lod === '_lo';
+    const tint = { iRim: rim };
     const bk = D.geo[P + lod] ? P + lod : P; put(bk, () => D.geo[bk], 'body', pm, tint);
-    const L = lo ? '_lo' : '';
-    if (r.top) put(P + '_top' + L, () => D.geo[P + '_top' + L], 'body', pm, tint);
-    if (r.shorts) put(P + '_shorts' + L, () => D.geo[P + '_shorts' + L], 'body', pm, tint);
     const head = pm.clone().multiply(D.anchor[P + '_@Head'] ?? _e.identity());
     const hk = `${r.S}_hair_${r.hair}` + (lo && D.geo[`${r.S}_hair_${r.hair}_lo`] ? '_lo' : ''); if (D.geo[hk]) put(hk, () => D.geo[hk], 'body', head, tint);
     if (look.hair === 'buzz' && r.S === 'M' && look.beard) put(`M_hair_Beard`, () => D.geo.M_hair_Beard, 'body', head, tint);
-    const acc = (kind, c) => put(kind + r.S, () => accGeo(kind, r.S), ACC_KIND[kind], kind === 'chain' ? pm.clone().multiply(D.anchor[P + '_@spine_03'] ?? _e.identity()) : head, { c: col(c) });
-    if (look.glasses) { acc('frame', look.glasses.c ?? '#111'); acc('lens', look.glasses.lens ?? look.glasses.c ?? '#0a0a0e'); }
-    if (look.cap) acc(look.cap.back ? 'capBack' : 'cap', look.cap.c);
-    if (look.bucket) acc('bucket', look.bucket);
-    if (look.chain) acc('chain', look.chain);
+    // силуэт: кепки и панамы меняют контур, очки и цепи не видны
+    const acc = (kind) => put(kind + r.S, () => accGeo(kind, r.S), ACC_KIND[kind], head, { c: col('#07060b') });
+    if (look.cap) acc(look.cap.back ? 'capBack' : 'cap');
+    if (look.bucket) acc('bucket');
+    // огонёк телефона в поднятой руке — у каждого третьего, кто танцует с руками вверх или снимает
+    const hr = D.anchor[`${r.S}_rest_@hand_r`];
+    if (hr && (r.pose === 'phone' || ((r.pose === 'up' || r.pose === 'wave') && n % 3 === 0))) {
+      _p.setFromMatrixPosition(hr).applyMatrix4(D.anchor[P + '_@hand_r'] ?? _e.identity()).applyMatrix4(pm);
+      phones.push([_p.x, _p.y + 0.06, _p.z, '#e8f4ff', 0.35, 2.2]);
+    }
   }
   for (const [key, bk] of buckets) {
     const src = bk.geoFn(); if (!src) continue;
@@ -192,7 +187,7 @@ Builder.peopleBuild = (list) => {
     const n = bk.mats.length;
     let mat;
     if (bk.mat === 'body') {
-      for (const k of ['iSkin', 'iCloth', 'iTop', 'iShorts', 'iHair']) {
+      for (const k of ['iRim']) {
         const a = new Float32Array(n * 3); bk.attrs.forEach((t, i) => t[k].toArray(a, i * 3));
         g.setAttribute(k, new THREE.InstancedBufferAttribute(a, 3));
       }
@@ -203,6 +198,7 @@ Builder.peopleBuild = (list) => {
     im.computeBoundingSphere(); im.frustumCulled = true; im.userData.dynamic = false;
     group.add(im);
   }
+  if (phones.length) group.add(kit_glow(phones));
   return group;
 };
 export const POSES = Object.keys(POSE_MAP);

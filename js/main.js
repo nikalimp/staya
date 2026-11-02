@@ -12,9 +12,10 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const SCENES = [
-  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.35, out: 'water', sfx: [[0.02, 'whoosh'], [0.37, 'whoosh'], [0.95, 'splash']] },
+  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.15, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.95, 'splash']] },
   { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.5, out: 'black', sfx: [[0.0, 'bubbles'], [0.1, 'bubbles'], [0.36, 'splash'], [0.86, 'clink'], [0.95, 'gulp']] },
   { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black', sfx: [[0.03, 'clink'], [0.97, 'door']] },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.03, 'door'], [0.9, 'whoosh']] },
@@ -35,6 +36,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 const mobile = isTouch || innerWidth <= 860;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const DEBUG = new URLSearchParams(location.search).has('debug');
+if (mobile) document.documentElement.classList.add('touch');
 
 const $ = (s) => document.querySelector(s);
 const canvas = $('#gl'), fadeEl = $('#fade'), pctEl = $('#pct'), arc = $('#arc'), ring = $('#ring'), pre = $('#pre');
@@ -53,12 +55,28 @@ renderer.toneMappingExposure = 1.05;
 renderer.setClearColor(0x000000, 1);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
 // десктоп: настоящее свечение неона и солнца (bloom); телефон — лёгкие ореолы-спрайты без постобработки
-let composer = null, renderPass = null, bloomPass = null;
+let composer = null, renderPass = null, bloomPass = null, vigPass = null;
 if (!mobile) {
   composer = new EffectComposer(renderer);
   renderPass = new RenderPass(new THREE.Scene(), camera);
   composer.addPass(renderPass);
   composer.addPass(bloomPass = new UnrealBloomPass(new THREE.Vector2(1024, 1024), 0.42, 0.5, 0.9));
+  // виньетка и лёгкий расфокус по краям кадра (центр резкий)
+  composer.addPass(vigPass = new ShaderPass({
+    uniforms: { tDiffuse: { value: null }, uAspect: { value: 1 } },
+    vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uAspect; varying vec2 vUv;
+      void main(){
+        vec2 d = vUv - 0.5; d.x *= uAspect; float r = length(d);
+        float k = smoothstep(0.45, 0.95, r);
+        vec2 dir = (vUv - 0.5) * 0.006 * k;
+        vec4 c = vec4(0.0);
+        for (int i = 0; i < 8; i++) c += texture2D(tDiffuse, vUv - dir * float(i));
+        c /= 8.0;
+        c.rgb *= mix(1.0, 0.42, smoothstep(0.38, 0.95, r));
+        gl_FragColor = c;
+      }`,
+  }));
   composer.addPass(new OutputPass());
 }
 
@@ -69,7 +87,7 @@ const fovFor = (aspect) => (aspect < 0.8 ? 72 : aspect < 1.2 ? 64 : 54);
 function layout() {
   const w = innerWidth, h = isTouch ? Math.max(VH, innerHeight) : innerHeight;
   renderer.setSize(w, h, false); canvas.style.height = h + 'px';
-  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
+  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); vigPass.uniforms.uAspect.value = w / h; }
   camera.aspect = w / h; camera.fov = baseFov = fovFor(camera.aspect); camera.updateProjectionMatrix();
   glowScale = renderer.getDrawingBufferSize(new THREE.Vector2()).y / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
   kit.glowMats.forEach((m) => (m.uniforms.uScale.value = glowScale));
@@ -153,12 +171,14 @@ function apply(g) {
   if (s.roll) camera.rotateZ(s.roll(t));
   // погружение: камера чуть поворачивается за головой зрителя, кивки в такт качают сцену
   // сдвиг головы — как взгляд в окно (камера уходит в обратную сторону), поворот головы — камера смотрит туда же
-  const fv = baseFov * (1 - Math.max(-0.6, Math.min(1, head.z)) * 0.2);   // зритель ближе к экрану — кадр приближается
+  // у переходов (телефон, стакан) кадр центрируется: влияние головы и курсора плавно гаснет
+  const cw = 1 - (s.calm?.(t) ?? 0), hx = head.x * cw, hy = head.y * cw, hyaw = head.yaw * cw, hp = head.pitch * cw;
+  const fv = baseFov * (1 - Math.max(-0.6, Math.min(1, head.z * cw)) * 0.2);   // зритель ближе к экрану — кадр приближается
   if (Math.abs(camera.fov - fv) > 1e-3) { camera.fov = fv; camera.updateProjectionMatrix(); }
-  if (head.x || head.y || head.yaw || head.pitch) {
+  if (hx || hy || hyaw || hp) {
     // сдвиг головы → камера сдвигается туда же и чуть поворачивается вслед; поворот головы → камера смотрит туда же
-    camera.translateX(head.x * 0.55); camera.translateY(head.y * 0.4);
-    camera.rotateY(-head.x * 0.16 - head.yaw * 0.3); camera.rotateX(head.y * 0.12 + head.pitch * 0.2);
+    camera.translateX(hx * 0.55); camera.translateY(hy * 0.4);
+    camera.rotateY(-hx * 0.16 - hyaw * 0.3); camera.rotateX(hy * 0.12 + hp * 0.2);
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
   if (composer) { renderPass.scene = s.scene; bloomPass.strength = s.bloom ?? 0.42; composer.render(); } else renderer.render(s.scene, camera);

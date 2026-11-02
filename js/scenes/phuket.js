@@ -79,6 +79,7 @@ export async function build({ THREE, kit, renderer, mobile }) {
 
   /* --- люди: команда в VIP-беседке и гости у бассейна --- */
   const b = new Builder(), R = kit.rng(5);
+  b.rim = ['#ffb070', '#ff7a5a', '#ffd9a8'];   // силуэты в лучах рассвета
   // команда STAYA: двое за диджейской стойкой играют для толпы у бассейна
   human(b, RESIDENTS.gulidic, { p: [GX - 1.7, GY, GZ - 0.6], ry: -Math.PI / 2, pose: 'dj' });
   human(b, RESIDENTS.klen, { p: [GX - 1.7, GY, GZ + 0.6], ry: -Math.PI / 2, pose: 'up' });
@@ -113,6 +114,7 @@ export async function build({ THREE, kit, renderer, mobile }) {
   for (let i = 0; i < 26; i += 2) for (const z of [GZ - 3.4, GZ + 3.4]) glows.push([GX - 4 + (i / 26) * 8, 3.72, z, '#ffd9a0', 0.45, 1.4]);
   glows.push([GX - 4.25, 4.3, GZ, '#ff3fb4', 3, 0.7], [GX - 2.9, 1.05, GZ, '#ff3fb4', 1.6, 0.8]);
   scene.add(kit.glowPoints(glows));
+  kit.haze(scene, { box: [-60, 80, -24, -8, -160, -40], colors: ['#ffd2b0', '#ffb07a'], n: 14, size: 60, opacity: 0.08 });
 
   /* --- финальная композиция: солнце слева, гидроциклы справа, по центру титры встают из-за горизонта --- */
   const CP = new THREE.Vector3(0, 2.6, -21.5);
@@ -120,7 +122,7 @@ export async function build({ THREE, kit, renderer, mobile }) {
   const RT = new THREE.Vector3(-VD.z, 0, VD.x);                                                    // вправо от взгляда
   const at = (dist, side, y) => CP.clone().addScaledVector(VD, dist).addScaledVector(RT, side).setY(y);
   // гидроциклы с райдерами и пенным следом
-  const jb = new Builder();
+  const jb = new Builder(); jb.rim = ['#ffb070'];
   const wakeT = kit.canvasTex(64, 512, (x, w, h) => {
     const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g;
     for (let y = 0; y < h; y += 3) { const ww = w * (0.35 + 0.65 * (y / h)) * (0.7 + Math.random() * 0.3); x.globalAlpha = 0.5 + Math.random() * 0.5; x.fillRect((w - ww) / 2, y, ww, 2); }
