@@ -1,6 +1,6 @@
 // 04 · STAYA HALLOWEEN — двухэтажный дворец XIX века с парадной лестницей посередине.
 // Портал: камера поднимается по лестнице и влетает в приоткрытые двери.
-export function build({ THREE, kit, font, renderer }) {
+export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M, V } = kit;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#080203');
@@ -118,16 +118,27 @@ export function build({ THREE, kit, font, renderer }) {
     b.add(G.box(4.2, 6, 0.2), GOLD, 'metal', M([sx * 10.5, 14, DZ + 0.3]));
   }
 
-  /* --- люстры --- */
-  for (const z of [14, 3, -9]) {
-    const y = 16.5;
-    kit.rod(b, [0, 24, z], [0, y + 1.4, z], 0.05, GOLD, 'metal');
-    for (const [rr, dy] of [[2.4, 0], [1.7, 0.7], [1.0, 1.3]]) {
-      b.add(G.tor(rr, 0.07, 6, 36), GOLD, 'metal', M([0, y + dy, z], [Math.PI / 2, 0, 0]));
-      const n = Math.round(rr * 7);
-      for (let k = 0; k < n; k++) { const a = (k / n) * Math.PI * 2; glows.push([Math.cos(a) * rr, y + dy + 0.3, z + Math.sin(a) * rr, '#ffc27a', 0.55, 2]); b.add(G.cyl(0.04, 0.04, 0.22, 5), '#fff4e0', 'plastic', M([Math.cos(a) * rr, y + dy + 0.12, z + Math.sin(a) * rr])); }
-    }
-    glows.push([0, y + 0.6, z, '#ffb15a', 7, 0.5]);
+  /* --- люстры (Poly Haven, CC0): три разные, огромные, на золотых штангах --- */
+  const props = [];
+  [['Chandelier_01', 14], ['Chandelier_02', 3], ['Chandelier_03', -9]].forEach(([n, z]) => {
+    kit.rod(b, [0, 24, z], [0, 18.1, z], 0.05, GOLD, 'metal');
+    props.push(kit.prop(scene, n, { p: [0, 18.2, z], s: 4.2, anchor: 'top', emissive: '#ffb15a', ei: 0.35 }));
+    for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; glows.push([Math.cos(a) * 1.4, 16.2, z + Math.sin(a) * 1.4, '#ffc27a', 0.6, 2]); }
+    glows.push([0, 15.8, z, '#ffb15a', 7, 0.5]);
+  });
+  // фонари-люстры под галереями
+  for (const sx of [-1, 1]) for (const z of [-20, -8, 4, 16]) {
+    props.push(kit.prop(scene, 'lantern_chandelier_01', { p: [sx * 16.5, 9.6, z], s: 1.5, anchor: 'top', emissive: '#ffb15a', ei: 0.3 }));
+    glows.push([sx * 16.5, 8.4, z, '#ffc27a', 2.2, 0.8]);
+  }
+  // готические статуи вдоль зала, шкафы под галереями, комоды с лампами на площадке
+  for (const sx of [-1, 1]) {
+    for (const z of [17.5, 6]) props.push(kit.prop(scene, 'gothic_statue', { p: [sx * 8, 0, z], ry: -sx * Math.PI / 2, s: 1.35 }));
+    for (const z of [-12, -1, 10]) props.push(kit.prop(scene, 'GothicCabinet_01', { p: [sx * 19.4, 0, z], ry: -sx * Math.PI / 2, s: 1.35 }));
+    props.push(kit.prop(scene, 'GothicCommode_01', { p: [sx * 9.5, 6, -19.6], s: 1.3 }));
+    props.push(kit.prop(scene, 'vintage_oil_lamp', { p: [sx * 9.1, 6 + 1.58, -19.6], s: 1.4, emissive: '#ffb15a', ei: 0.6 }));
+    props.push(kit.prop(scene, 'horse_statue_01', { p: [sx * 10.1, 6 + 1.58, -19.6], ry: sx * 0.6, s: 2.2 }));
+    glows.push([sx * 9.1, 6 + 2.3, -19.6, '#ffb15a', 1.4, 1.4]);
   }
 
   /* --- тыквы, летучие мыши, гости --- */
@@ -210,6 +221,7 @@ export function build({ THREE, kit, font, renderer }) {
   const nrm = new THREE.Vector3(0, 0, 1).applyQuaternion(phone.quaternion);
   glows.push([...W(0, 1.45, 0.25), '#9fb2ff', 0.6, 0.5]);
 
+  await Promise.all(props);
   scene.add(kit.glowPoints(glows));
   scene.add(b.build());
 

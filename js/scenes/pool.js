@@ -109,6 +109,8 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     b.add(kit.G.cyl(0.038, 0.034, 0.08, 14), kit.pick(['#ff3fb4', '#2fe6ff', '#ffb23f', '#2a0812'], i), 'gloss', kit.M([BX + dx, BT + 0.12, BZ + dz]));
   });
   const hero = kit.drink(); scene.add(hero.group);
+  // барные стулья (Poly Haven, CC0) — по краям стойки, центр свободен для героя
+  await Promise.all([-2.0, -1.3, 1.3, 2.0].map((dx, i) => kit.prop(scene, 'bar_chair_round_01', { p: [BX + dx, T, BZ - 1.05], ry: (i % 2 ? 0.3 : -0.4), s: 1.05 })));
   scene.add(b.build());
 
   /* --- свет для людей (запечённый двор от него не зависит) --- */

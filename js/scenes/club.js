@@ -2,7 +2,7 @@
 // Голова поднимается от стакана (из прошлой сцены) — мы уже в толпе → протискиваемся к сцене →
 // выход под табличкой WC → лестница вниз → коридор с парочками → красная двойная дверь, как во дворце.
 import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
-export function build({ THREE, kit, font, renderer }) {
+export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M } = kit;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#05020a');
@@ -225,6 +225,13 @@ export function build({ THREE, kit, font, renderer }) {
   const L = (c, i, p, d = 45) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
   L(PINK, 200, [0, 11.5, 37.5], 18); L(PINK, 120, [0, 8, 27], 18); L(VIO, 380, [0, 8, -8]); L(CY, 220, [-10, 5, 0]); L(PINK, 220, [10, 5, 0]); L('#fff1d6', 40, [0, 5, 0], 10); L(PINK, 70, [18, 2.8, -7.5], 9); L('#ff2a55', 90, [24, -2, -7.5], 10); L(PINK, 90, [33, LY + 2.8, -7.5], 11);
   scene.add(kit.glowPoints(glows));
+  // реквизит 2017 (Poly Haven, CC0): бумбокс на сцене, кассетники и бутылки на столиках лаунжа
+  await Promise.all([
+    kit.prop(scene, 'boombox', { p: [-4.6, 1.0, -11.9], ry: 0.25, s: 2.2 }),
+    kit.prop(scene, 'boombox', { p: [4.8, 1.0, -11.8], ry: -0.3, s: 2.2 }),
+    kit.prop(scene, 'portable_cassette_player', { p: [-12.2, 0.58, 2.6], ry: 0.8, s: 2.4 }),
+    kit.prop(scene, 'wine_bottles_01', { p: [-12.9, 0.58, 9.2], ry: 1.2, s: 1.6 }),
+  ]);
   scene.add(b.build());
 
   /* --- камера --- */
