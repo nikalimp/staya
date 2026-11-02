@@ -1,12 +1,11 @@
 // 02 · STAYA POOL — двор коттеджа: бассейн, главная сцена с хитами и осьминогом, электро-сцена вдали, дом.
 // Геометрия и свет собраны в Blender и запечены в текстуры (Cycles): scripts/blender/pool_build.py, pool_bake.py.
 // Здесь: загрузка GLB, материалы по группам, живая вода, люди, свечение и путь камеры.
-// Путь от первого лица: короткий заплыв под водой → выныриваем лицом к сцене → плывём к лестнице →
-// пешком вдоль бассейна, взгляд на электро-сцену → бар: герой берёт стакан и подносит ко рту → темнота.
+// Путь от первого лица: выныриваем в центре бассейна, взгляд с неба вниз на осьминога → плывём к лестнице →
+// пешком вдоль бассейна, «прищур» на электро-сцену → бар: нырок в коктейль на стойке → темнота.
 const BASE = 'world/pool/';
 const T = 0.3, SZ = -12.2, EX = 43, EZ = -4, HZ = 19;
 
-import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
 export async function build({ THREE, kit, font, renderer, mobile }) {
   const { Builder } = kit;
   const scene = new THREE.Scene();
@@ -63,26 +62,7 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   const w = kit.water(22, 10, '#13c8f0', { tile: 4, ei: 0.55, emissive: '#0aa8e0', opacity: 0.82 });
   w.position.y = 0.12; scene.add(w);
 
-  /* --- люди: толпа у главной сцены, у электро-сцены, пловцы --- */
-  const b = new Builder(), R = kit.rng(11);
-  let k = 0;
-  const guest = (x, y, z, ry, o = {}) => {
-    human(b, castGuest(k), { p: [x, y, z], ry, pose: kit.pick(['up', 'wave', 'up', 'hips', 'phone', 'peace'], k), s: 0.95 + R() * 0.1, lo: true, barefoot: y < 0, ...o });
-    k++;
-  };
-  for (let z = -6.2; z > -9.2; z -= 0.95) for (let x = -6.6; x <= 6.6; x += 1.05) {
-    if (R() < 0.18) continue;
-    guest(x + (R() - 0.5) * 0.4, T, z + (R() - 0.5) * 0.35, Math.PI + (R() - 0.5) * 0.8);
-  }
-  for (let x = 33.5; x < 38.4; x += 1.0) for (let z = EZ - 5.5; z <= EZ + 5.5; z += 1.0) {
-    if (R() < 0.25) continue;
-    guest(x + (R() - 0.5) * 0.4, 0.06, z + (R() - 0.5) * 0.4, Math.PI / 2 + (R() - 0.5) * 0.8);
-  }
-  // пловцы — в стороне от пути камеры (камера идёт от центра к лестнице справа)
-  [[-6, -2], [-3, -3.6], [-8.4, 2.6], [5.5, 3.6], [7.4, -3.7], [-4.6, 3.4]].forEach(([x, z], i) => {
-    guest(x, -0.85, z, Math.PI + (i % 2 ? 0.5 : -0.5), { pose: i % 3 ? 'up' : 'wave' });
-    if (i % 2 === 0) kit.ring(b, [x, 0.12, z], kit.pick(['#ff5fc0', '#ffd23f', '#2fe6ff'], i), 0.5, 0.17);
-  });
+  const b = new Builder();
   // лазеры электро-сцены веером над толпой
   for (let i = 0; i < 10; i++) {
     const a = -0.75 + i * 0.166;
@@ -140,14 +120,14 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
 
   /* --- камера: от первого лица --- */
   const STAGE = [0, 6.5, SZ], EYE = T + 1.62;
+  const OCT = [0, 10.6, -13.4];   // центр осьминога над главной сценой
   const keys = [
-    // короткий заплыв под водой → выныриваем лицом к сцене
-    { p: [-6.2, -1.15, 3.4], l: [0, -1.2, 1.5], t: 0 },
-    { p: [-2.6, -1.0, 3.3], l: [1, -0.6, 0], t: 0.06 },
-    { p: [-0.6, -0.4, 3.4], l: [0, 2, -8] },
-    { p: [0, 0.55, 3.6], l: [0, 5.5, -12], t: 0.12 },
-    { p: [0, 0.6, 3.5], l: [0, 7, -12] },
-    { p: [0.4, 0.6, 3.3], l: STAGE, t: 0.24 },
+    // выныриваем в центре бассейна: сначала взгляд в ночное небо, затем вниз — осьминог по центру кадра
+    { p: [0, -0.9, 2.4], l: [0, 30, -1.2], t: 0 },
+    { p: [0, 0.68, 2.8], l: [0, 30, -1.6], t: 0.05 },
+    { p: [0, 0.74, 3.5], l: [0, 22, -9], t: 0.12 },
+    { p: [0, 0.76, 4.2], l: OCT, t: 0.2 },
+    { p: [0.3, 0.74, 4.0], l: OCT, t: 0.25 },
     // плывём к лестнице справа и выбираемся
     { p: [5.5, 0.58, 0.4], l: [9, 0.9, -1.6] },
     { p: [9.7, 0.75, -1.6], l: [13, 1.6, -1.6], t: 0.36 },
@@ -155,25 +135,17 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     // пешком: поворот головы к электро-сцене
     { p: [13.2, EYE, -0.6], l: [EX, 4, EZ], t: 0.47 },
     { p: [13.8, EYE, 1.4], l: [EX, 4.5, EZ + 1], t: 0.57 },
-    // вдоль бассейна к бару
-    { p: [14.1, EYE, 5.2], l: [12.8, 1.3, 12.3], t: 0.68 },
-    { p: [13.1, EYE, 8.8], l: [12.5, 1.25, 12.2], t: 0.78 },
-    { p: [12.5, EYE, 10.9], l: [12.45, 1.2, 12.1], t: 0.83 },
-    { p: [12.5, EYE, 11.0], l: [12.45, 1.1, 11.9], t: 1 },
+    // вдоль бассейна к бару и нырок в коктейль на стойке
+    { p: [14.1, EYE, 5.2], l: [12.8, 1.3, 12.3], t: 0.66 },
+    { p: [13.1, EYE, 8.8], l: [GL[0], GL[1] + 0.06, GL[2]], t: 0.75 },
+    { p: [12.6, EYE - 0.1, 10.6], l: [GL[0], GL[1] + 0.06, GL[2]], t: 0.83 },
+    { p: [GL[0], GL[1] + 0.55, GL[2] - 0.3], l: [GL[0], GL[1], GL[2] + 0.02], t: 0.9 },
+    { p: [GL[0], GL[1] + 0.22, GL[2] - 0.05], l: [GL[0], GL[1] - 0.3, GL[2] + 0.01], t: 0.95 },
+    { p: [GL[0], GL[1] + 0.108, GL[2]], l: [GL[0], GL[1] - 0.5, GL[2] + 0.004], t: 1 },
   ];
   const path = kit.camPath(keys);
-  // стакан: со стойки в руку (0.84–0.89), затем ко рту (до 0.97) — кадр тонет в тёмном напитке
-  const ease = (x) => x * x * (3 - 2 * x), cl = (x) => Math.min(1, Math.max(0, x));
-  const placeGlass = (t) => {
-    if (t < 0.84) { hero.group.position.set(...GL); hero.group.quaternion.identity(); hero.hand.visible = false; return; }
-    const c = path(t); hero.hand.visible = t > 0.865;
-    const a = ease(cl((t - 0.84) / 0.05)), m = ease(cl((t - 0.89) / 0.08));
-    if (a < 1) {
-      hero.at(c, [0.16, -0.32, -0.55], 0);
-      const p1 = hero.group.position.clone();
-      hero.group.position.set(...GL).lerp(p1, a);
-    } else hero.at(c, [0.16 * (1 - m), -0.32 + 0.29 * m, -0.55 + 0.425 * m], 1.25 * m);
-  };
+  // коктейль стоит на стойке, камера ныряет в него сверху
+  hero.group.position.set(...GL); hero.hand.visible = false;
   const cam = (t) => path(t);
   // надписи надуваются по очереди: STAYA и POOL при выныривании, ELECTRO при повороте
   const blow = (g, a, d, t) => {
@@ -184,12 +156,13 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   };
   const update = (t) => {
     // синяя толща воды рассеивается, когда голова выходит на поверхность
-    const u = Math.min(1, Math.max(0, (t - 0.07) / 0.05));
+    const u = Math.min(1, Math.max(0, (t - 0.025) / 0.03));
     scene.fog.color.copy(DEEP).lerp(NIGHT, u); scene.fog.density = 0.12 + (0.004 - 0.12) * u;
     blow(pv.STAYA, 0.1, 0.1, t); blow(pv.POOL, 0.14, 0.1, t); blow(pv.ELECTRO, 0.45, 0.1, t);
-    placeGlass(t);
   };
-  const near = (t) => (t > 0.84 ? 0.01 : 0.05);
-  const calm = (t) => Math.min(1, Math.max(0, (t - 0.8) / 0.05));   // стакан ко рту — кадр по центру
-  return { scene, cam, update, near, calm };
+  const near = (t) => (t > 0.93 ? 0.004 : t > 0.84 ? 0.01 : 0.05);
+  const calm = (t) => Math.min(1, Math.max(0, (t - 0.8) / 0.05));   // нырок в коктейль — кадр по центру
+  // «прищур» на электро-сцену: камера приближает её, сверху и снизу темнеет, как веки
+  const squint = (t) => { const a = Math.min(1, Math.max(0, (t - 0.45) / 0.04)), b2 = Math.min(1, Math.max(0, (0.6 - t) / 0.04)); return a * b2 * a * (3 - 2 * a); };
+  return { scene, cam, update, near, calm, squint };
 }

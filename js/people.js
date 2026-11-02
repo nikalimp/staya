@@ -68,7 +68,10 @@ function toFloat(mesh) {
   mesh.updateWorldMatrix(true, false); out.applyMatrix4(mesh.matrixWorld);
   out.computeBoundingSphere(); return out;
 }
+// люди временно выключены: модели не подошли, ищем другую подачу толпы
+export const PEOPLE_ON = false;
 export async function loadPeople() {
+  if (!PEOPLE_ON) return;
   for (const S of ['M', 'F']) {
     const gl = await loadGLB(`world/people/people_${S}.glb`); gl.scene.updateMatrixWorld(true);
     const geo = {}, anchor = {};
@@ -102,6 +105,7 @@ function resolve(look, o) {
 }
 
 export function person(b, look, o = {}) {
+  if (!PEOPLE_ON) return;
   (b.people ||= []).push({ look, o: { ...o }, base: b.stack[b.stack.length - 1].clone() });
 }
 

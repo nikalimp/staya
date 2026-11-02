@@ -30,6 +30,10 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 #spacer{position:relative;width:1px;pointer-events:none}
 #fade{position:fixed;inset:0;background:#000;z-index:5;pointer-events:none;opacity:1}
 /* телефон: виньетка без постобработки (на десктопе — в шейдере вместе с расфокусом краёв) */
+#lids{position:fixed;inset:0;z-index:4;pointer-events:none;--sq:0}
+#lids::before,#lids::after{content:"";position:absolute;left:-5%;right:-5%;height:calc(var(--sq) * 30vh + 2vh);background:radial-gradient(120% 100% at 50% 0%,#000 55%,rgba(0,0,0,.85) 75%,rgba(0,0,0,0) 100%);opacity:min(1,calc(var(--sq) * 3));filter:blur(6px)}
+#lids::before{top:-2vh}
+#lids::after{bottom:-2vh;transform:scaleY(-1)}
 #vig{position:fixed;inset:0;z-index:4;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.5) 100%);display:none}
 .touch #vig{display:block}
 
@@ -127,6 +131,7 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 
 <canvas id="gl" aria-hidden="true"></canvas>
 <div id="vig"></div>
+<div id="lids" aria-hidden="true"></div>
 <div id="fade"></div>
 
 <!-- Текст сайта для поиска и нейросетей. На экране — только путешествие. -->
