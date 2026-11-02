@@ -36,12 +36,13 @@ def join(objs, name):
     return o
 
 def uv_project(objs):
+    # исходные UV остаются для текстур готовых моделей (active_render), запекаем в новый слой 'bake'
     bpy.ops.object.select_all(action='DESELECT')
     for o in objs:
         o.select_set(True)
         me = o.data
-        while me.uv_layers: me.uv_layers.remove(me.uv_layers[0])
-        me.uv_layers.new(name='bake'); me.uv_layers.active_index = 0
+        for l in me.uv_layers: l.active_render = l.name != 'bake' and l == me.uv_layers[0]
+        b = me.uv_layers.new(name='bake'); me.uv_layers.active = b
     bpy.context.view_layer.objects.active = objs[0]
     bpy.ops.object.mode_set(mode='EDIT'); bpy.ops.mesh.select_all(action='SELECT')
     bpy.ops.uv.smart_project(angle_limit=math.radians(60), island_margin=0.004, area_weight=0.0, scale_to_bounds=True)
@@ -108,6 +109,8 @@ for g, (asz, lsz, spp, mode) in GROUPS.items():
         m = bpy.data.materials.new(o.name) if o.name.startswith('letters_') else shared
         o.data.materials.clear(); o.data.materials.append(m)
         for p in o.data.polygons: p.material_index = 0
+    for o in objs:   # на сайт уходит только слой 'bake'
+        for l in [l for l in o.data.uv_layers if l.name != 'bake']: o.data.uv_layers.remove(l)
     result[g] = [o.name for o in objs]
 
 # неон: имя материала neon_* + цвет в glTF (emissive)

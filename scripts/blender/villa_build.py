@@ -66,6 +66,30 @@ def olive(x, z, h, seed):
         a = rnd.random() * math.tau; rr = rnd.random() * 1.6
         rock((x + math.cos(a) * rr, h * 0.75 + rnd.random() * 1.2, z + math.sin(a) * rr), 1.1 + rnd.random() * 0.5, s=(1.2, 0.7, 1.2), m=OLIVE, g='far', seed=seed * 10 + i, k=0.5, sub=2)
 
+# готовые модели Poly Haven (CC0): импорт glTF, упрощение, масштаб, установка низом (или верхом) в точку
+PH = os.path.join(D, '..', 'ph')
+def asset(name, pos, ry=0.0, s=1.0, g='far', tris=None, top=False):
+    import glob
+    before = set(bpy.data.objects)
+    bpy.ops.import_scene.gltf(filepath=glob.glob(os.path.join(PH, name, '*.gltf'))[0])
+    objs = [o for o in bpy.data.objects if o not in before and o.type == 'MESH']
+    for o in [o for o in bpy.data.objects if o not in before and o.type != 'MESH']: bpy.data.objects.remove(o, do_unlink=True)
+    bpy.ops.object.select_all(action='DESELECT')
+    for o in objs: o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    if len(objs) > 1: bpy.ops.object.join()
+    o = bpy.context.view_layer.objects.active; o.name = name
+    n = len(o.data.polygons)
+    if tris and n > tris:
+        dm = o.modifiers.new('d', 'DECIMATE'); dm.ratio = tris / n; bpy.ops.object.modifier_apply(modifier='d')
+    o.rotation_mode = 'XYZ'; o.scale = (s, s, s); o.rotation_euler = (0, 0, ry); bpy.ops.object.transform_apply(location=False, rotation=True, scale=True)
+    bb = [o.matrix_world @ Vector(v) for v in o.bound_box]
+    cx = sum(v.x for v in bb) / 8; cy = sum(v.y for v in bb) / 8; zmin = min(v.z for v in bb); zmax = max(v.z for v in bb)
+    t = P(*pos); o.location.x += t.x - cx; o.location.y += t.y - cy; o.location.z += t.z - (zmax if top else zmin)
+    print('  asset', name, n, '->', len(o.data.polygons), flush=True)
+    return link(o, g)
+
 def sofa(c, w, d, ry=0.0, m=FABRIC):
     parts = [box((0, 0.22, 0), (w, 0.44, d), m, 'inner', bevel=0.05), box((0, 0.62, -d / 2 + 0.12), (w, 0.5, 0.24), m, 'inner', bevel=0.06)]
     for sx in (-1, 1): parts.append(box((sx * (w / 2 - 0.1), 0.5, 0), (0.2, 0.3, d), m, 'inner', bevel=0.05))
@@ -87,11 +111,13 @@ for sx in (-1, 1): box((sx * 20.5, -0.2, -12.95), (23, 0.4, 12.9), TRAV, 'ground
 box((0, -0.2, 45), (90, 0.4, 36), GRASS, 'ground')                 # газон перед въездом
 for sx in (-1, 1): box((sx * 52, -0.2, 4), (40, 0.4, 46), GRASS, 'ground')
 box((0, -15, -19.2), (64, 30, 0.6), STONE, 'far')                  # подпорная стена утёса
-for i in range(14):
-    x = -60 + i * 9 + random.random() * 4
-    rock((x, SEA + 6 + random.random() * 6, -26 - random.random() * 6), 9 + random.random() * 4, s=(1.2, 1.4, 0.8), seed=i)
-for i, (x, z, r, sy) in enumerate([(-95, -60, 40, 0.7), (-140, -150, 70, 0.6), (120, -90, 55, 0.55), (180, -220, 90, 0.45), (-60, -260, 50, 0.35), (70, -330, 80, 0.3)]):
-    rock((x, SEA - r * 0.2, z), r, s=(1.4, sy, 1), m=HILL, seed=40 + i, k=0.25, sub=5)
+# утёс под террасой и мысы над морем — сканы скал Poly Haven
+asset('coastal_cliff_02', (-90, -12, -50), ry=0.5, s=2.4, tris=50000, top=True)
+asset('coastal_cliff_02', (95, -12, -50), ry=-0.6, s=2.4, tris=50000, top=True)
+asset('coast_rocks_01', (-30, SEA - 1.2, -36), ry=0.3, s=1.2, tris=25000)
+asset('coast_rocks_01', (30, SEA - 1.2, -38), ry=2.4, s=1.1, tris=25000)
+for (x, z, ry, s) in [(-250, -210, 0.9, 3.0), (-230, -470, 0.35, 3.5), (290, -230, -0.9, 3.0), (430, -520, -0.45, 3.5)]:
+    asset('coastal_cliff_04', (x, SEA - 4, z), ry=ry, s=s, tris=60000)
 
 # ---------- вилла: два объёма, консоли, стекло ----------
 VZ0, VZ1, VX = 0.0, 14.0, 14.0     # фасад к морю z=0, вход z=14
@@ -130,10 +156,8 @@ for x in (-10, -6, -2, 2): box((x, H1 + 0.62, 0.7), (1.6, 0.04, 0.06), N_WARM, '
 box((-5, 0.05, 6.5), (7, 0.02, 5), RUG, 'inner')
 sofa((-5, 0, 8.6), 4.6, 1.1, 0); sofa((-8.2, 0, 6.2), 3.2, 1.0, math.radians(-90))
 box((-5, 0.2, 6.3), (2.2, 0.4, 1.2), mat('travertine_block', srgb('#d2c2a6'), 0.5), 'inner', bevel=0.03)
-for x, z, ry in [(-3, 4.4, 2.6), (-6.6, 4.2, 3.6)]:
-    p = [box((0, 0.25, 0), (0.85, 0.5, 0.85), FABRIC2, 'inner', bevel=0.12), box((0, 0.6, -0.35), (0.85, 0.5, 0.18), FABRIC2, 'inner', bevel=0.08)]
-    M_ = Matrix.Translation(P(x, 0, z)) @ Matrix.Rotation(ry, 4, 'Z')
-    for o in p: o.matrix_world = M_ @ o.matrix_world
+for x, z, ry in [(-3, 4.4, 2.6), (-6.6, 4.2, 3.6)]: asset('modern_arm_chair_01', (x, 0.04, z), ry=ry, s=1.0, g='inner')
+asset('mid_century_lounge_chair', (-11.6, 0.04, 2.2), ry=0.7, s=1.0, g='inner')
 # камин в левой стене
 box((-VX + 0.45, 1.6, 7), (0.5, 3.2, 3.2), CHAR, 'near')
 box((-VX + 0.72, 0.75, 7), (0.06, 0.5, 2.2), N_FIRE, 'neon')
@@ -187,9 +211,8 @@ BX, BZ = -19.5, -2.0
 box((BX, 0.46, BZ), (1.2, 0.92, 5), STONE, 'near'); box((BX, 0.95, BZ), (1.3, 0.06, 5.2), CHAR, 'near')
 box((BX, 1.1, BZ - 0.8), (0.9, 0.3, 1.6), STEEL, 'near'); box((BX + 0.2, 1.45, BZ - 0.8), (0.5, 0.5, 1.6), STEEL, 'near')
 box((BX, 1.6, BZ + 1.4), (0.3, 0.02, 0.4), mat('food', srgb('#a0552a'), 0.6), 'near')
-box((-15.5, 0.74, -2), (1.2, 0.06, 3.6), OAK, 'near'); box((-15.5, 0.36, -2), (0.3, 0.72, 2.6), BRONZE, 'near')
-for z in (-3.2, -2, -0.8):
-    for sx in (-1, 1): box((-15.5 + sx * 0.9, 0.24, z), (0.5, 0.48, 0.5), FABRIC2, 'near', bevel=0.06)
+asset('outdoor_table_chair_set_01', (-15.5, 0.0, -2), ry=math.pi / 2, s=1.3, g='near')
+for x, z in [(-10.6, -5.4), (10.4, -5.4), (-12.6, -16.8), (12.4, -16.8), (-2.6, 13.2), (2.6, 13.2)]: asset('potted_plant_04', (x, 0.0, z), ry=x, s=3.0, g='near')
 for x in (-21, -14): cyl((x, 0, -6), (x, 3.2, -6), 0.08, BRONZE, 'near', seg=8); cyl((x, 0, 2), (x, 3.2, 2), 0.08, BRONZE, 'near', seg=8)
 for z in [i * 0.4 - 6 for i in range(21)]: box((-17.5, 3.25, z), (7.4, 0.1, 0.08), OAK, 'near')
 # шезлонги вдоль бассейна (камера идёт по центру)

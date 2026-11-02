@@ -1,9 +1,11 @@
 // STAYA — люди. Пять резидентов и двадцать гостей, одни и те же на всех сценах.
-// Стиль: глянцевые «виниловые» фигурки, хип-хоп: девушки в бикини, парни в майках и шортах, очки, кепки, цепи.
-// person(b, look, o) собирает фигуру в Builder. look — образ из CAST, o — поза и место:
-//   o.p [x,y,z] — ноги; o.ry — поворот (лицо в +Z при ry=0); o.pose — руки; o.legs — 'stand' | 'sit' | 'feetUp';
-//   o.s — масштаб; o.lo — упрощённая геометрия для толпы.
-import { THREE, G, M, V } from './kit.js';
+// Тела и причёски — Quaternius Universal Base Characters (CC0), позы — Quaternius Universal Animation Library (CC0).
+// Позы запечены в Blender (scripts/blender/people_build.py) в world/people/people_M|F.glb:
+//   тело в позе (цвет вершин + область в альфе: кожа, бельё/бикини, глаза, волосы, майка, шорты), майка и шорты оболочками,
+//   упрощённая копия для толпы, якоря костей (голова, грудь, кисти) для причёсок и аксессуаров.
+// person(b, look, o) кладёт человека в Builder; при b.build() все люди сцены собираются в InstancedMesh — мало вызовов отрисовки.
+//   o.p [x,y,z] — ноги; o.ry — поворот (лицо в +Z при ry=0); o.pose — поза; o.s — масштаб; o.lo — упрощённая копия для толпы.
+import { THREE, G, M, V, Builder, loadGLB } from './kit.js';
 
 /* ---------- образы ---------- */
 const SK = { light: '#f3cdb2', fair: '#ecbf9f', tan: '#d9a07c', olive: '#c98f69', deep: '#8a5a3e' };
@@ -49,209 +51,158 @@ export const GUESTS = [
 export const CAST = [...Object.values(RESIDENTS), ...GUESTS];
 export const guest = (i) => GUESTS[((i % GUESTS.length) + GUESTS.length) % GUESTS.length];
 
-/* ---------- геометрия ---------- */
-let LO = false;
-const seg = (a, b) => (LO ? b : a);
-const rb = (w, h, d, r) => (LO ? G.box(w, h, d) : G.rbox(w, h, d, r));
-const sph = (r) => G.sph(r, seg(16, 7), seg(10, 5));
-function limb(b, A, B, r, c, kind = 'gloss', r2 = null) {
-  A = A.isVector3 ? A : V(...A); B = B.isVector3 ? B : V(...B);
-  const d = B.clone().sub(A), len = d.length();
-  const q = new THREE.Quaternion().setFromUnitVectors(V(0, 1, 0), d.normalize());
-  const m = new THREE.Matrix4().compose(A.clone().add(B).multiplyScalar(0.5), q, V(1, 1, 1));
-  if (r2 == null) b.add(G.cap(r, len, seg(3, 1), seg(10, 5)), c, kind, m);
-  else b.add(G.cyl(r2, r, len, seg(12, 5), true), c, kind, m);
+/* ---------- загрузка запечённых поз ---------- */
+const DATA = { M: null, F: null };
+function toFloat(mesh) {
+  const g = mesh.geometry, out = new THREE.BufferGeometry();
+  for (const k of ['position', 'normal']) {
+    const a = g.attributes[k], f = new Float32Array(a.count * 3);
+    for (let i = 0; i < a.count; i++) { f[i * 3] = a.getX(i); f[i * 3 + 1] = a.getY(i); f[i * 3 + 2] = a.getZ(i); }
+    out.setAttribute(k, new THREE.BufferAttribute(f, 3));
+  }
+  const c = g.attributes.color, cf = new Float32Array(c.count * 4);
+  for (let i = 0; i < c.count; i++) { cf[i * 4] = c.getX(i); cf[i * 4 + 1] = c.getY(i); cf[i * 4 + 2] = c.getZ(i); cf[i * 4 + 3] = c.getW(i); }
+  out.setAttribute('color', new THREE.BufferAttribute(cf, 4));
+  if (g.index) out.setIndex(g.index.clone());
+  mesh.updateWorldMatrix(true, false); out.applyMatrix4(mesh.matrixWorld);
+  out.computeBoundingSphere(); return out;
 }
-// Тело-«вращение» по профилю [r, y]; z сжимается (тело плоское спереди-сзади)
-function lathe(b, prof, c, kind, zk = 0.72, m = null, open = false) {
-  const pts = prof.map(([r, y]) => new THREE.Vector2(r, y));
-  const g = new THREE.LatheGeometry(pts, seg(20, 8));
-  g.scale(1, 1, zk);
-  b.add(g, c, kind, m);
+export async function loadPeople() {
+  for (const S of ['M', 'F']) {
+    const gl = await loadGLB(`world/people/people_${S}.glb`); gl.scene.updateMatrixWorld(true);
+    const geo = {}, anchor = {};
+    gl.scene.traverse((o) => {
+      if (!o.name) return;
+      if (o.name.includes('_@')) { anchor[o.name] = o.matrixWorld.clone(); return; }
+      const m = o.isMesh ? o : o.children.find((c) => c.isMesh);
+      if (m) geo[o.name] = toFloat(m);
+    });
+    DATA[S] = { geo, anchor };
+  }
 }
-const lerp = (a, b, t) => a + (b - a) * t;
 
-// Руки: [локоть, кисть] от плеча; sx = −1 левая, +1 правая
-const ARMS = {
-  stand: (sx, S) => [[sx * 0.25, S - 0.28, 0.0], [sx * 0.27, S - 0.55, 0.05]],
-  up: (sx, S) => [[sx * 0.32, S + 0.28, 0.02], [sx * 0.4, S + 0.6, 0.06]],
-  wave: (sx, S) => (sx > 0 ? [[sx * 0.33, S + 0.26, 0.04], [sx * 0.36, S + 0.58, 0.1]] : [[sx * 0.32, S - 0.2, -0.02], [sx * 0.17, S - 0.38, 0.03]]),
-  hips: (sx, S) => [[sx * 0.33, S - 0.2, -0.02], [sx * 0.17, S - 0.38, 0.03]],
-  dj: (sx, S) => [[sx * 0.27, S - 0.22, 0.14], [sx * 0.16, S - 0.22, 0.42]],
-  cross: (sx, S) => [[sx * 0.24, S - 0.24, 0.12], [-sx * 0.1, S - 0.17, 0.17]],
-  peace: (sx, S) => (sx > 0 ? [[sx * 0.24, S - 0.12, 0.18], [sx * 0.15, S + 0.22, 0.24]] : [[sx * 0.25, S - 0.28, 0.0], [sx * 0.27, S - 0.55, 0.05]]),
-  phone: (sx, S) => (sx < 0 ? [[sx * 0.25, S - 0.28, 0.0], [sx * 0.27, S - 0.55, 0.05]] : [[sx * 0.21, S - 0.25, 0.12], [sx * 0.06, S + 0.0, 0.3]]),
-  relax: (sx, S) => [[sx * 0.25, S - 0.26, 0.08], [sx * 0.15, S - 0.38, 0.3]],
-  behindHead: (sx, S) => [[sx * 0.36, S + 0.22, -0.02], [sx * 0.08, S + 0.36, -0.12]],
-  hug: (sx, S) => [[sx * 0.3, S - 0.14, 0.2], [sx * 0.13, S - 0.1, 0.44]],
-  neck: (sx, S) => [[sx * 0.3, S + 0.04, 0.2], [sx * 0.12, S + 0.16, 0.42]],
-  hold: (sx, S) => [[sx * 0.22, S - 0.32, 0.12], [sx * 0.07, S - 0.2, 0.36]],
-  count: (sx, S) => [[sx * 0.24, S - 0.3, 0.14], [sx * 0.08, S - 0.36, 0.38]],
-};
-export const POSES = Object.keys(ARMS);
+/* ---------- образ → параметры отрисовки ---------- */
+const HAIR_MAP = { M: { buzz: 'Buzzed', fade: 'Buzzed', curly: 'SimpleParted', twists: 'Buzzed', swept: 'SimpleParted', bowl: 'SimpleParted' },
+  F: { long: 'Long', curlyLong: 'Long', braids: 'Long', bob: 'Long', bun: 'Buns', pony: 'Buns', afro: 'Buns', buzz: 'BuzzedFemale' } };
+const POSE_MAP = { stand: 'idle', peace: 'wave', cross: 'hips', relax: 'sit', behindHead: 'sit', neck: 'hug', hold: 'phone', up: 'up', wave: 'wave', dj: 'dj',
+  phone: 'phone', hips: 'hips', hug: 'hug', count: 'count', sit: 'sit', idle: 'idle', talk: 'talk', dance_a: 'dance_a', dance_b: 'dance_b', dance_c: 'dance_c', swim: 'swim', drive: 'drive', sit_talk: 'sit_talk' };
+const BASE_SKIN = new THREE.Color('#efc3a1');
+const col = (h) => new THREE.Color(h);
+function resolve(look, o) {
+  const S = look.sex === 'f' ? 'F' : 'M';
+  let pose = POSE_MAP[o.pose] ?? 'idle';
+  if (o.legs === 'sit' || o.legs === 'feetUp') pose = pose === 'talk' ? 'sit_talk' : 'sit';
+  const sk = col(look.skin ?? '#ecbf9f'); const skin = new THREE.Color(sk.r / BASE_SKIN.r, sk.g / BASE_SKIN.g, sk.b / BASE_SKIN.b);
+  const topC = look.top && look.top !== 'none' && look.top !== 'bikini' ? col(look.topC) : null;
+  const shorts = look.bottom === 'shorts' || look.bottom === 'cargo' || (S === 'M' && look.bottom !== 'bikini' && look.bottomC) ? col(look.bottomC ?? '#222') : null;
+  const cloth = col(look.top === 'bikini' ? look.topC : (look.bottomC ?? '#111'));
+  const hair = HAIR_MAP[S][look.hair] ?? (S === 'M' ? 'Buzzed' : 'Long');
+  return { S, pose, skin, cloth, top: topC, shorts, hair, hairC: col(look.hairC ?? '#1a1210') };
+}
 
 export function person(b, look, o = {}) {
-  LO = !!o.lo;
-  const f = look.sex === 'f', skin = look.skin ?? SK.fair, s = (o.s ?? 1) * (f ? 0.95 : 1.02);
-  const legs = o.legs ?? (o.pose === 'relax' || o.pose === 'behindHead' ? 'sit' : 'stand');
-  const pose = ARMS[o.pose] ? o.pose : 'stand';
-  const CL = 'plastic', SKN = 'gloss';
-  b.push(M(o.p ?? [0, 0, 0], [0, o.ry ?? 0, 0], s));
-  const H = legs === 'stand' ? 0.93 : 0.5;          // высота бёдер
-  const hipW = f ? 0.105 : 0.095;
-
-  /* ноги */
-  const bot = look.bottom ?? (f ? 'bikini' : 'shorts');
-  for (const sx of [-1, 1]) {
-    let K, F;
-    if (legs === 'sit') { K = [sx * 0.12, H + 0.02, 0.44]; F = [sx * 0.13, 0.08, 0.5]; }
-    else if (legs === 'feetUp') { K = [sx * 0.12, H + 0.18, 0.44]; F = [sx * 0.13, H + 0.34, 0.86]; }
-    else { const st = o.step ? sx * 0.06 : 0; K = [sx * 0.115, H * 0.52, 0.03 + st]; F = [sx * 0.13, 0.09, 0.02 + st * 1.5]; }
-    const Hp = [sx * hipW, H, 0];
-    limb(b, Hp, K, f ? 0.08 : 0.078, skin, SKN, f ? 0.066 : 0.066);
-    limb(b, K, F, f ? 0.06 : 0.062, skin, SKN, 0.048);
-    b.add(sph(0.068), skin, SKN, M(K));
-    // шорты: широкие «баскетбольные» до колена, карго — ниже колена
-    if (bot === 'shorts' || bot === 'cargo') {
-      const kv = V(...K), hv = V(...Hp), e = hv.clone().lerp(kv, bot === 'cargo' ? 1.08 : 0.92);
-      limb(b, hv.clone().add(V(sx * 0.01, 0.04, 0)), e.clone().add(V(sx * 0.015, 0, 0)), 0.1, look.bottomC, CL, 0.104);
-      if (look.bottomTrim) limb(b, hv.clone().lerp(e, 0.15).add(V(sx * 0.105, 0, 0)), e.clone().add(V(sx * 0.1, 0, 0)), 0.012, look.bottomTrim, CL);
-      if (bot === 'cargo') b.add(rb(0.07, 0.11, 0.1, 0.02), look.bottomC, CL, M([kv.x * 0.6 + hv.x * 0.4 + sx * 0.1, lerp(hv.y, kv.y, 0.55), kv.z * 0.5]));
-    }
-    // носки и обувь
-    if (look.socks && legs === 'stand' && !LO) limb(b, [F[0], 0.1, F[2]], [K[0] * 0.3 + F[0] * 0.7, K[1] * 0.42, K[2] * 0.3 + F[2] * 0.7], 0.056, '#f6f6f6', CL, 0.054);
-    const shoe = look.shoes ?? (o.barefoot ? 'none' : 'sneaker');
-    if (shoe === 'sneaker' || shoe === 'platform') {
-      const hh = shoe === 'platform' ? 0.13 : 0.1;
-      b.add(rb(0.13, hh, 0.29, 0.045), look.shoesC ?? '#f4f4f4', SKN, M([F[0], F[1] - 0.09 + hh / 2, F[2] + 0.06]));
-      b.add(rb(0.135, 0.035, 0.3, 0.015), shoe === 'platform' ? '#f4f4f4' : '#ececec', CL, M([F[0], F[1] - 0.085, F[2] + 0.06]));
-    } else b.add(rb(0.1, 0.06, 0.22, 0.03), skin, SKN, M([F[0], F[1] - 0.06, F[2] + 0.06]));
-  }
-
-  /* таз и торс */
-  const tor = f
-    ? [[0.001, H - 0.06], [0.15, H - 0.02], [0.165, H + 0.06], [0.13, H + 0.2], [0.125, H + 0.26], [0.145, H + 0.38], [0.155, H + 0.46], [0.16, H + 0.53], [0.1, H + 0.6], [0.001, H + 0.62]]
-    : [[0.001, H - 0.06], [0.145, H - 0.02], [0.15, H + 0.06], [0.145, H + 0.2], [0.155, H + 0.32], [0.18, H + 0.44], [0.195, H + 0.53], [0.11, H + 0.61], [0.001, H + 0.63]];
-  lathe(b, tor, skin, SKN, f ? 0.7 : 0.68);
-  if (f) for (const sx of [-1, 1]) b.add(sph(0.072), skin, SKN, M([sx * 0.068, H + 0.42, 0.06], [0, 0, 0], [1, 0.95, 0.9]));
-  else if (look.top === 'none' && !LO) for (const sx of [-1, 1]) b.add(sph(0.075), skin, SKN, M([sx * 0.08, H + 0.43, 0.045], [0, 0, 0], [1.1, 0.6, 0.55]));
-  // низ: бикини или пояс шорт
-  if (bot === 'bikini') {
-    const g = new THREE.SphereGeometry(0.168, seg(20, 10), seg(10, 6), 0, Math.PI * 2, Math.PI * 0.52, Math.PI * 0.36);
-    g.scale(1, 1.05, 0.72); b.add(g, look.bottomC ?? look.topC, CL, M([0, H + 0.02, 0]));
-    for (const sx of [-1, 1]) b.add(G.tor(0.035, 0.007, 5, 10), look.bottomC ?? look.topC, CL, M([sx * 0.16, H + 0.06, 0], [0, Math.PI / 2, 0]));
-  } else {
-    lathe(b, [[0.001, H - 0.08], [0.16, H - 0.06], [0.168, H + 0.04], [0.158, H + 0.12], [0.001, H + 0.13]], look.bottomC, CL, 0.74);
-    if (!LO) b.add(G.tor(0.15, 0.012, 5, 24), look.bottomTrim ?? '#f4f4f4', CL, M([0, H + 0.12, 0], [Math.PI / 2, 0, 0], [1, 0.74, 1]));
-  }
-  // верх
-  const top = look.top ?? 'tank';
-  if (top === 'bikini') {
-    for (const sx of [-1, 1]) {
-      b.add(sph(0.077), look.topC, CL, M([sx * 0.068, H + 0.422, 0.062], [0, 0, 0], [1.04, 0.98, 0.93]));
-      limb(b, [sx * 0.07, H + 0.47, 0.1], [sx * 0.045, H + 0.62, 0.02], 0.008, look.topC, CL);
-    }
-    b.add(G.tor(0.142, 0.01, 5, 24), look.topC, CL, M([0, H + 0.4, 0], [Math.PI / 2, 0, 0], [1, 0.72, 1]));
-  } else if (top !== 'none') {
-    const k = 1.06, tee = top === 'tee';
-    const pr = tor.filter(([, y]) => y >= H + 0.04).map(([r, y]) => [Math.max(r * k + 0.005, 0.07), y + 0.005]);
-    pr.unshift([0.001, H + 0.04]);
-    lathe(b, pr, look.topC, CL, (f ? 0.7 : 0.68) * 1.05);
-    if (tee) for (const sx of [-1, 1]) b.add(sph(0.078), look.topC, CL, M([sx * 0.17, H + 0.52, 0], [0, 0, 0], [1, 0.8, 0.95]));
-    if (look.trim) b.add(G.tor(0.17, 0.012, 5, 24), look.trim, CL, M([0, H + 0.1, 0], [Math.PI / 2, 0, 0], [1, 0.72, 1]));
-    if (look.trim && top !== 'tee' && !LO) for (const sx of [-1, 1]) b.add(G.tor(0.075, 0.01, 5, 16), look.trim, CL, M([sx * 0.15, H + 0.5, 0], [0, Math.PI / 2, 0.25 * sx]));
-    if (top === 'jersey' && !LO) b.add(rb(0.16, 0.14, 0.01, 0.004), look.trim ?? '#fff', CL, M([0, H + 0.33, 0.135]));
-  }
-
-  /* шея и голова */
-  limb(b, [0, H + 0.58, 0], [0, H + 0.7, 0.01], 0.05, skin, SKN);
-  const HY = H + 0.82;
-  b.add(sph(0.112), skin, SKN, M([0, HY, 0.01], [0, 0, 0], [0.93, 1.1, 1]));
-  b.add(sph(0.06), skin, SKN, M([0, HY - 0.07, 0.04], [0, 0, 0], [1, 0.8, 1]));   // подбородок
-  if (!LO) {
-    b.add(sph(0.018), skin, SKN, M([0, HY - 0.005, 0.112]));                         // нос
-    for (const sx of [-1, 1]) b.add(sph(0.025), skin, SKN, M([sx * 0.104, HY, 0], [0, 0, 0], [0.5, 1, 0.8]));
-    b.add(G.cap(0.008, 0.035, 2, 6), f ? '#c0506a' : '#a0605a', SKN, M([0, HY - 0.058, 0.098], [0, 0, Math.PI / 2]));
-  }
-  const see = !look.glasses || look.glasses.kind === 'square' || look.glasses.kind === 'round';
-  if (see && !LO) for (const sx of [-1, 1]) {
-    b.add(sph(0.016), '#1a1210', SKN, M([sx * 0.042, HY + 0.012, 0.098]));
-    b.add(rb(0.045, 0.011, 0.012, 0.005), look.hairC ?? '#1a1210', SKN, M([sx * 0.045, HY + 0.05, 0.1], [0, 0, -sx * 0.12]));
-  }
-  hairDo(b, look, HY, f);
-  headwear(b, look, HY);
-  if (look.glasses) glasses(b, look.glasses, HY);
-  if (look.hoops) for (const sx of [-1, 1]) b.add(G.tor(0.028, 0.005, 5, 14), look.hoops, 'metal', M([sx * 0.11, HY - 0.05, 0.005], [0, Math.PI / 2, 0]));
-  if (look.chain) {
-    b.add(G.tor(0.115, 0.011, 6, seg(28, 14)), look.chain, 'metal', M([0, H + 0.55, 0.05], [Math.PI / 2 - 0.55, 0, 0], [1, 0.8, 1]));
-    if (!LO) b.add(sph(0.025), look.chain, 'metal', M([0, H + 0.47, 0.135]));
-  }
-
-  /* руки */
-  const S = H + 0.5, sw = f ? 0.17 : 0.2;
-  for (const sx of [-1, 1]) {
-    const [E, Hn] = ARMS[pose](sx, S);
-    const Sh = [sx * sw, S, 0];
-    const c1 = top === 'tee' ? look.topC : skin;
-    limb(b, Sh, E, f ? 0.046 : 0.054, skin, SKN, f ? 0.04 : 0.046);
-    if (top === 'tee') limb(b, Sh, V(...Sh).lerp(V(...E), 0.5), 0.07, c1, CL, 0.066);
-    limb(b, E, Hn, f ? 0.04 : 0.046, skin, SKN, f ? 0.032 : 0.036);
-    b.add(sph(f ? 0.05 : 0.064), skin, SKN, M(Sh, [0, 0, 0], [1, 0.85, 0.9]));
-    b.add(sph(f ? 0.04 : 0.046), skin, SKN, M(Hn, [0, 0, 0], [0.85, 1.1, 0.7]));
-    if (look.ink && sx > 0 && !LO) limb(b, V(...Sh).lerp(V(...E), 0.25), V(...E).lerp(V(...Hn), 0.8), f ? 0.047 : 0.055, '#2a2a3a', 'matte', f ? 0.041 : 0.047);
-    if (look.rings && sx > 0) b.add(G.tor(0.04, 0.008, 5, 12), SILVER, 'metal', M(Hn, [Math.PI / 2, 0, 0]));
-    if (pose === 'phone' && sx > 0) b.add(rb(0.08, 0.16, 0.015, 0.012), '#111', 'gloss', M([Hn[0], Hn[1] + 0.06, Hn[2] + 0.03], [0.4, 0, 0]));
-    if (pose === 'count') b.add(G.box(0.16, 0.03, 0.08), '#7fa86a', 'matte', M([Hn[0] * 0.5, Hn[1] + 0.03, Hn[2] + 0.02]));
-  }
-  // распахнутая рубашка поверх (оверсайз)
-  if (look.over && legs === 'stand') {
-    for (const sx of [-1, 1]) {
-      const g = new THREE.CylinderGeometry(0.2, 0.235, 0.6, seg(14, 8), 1, true, sx > 0 ? 0.35 : Math.PI, Math.PI * 0.62);
-      g.scale(1, 1, 0.8); b.add(g, look.over.c, CL, M([0, H + 0.3, -0.005]));
-    }
-    lathe(b, [[0.2, H + 0.6], [0.12, H + 0.66]], look.over.c, CL, 0.75);
-  }
-  b.pop();
-  LO = false;
+  (b.people ||= []).push({ look, o: { ...o }, base: b.stack[b.stack.length - 1].clone() });
 }
 
-function hairDo(b, L, HY, f) {
-  const c = L.hairC ?? '#1a1210', K = 'gloss', st = L.hair ?? 'fade';
-  const cap = (k = 1.04, lift = 0.03, back = -0.015) => b.add(sph(0.12), c, K, M([0, HY + lift, back], [0, 0, 0], [k * 0.96, k * 0.92, k]));
-  if (st === 'buzz' || st === 'fade') { cap(st === 'fade' ? 1.0 : 0.98, 0.02, -0.01); if (st === 'fade') b.add(sph(0.1), c, K, M([0, HY + 0.07, 0.0], [0, 0, 0], [1, 0.6, 1.05])); return; }
-  cap();
-  if (st === 'long' || st === 'curlyLong') {
-    limb(b, [0, HY + 0.02, -0.06], [0, HY - 0.48, -0.1], 0.11, c, K, 0.09);
-    for (const sx of [-1, 1]) limb(b, [sx * 0.09, HY, 0.0], [sx * 0.11, HY - 0.36, 0.0], 0.04, c, K);
-    if (st === 'curlyLong' && !LO) for (let i = 0; i < 8; i++) b.add(sph(0.06), c, K, M([Math.cos(i) * 0.12, HY - 0.1 - (i % 4) * 0.1, -0.08 + Math.sin(i * 2) * 0.03]));
-  } else if (st === 'bun') b.add(sph(0.065), c, K, M([0, HY + 0.13, -0.04]));
-  else if (st === 'pony') { b.add(sph(0.04), c, K, M([0, HY + 0.07, -0.11])); limb(b, [0, HY + 0.06, -0.14], [0, HY - 0.3, -0.18], 0.045, c, K, 0.02); }
-  else if (st === 'braids') for (const sx of [-1, 1]) limb(b, [sx * 0.07, HY - 0.02, -0.08], [sx * 0.1, HY - 0.55, -0.06], 0.03, c, K, 0.02);
-  else if (st === 'bob') { b.add(sph(0.13), c, K, M([0, HY - 0.01, -0.01], [0, 0, 0], [1.02, 0.95, 0.98])); b.add(rb(0.2, 0.05, 0.04, 0.02), c, K, M([0, HY + 0.07, 0.1])); }
-  else if (st === 'afro') b.add(sph(0.17), c, K, M([0, HY + 0.06, -0.02], [0, 0, 0], [1.05, 0.95, 1]));
-  else if (st === 'curly') for (let i = 0; i < (LO ? 6 : 13); i++) { const a = i * 2.4, r = 0.1; b.add(sph(0.05), c, K, M([Math.cos(a) * r, HY + 0.08 + Math.sin(i * 1.3) * 0.03, Math.sin(a) * r - 0.01])); }
-  else if (st === 'twists') for (let i = 0; i < (LO ? 6 : 12); i++) { const a = i * 0.52; limb(b, [Math.cos(a) * 0.07, HY + 0.1, Math.sin(a) * 0.07 - 0.02], [Math.cos(a) * 0.11, HY + 0.16, Math.sin(a) * 0.11 - 0.02], 0.022, c, K); }
-  else if (st === 'bowl') { b.add(sph(0.125), c, K, M([0, HY + 0.035, 0], [0, 0, 0], [1.06, 0.92, 1.06])); b.add(rb(0.21, 0.06, 0.05, 0.025), c, K, M([0, HY + 0.06, 0.1])); }
-  else if (st === 'swept') { b.add(sph(0.12), c, K, M([0.02, HY + 0.07, 0.03], [0, 0, -0.3], [1.02, 0.6, 1.02])); }
+/* ---------- аксессуары: в пространстве «позы покоя», ведутся якорем кости ---------- */
+const HEAD = { M: { eye: [0, 1.675, 0.098], top: 1.83 }, F: { eye: [0, 1.628, 0.092], top: 1.775 } };
+const CHEST = { M: [0, 1.47, 0.05], F: [0, 1.405, 0.045] };
+const merge = (parts) => { const b = new Builder(); parts(b); const g = b.build().children[0].geometry; g.deleteAttribute('color'); return g; };
+const ACC = {};
+function accGeo(kind, S) {
+  const key = kind + S; if (ACC[key]) return ACC[key];
+  const [ex, ey, ez] = HEAD[S].eye, ht = HEAD[S].top;
+  const f = {
+    frame: (b) => { for (const sx of [-1, 1]) b.add(G.rbox(0.078, 0.052, 0.012, 0.012), '#fff', 'gloss', M([ex + sx * 0.043, ey, ez + 0.012])); b.add(G.box(0.03, 0.008, 0.008), '#fff', 'gloss', M([ex, ey + 0.008, ez + 0.012]));
+      for (const sx of [-1, 1]) b.add(G.box(0.006, 0.006, 0.12), '#fff', 'gloss', M([ex + sx * 0.082, ey + 0.008, ez - 0.05])); },
+    lens: (b) => { for (const sx of [-1, 1]) b.add(G.rbox(0.068, 0.044, 0.01, 0.01), '#fff', 'gloss', M([ex + sx * 0.043, ey, ez + 0.016])); },
+    cap: (b) => { b.add(G.sph(0.112, 18, 10), '#fff', 'plastic', M([ex, ht - 0.07, ez - 0.085], [0, 0, 0], [1.02, 0.78, 1.06])); b.add(G.rbox(0.19, 0.016, 0.13, 0.008), '#fff', 'plastic', M([ex, ht - 0.075, ez + 0.06], [-0.12, 0, 0])); },
+    capBack: (b) => { b.add(G.sph(0.112, 18, 10), '#fff', 'plastic', M([ex, ht - 0.07, ez - 0.085], [0, 0, 0], [1.02, 0.78, 1.06])); b.add(G.rbox(0.19, 0.016, 0.13, 0.008), '#fff', 'plastic', M([ex, ht - 0.085, ez - 0.22], [0.12, 0, 0])); },
+    bucket: (b) => { b.add(G.cyl(0.105, 0.125, 0.1, 18), '#fff', 'plastic', M([ex, ht - 0.03, ez - 0.09])); b.add(G.cyl(0.18, 0.18, 0.01, 22), '#fff', 'plastic', M([ex, ht - 0.075, ez - 0.09], [0.06, 0, 0])); },
+    chain: (b) => { const [cx, cy, cz] = CHEST[S]; b.add(G.tor(0.105, 0.009, 6, 28), '#fff', 'metal', M([cx, cy, cz], [Math.PI / 2 - 0.5, 0, 0], [1, 0.85, 1])); b.add(G.sph(0.022, 10, 8), '#fff', 'metal', M([cx, cy - 0.085, cz + 0.07])); },
+  }[kind];
+  return (ACC[key] = merge(f));
 }
-function headwear(b, L, HY) {
-  if (L.cap) {
-    b.add(sph(0.125), L.cap.c, 'plastic', M([0, HY + 0.05, -0.005], [0, 0, 0], [1.0, 0.82, 1.04]));
-    b.add(rb(0.2, 0.022, 0.15, 0.01), L.cap.c, 'plastic', M([0, HY + 0.06, 0.15], [L.cap.back ? 0 : -0.12, L.cap.back ? Math.PI : 0, 0]));
-  }
-  if (L.bucket) {
-    b.add(G.cyl(0.11, 0.13, 0.1, seg(18, 10)), L.bucket, 'plastic', M([0, HY + 0.1, 0]));
-    b.add(G.cyl(0.19, 0.19, 0.012, seg(22, 12)), L.bucket, 'plastic', M([0, HY + 0.05, 0], [0.08, 0, 0]));
-  }
+
+/* ---------- материал тела: перекраска областей по атрибутам экземпляра ---------- */
+let BODY_MAT = null;
+function bodyMat() {
+  if (BODY_MAT) return BODY_MAT;
+  const m = new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.3, sheen: 0.3 });
+  m.onBeforeCompile = (sh) => {
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', `#include <common>
+      attribute vec3 iSkin; attribute vec3 iCloth; attribute vec3 iTop; attribute vec3 iShorts; attribute vec3 iHair;
+      varying vec3 vSkin; varying vec3 vCloth; varying vec3 vTop; varying vec3 vShorts; varying vec3 vHair;`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+      vSkin = iSkin; vCloth = iCloth; vTop = iTop; vShorts = iShorts; vHair = iHair;`);
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vSkin; varying vec3 vCloth; varying vec3 vTop; varying vec3 vShorts; varying vec3 vHair;`)
+      .replace('#include <color_fragment>', `
+      #if defined( USE_COLOR_ALPHA )
+        float rg = floor(vColor.a * 10.0 + 0.5); vec3 c = vColor.rgb;
+        if (rg < 0.5) c = c * vSkin;
+        else if (rg < 1.5) c = vCloth;
+        else if (rg < 2.5) c = c;
+        else if (rg < 3.5) c = vHair * (0.35 + 1.4 * dot(c, vec3(0.3, 0.59, 0.11)));
+        else if (rg < 4.5) c = vTop;
+        else c = vShorts;
+        diffuseColor.rgb *= c;
+      #endif`);
+  };
+  return (BODY_MAT = m);
 }
-function glasses(b, gl, HY) {
-  const y = HY + 0.02, z = 0.108, c = gl.c, lens = gl.lens ?? '#0a0a0e';
-  if (gl.kind === 'wrap') { b.add(rb(0.23, 0.05, 0.03, 0.02), lens, 'gloss', M([0, y, z])); b.add(rb(0.235, 0.015, 0.035, 0.007), c, 'gloss', M([0, y + 0.03, z])); return; }
-  for (const sx of [-1, 1]) {
-    const w = gl.kind === 'round' ? 0.075 : gl.kind === 'cat' ? 0.085 : 0.08, h = gl.kind === 'shades' ? 0.05 : gl.kind === 'round' ? 0.065 : 0.055;
-    b.add(rb(w + 0.016, h + 0.016, 0.014, 0.012), c, 'gloss', M([sx * 0.052, y, z], [0, 0, gl.kind === 'cat' ? -sx * 0.18 : 0]));
-    b.add(rb(w, h, 0.016, 0.01), lens, gl.lens ? 'glass' : 'gloss', M([sx * 0.052, y, z + 0.004]));
-    limb(b, [sx * 0.1, y + 0.01, z - 0.01], [sx * 0.112, y + 0.01, -0.02], 0.006, c, 'gloss');
+const ACC_MAT = { gloss: () => new THREE.MeshPhysicalMaterial({ roughness: 0.18, clearcoat: 1, clearcoatRoughness: 0.05 }), plastic: () => new THREE.MeshStandardMaterial({ roughness: 0.55 }),
+  metal: () => new THREE.MeshStandardMaterial({ roughness: 0.25, metalness: 1 }), lens: () => new THREE.MeshPhysicalMaterial({ roughness: 0.05, metalness: 0.3, clearcoat: 1, transparent: true, opacity: 0.85 }) };
+const ACC_KIND = { frame: 'gloss', lens: 'lens', cap: 'plastic', capBack: 'plastic', bucket: 'plastic', chain: 'metal' };
+
+/* ---------- сборка: все люди сцены → InstancedMesh по видам геометрии ---------- */
+const _m = new THREE.Matrix4(), _e = new THREE.Matrix4();
+Builder.peopleBuild = (list) => {
+  const group = new THREE.Group(); group.name = 'people';
+  if (!DATA.M) { console.warn('[staya] people not loaded'); return group; }
+  const buckets = new Map();
+  const put = (key, geoFn, mat, matrix, attrs) => {
+    if (!buckets.has(key)) buckets.set(key, { geoFn, mat, mats: [], attrs: [] });
+    const bk = buckets.get(key); bk.mats.push(matrix); bk.attrs.push(attrs);
+  };
+  for (const { look, o, base } of list) {
+    const r = resolve(look, o), D = DATA[r.S], P = `${r.S}_${r.pose}`;
+    const pm = base.clone().multiply(M(o.p ?? [0, 0, 0], [0, o.ry ?? 0, 0], (o.s ?? 1) * (r.S === 'F' ? 0.95 : 0.97)));
+    // детализация: резиденты — полная, гости — средняя, толпа вдали (o.lo) — упрощённая
+    const lod = o.lo ? '_lo' : look.name ? '' : '_mid', lo = lod === '_lo';
+    const tint = { iSkin: r.skin, iCloth: r.cloth, iTop: r.top ?? r.cloth, iShorts: r.shorts ?? r.cloth, iHair: r.hairC };
+    const bk = D.geo[P + lod] ? P + lod : P; put(bk, () => D.geo[bk], 'body', pm, tint);
+    const L = lo ? '_lo' : '';
+    if (r.top) put(P + '_top' + L, () => D.geo[P + '_top' + L], 'body', pm, tint);
+    if (r.shorts) put(P + '_shorts' + L, () => D.geo[P + '_shorts' + L], 'body', pm, tint);
+    const head = pm.clone().multiply(D.anchor[P + '_@Head'] ?? _e.identity());
+    const hk = `${r.S}_hair_${r.hair}` + (lo && D.geo[`${r.S}_hair_${r.hair}_lo`] ? '_lo' : ''); if (D.geo[hk]) put(hk, () => D.geo[hk], 'body', head, tint);
+    if (look.hair === 'buzz' && r.S === 'M' && look.beard) put(`M_hair_Beard`, () => D.geo.M_hair_Beard, 'body', head, tint);
+    const acc = (kind, c) => put(kind + r.S, () => accGeo(kind, r.S), ACC_KIND[kind], kind === 'chain' ? pm.clone().multiply(D.anchor[P + '_@spine_03'] ?? _e.identity()) : head, { c: col(c) });
+    if (look.glasses) { acc('frame', look.glasses.c ?? '#111'); acc('lens', look.glasses.lens ?? look.glasses.c ?? '#0a0a0e'); }
+    if (look.cap) acc(look.cap.back ? 'capBack' : 'cap', look.cap.c);
+    if (look.bucket) acc('bucket', look.bucket);
+    if (look.chain) acc('chain', look.chain);
   }
-  b.add(G.box(0.03, 0.01, 0.01), c, 'gloss', M([0, y + 0.01, z + 0.002]));
-}
+  for (const [key, bk] of buckets) {
+    const src = bk.geoFn(); if (!src) continue;
+    const g = new THREE.BufferGeometry();
+    for (const k of Object.keys(src.attributes)) g.setAttribute(k, src.attributes[k]);
+    if (src.index) g.setIndex(src.index);
+    const n = bk.mats.length;
+    let mat;
+    if (bk.mat === 'body') {
+      for (const k of ['iSkin', 'iCloth', 'iTop', 'iShorts', 'iHair']) {
+        const a = new Float32Array(n * 3); bk.attrs.forEach((t, i) => t[k].toArray(a, i * 3));
+        g.setAttribute(k, new THREE.InstancedBufferAttribute(a, 3));
+      }
+      mat = bodyMat();
+    } else mat = (ACC_MAT['_' + bk.mat] ||= ACC_MAT[bk.mat]());
+    const im = new THREE.InstancedMesh(g, mat, n);
+    bk.mats.forEach((mm, i) => { im.setMatrixAt(i, mm); if (bk.mat !== 'body') im.setColorAt(i, bk.attrs[i].c); });
+    im.computeBoundingSphere(); im.frustumCulled = true; im.userData.dynamic = false;
+    group.add(im);
+  }
+  return group;
+};
+export const POSES = Object.keys(POSE_MAP);

@@ -6,6 +6,8 @@ export const CREDITS = [
   { what: '3D-движок three.js', who: 'three.js authors', lic: 'MIT', url: 'https://threejs.org' },
   { what: 'Слежение за головой: MediaPipe Face Detector', who: 'Google', lic: 'Apache 2.0', url: 'https://ai.google.dev/edge/mediapipe/solutions/vision/face_detector' },
   { what: 'Сцены POOL и PHUKET собраны и запечены в Blender', who: 'Blender Foundation', lic: 'GPL (инструмент)', url: 'https://www.blender.org' },
+  { what: 'Люди: Universal Base Characters', who: 'Quaternius', lic: 'CC0', url: 'https://quaternius.com/packs/universalbasecharacters.html' },
+  { what: 'Позы: Universal Animation Library', who: 'Quaternius', lic: 'CC0', url: 'https://quaternius.com/packs/universalanimationlibrary.html' },
   // модели Poly Haven (CC0)
   { what: 'Chandelier 01', who: 'Kirill Sannikov · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/Chandelier_01' },
   { what: 'Chandelier 02', who: 'Kirill Sannikov · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/Chandelier_02' },
