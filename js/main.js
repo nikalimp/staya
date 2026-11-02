@@ -7,6 +7,7 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import * as kit from './kit.js';
 import { startHeadTrack } from './headtrack.js';
 import { makeSfx } from './sfx.js';
+import { loadPeople } from './people.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -315,7 +316,7 @@ async function boot() {
     const done = () => { setReal(60); res(); };
     a.addEventListener('canplaythrough', done, { once: true }); a.addEventListener('error', done, { once: true }); setTimeout(done, 4000);
   });
-  await Promise.all([fontP, cssFontP]);
+  await Promise.all([fontP, cssFontP, loadPeople().then(() => setReal(45))]);
   // все сцены — сразу, пока крутится кольцо: дальше путешествие идёт без подгрузок
   for (let i = 0; i < N; i++) { await buildScene(i); setReal(45 + (50 * (i + 1)) / N); await new Promise((r) => setTimeout(r, 0)); }
   await firstTrack;

@@ -82,6 +82,8 @@ export class Builder {
   }
   build() {
     const group = new THREE.Group();
+    // люди, добавленные через people.person(), собираются в инстансы (см. js/people.js)
+    if (this.people?.length && Builder.peopleBuild) { group.add(Builder.peopleBuild(this.people)); this.people = []; }
     for (const [kind, list] of Object.entries(this.b)) {
       if (!list.length) continue;
       const geo = mergeGeometries(list, false);

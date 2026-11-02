@@ -175,7 +175,7 @@ export async function build({ THREE, kit, font, renderer }) {
   for (let z = 5.6; z > -8.5; z -= 1.1) for (let x = -7.4; x <= 7.4; x += 1.1) {
     const xx = x + (R() - 0.5) * 0.5, zz = z + (R() - 0.5) * 0.5, d = Math.abs(xx - lane(zz));
     if (d < 0.75 || (d > 3 && R() < 0.5) || (xx > 1.1 && zz < -6.2 && zz > -8.9)) continue;
-    person(xx, zz, Math.PI + (R() - 0.5) * 1.2, d > 1.3);
+    person(xx, zz, Math.PI + (R() - 0.5) * 1.2, true);
   }
   // «тесные» соседи по краям коридора — камера протискивается между ними
   for (let z = 5; z > -8; z -= 1.3) for (const sx of [-1, 1]) if (!(sx > 0 && z < -5.8)) person(lane(z) + sx * (0.52 + R() * 0.08), z + (R() - 0.5) * 0.3, Math.PI + sx * 0.6 + (R() - 0.5) * 0.6);

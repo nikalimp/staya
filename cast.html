@@ -4,7 +4,8 @@
 <body><script type="module">
 // Витрина персонажей: 5 резидентов и 20 гостей. Только для разработки, в сборку не попадает.
 import * as kit from './js/kit.js';
-import { person, RESIDENTS, GUESTS, POSES } from './js/people.js';
+import { person, RESIDENTS, GUESTS, POSES, loadPeople } from './js/people.js';
+await loadPeople();
 const { THREE } = kit;
 const q = new URLSearchParams(location.search), which = q.get('set') || 'res';
 const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.toneMapping = THREE.ACESFilmicToneMapping; r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
@@ -14,7 +15,7 @@ sc.add(new THREE.HemisphereLight('#ffe6f4', '#3a2a48', 1.2));
 const dl = new THREE.DirectionalLight('#ffffff', 2.2); dl.position.set(3, 6, 8); sc.add(dl);
 const b = new kit.Builder();
 const looks = which === 'res' ? Object.values(RESIDENTS) : which === 'f' ? GUESTS.slice(0, 10) : GUESTS.slice(10);
-const poses = which === 'res' ? ['peace', 'cross', 'stand', 'hips', 'phone'] : POSES;
+const poses = which === 'res' ? ['wave', 'hips', 'idle', 'dj', 'phone'] : ['idle', 'up', 'dance_a', 'talk', 'hips', 'wave', 'phone', 'dance_b', 'dj', 'dance_c'];
 looks.forEach((L, i) => person(b, L, { p: [(i - (looks.length - 1) / 2) * 0.75, 0, 0], ry: 0, pose: q.get('pose') || poses[i % poses.length], lo: q.has('lo') }));
 b.add(kit.G.cyl(9, 9, 0.05, 48), '#3a3048', 'plastic', kit.M([0, -0.025, 0]));
 sc.add(b.build());
