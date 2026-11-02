@@ -52,3 +52,10 @@ bvenv/bin/python publish_assets.py out ../../world/pool
 `scripts/assets/polyhaven_fetch.py 1k <id>…` — скачать glTF; `polyhaven_pack.py <out> 512 <id>[:simplify]…` — GLB для сайта (world/assets).
 Скалы и мебель виллы импортируются в Blender (`asset()` в villa_build.py) и запекаются вместе со сценой.
 Вилла упакована с `-vt 16 -vp 16` (16-битные UV не ломают атлас).
+
+## Запечённый свет для AQUA и клуба (сцены собраны в коде)
+
+1. Локальный сервер в корне сайта, затем `node scripts/export-scene.cjs aqua <dir>` — выгружает геометрию Builder (dev/export.html) в `<dir>/aqua_src.glb` и свет в `aqua_lights.json`.
+2. `python bake_scene.py -- aqua 2048 64` (рядом с файлами из шага 1) — `aqua/aqua.glb` и `aqua/aqua_light.webp` (свет ×1/8).
+3. `gltfpack -i aqua/aqua.glb -o world/aqua/aqua.glb -cc -kn -km -kv -vt 16 -vp 16`, карту света — в world/aqua.
+4. В сцене: `kit.applyBake(scene, built, 'aqua', { k })` — k подбирается по яркости (сейчас 32 для AQUA, 26 для клуба).

@@ -1,0 +1,32 @@
+<!doctype html><html><head><meta charset="utf-8"><title>STAYA export</title><base href="/">
+<script type="importmap">{ "imports": { "three": "/vendor/three.module.js", "three/addons/": "/vendor/addons/" } }</script></head>
+<body><script type="module">
+// Выгрузка статичной геометрии сцены (меши Builder по видам материала) и источников света — для запекания в Blender.
+// Только для разработки: dev/ не попадает в сборку сайта.
+import * as THREE from 'three';
+import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+import * as kit from '/js/kit.js';
+import { loadPeople } from '/js/people.js';
+import { GLTFExporter } from '/dev/GLTFExporter.js';
+globalThis.__noBake = true;
+const id = new URLSearchParams(location.search).get('scene');
+const r = new THREE.WebGLRenderer(); const font = await new FontLoader().loadAsync('fonts/unbounded_black.typeface.json'); await loadPeople();
+const mod = await import(`/js/scenes/${id}.js`);
+const res = await mod.build({ THREE, kit, font, renderer: r, mobile: false });
+const KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome', 'neon'];
+const out = new THREE.Scene(), lights = [];
+res.scene.updateMatrixWorld(true);
+res.scene.traverse((o) => {
+  let p = o.parent, inPeople = false; while (p) { if (p.name === 'people') inPeople = true; p = p.parent; }
+  if (o.isMesh && !o.isInstancedMesh && KINDS.includes(o.name) && !inPeople) {
+    const g = o.geometry.clone(); g.applyMatrix4(o.matrixWorld);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ name: o.name, vertexColors: true })); m.name = o.name; out.add(m);
+  }
+  if (o.isPointLight) lights.push({ t: 'point', c: o.color.getHexString(), i: o.intensity, d: o.distance, p: o.getWorldPosition(new THREE.Vector3()).toArray() });
+  if (o.isHemisphereLight) lights.push({ t: 'hemi', c: o.color.getHexString(), g: o.groundColor.getHexString(), i: o.intensity });
+  if (o.isDirectionalLight) lights.push({ t: 'dir', c: o.color.getHexString(), i: o.intensity, p: o.position.toArray() });
+});
+const glb = await new GLTFExporter().parseAsync(out, { binary: true });
+const bytes = new Uint8Array(glb); let s = ''; for (let i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+window.__export = { glb: btoa(s), lights, fog: res.scene.fog ? { c: res.scene.fog.color.getHexString(), d: res.scene.fog.density } : null };
+</script></body></html>

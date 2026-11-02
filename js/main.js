@@ -58,7 +58,7 @@ if (!mobile) {
   composer = new EffectComposer(renderer);
   renderPass = new RenderPass(new THREE.Scene(), camera);
   composer.addPass(renderPass);
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(1024, 1024), 0.55, 0.55, 0.82));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(1024, 1024), 0.42, 0.5, 0.9));
   composer.addPass(new OutputPass());
 }
 

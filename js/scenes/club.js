@@ -232,7 +232,8 @@ export async function build({ THREE, kit, font, renderer }) {
     kit.prop(scene, 'portable_cassette_player', { p: [-12.2, 0.58, 2.6], ry: 0.8, s: 2.4 }),
     kit.prop(scene, 'wine_bottles_01', { p: [-12.9, 0.58, 9.2], ry: 1.2, s: 1.6 }),
   ]);
-  scene.add(b.build());
+  const built = b.build(); scene.add(built);
+  await kit.applyBake(scene, built, 'club', { k: 26 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
 
   /* --- камера --- */
   const EYE = 1.62;
