@@ -156,10 +156,9 @@ function apply(g) {
   const fv = baseFov * (1 - Math.max(-0.6, Math.min(1, head.z)) * 0.2);   // зритель ближе к экрану — кадр приближается
   if (Math.abs(camera.fov - fv) > 1e-3) { camera.fov = fv; camera.updateProjectionMatrix(); }
   if (head.x || head.y || head.yaw || head.pitch) {
-    // сдвиг головы → камера сдвигается в обратную сторону и чуть разворачивается (как взгляд в окно);
-    // поворот головы → камера смотрит туда же; оба эффекта складываются
-    camera.translateX(-head.x * 0.55); camera.translateY(-head.y * 0.4);
-    camera.rotateY(head.x * 0.16 - head.yaw * 0.3); camera.rotateX(-head.y * 0.12 + head.pitch * 0.2);
+    // сдвиг головы → камера сдвигается туда же и чуть поворачивается вслед; поворот головы → камера смотрит туда же
+    camera.translateX(head.x * 0.55); camera.translateY(head.y * 0.4);
+    camera.rotateY(-head.x * 0.16 - head.yaw * 0.3); camera.rotateX(head.y * 0.12 + head.pitch * 0.2);
   }
   if (composer) { renderPass.scene = s.scene; composer.render(); } else renderer.render(s.scene, camera);
   if (i !== curIdx) { curIdx = i; audio.go(i); }
