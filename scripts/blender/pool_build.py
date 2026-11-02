@@ -101,8 +101,9 @@ def tube(pts, r, m, g='far', taper=None, res=6):
 
 # ---------- палитра ----------
 WHITE = mat('tile_white', (0.9, 0.9, 0.92), 0.35, node=lambda m, p: tiles(m, p, (0.92, 0.92, 0.95), (0.86, 0.87, 0.9), 4.0, (0.55, 0.56, 0.6)))
-POOLT = mat('tile_pool', (0.1, 0.6, 0.75), 0.3, node=lambda m, p: tiles(m, p, srgb('#3fd2e8'), srgb('#2fbfda'), 8.0, srgb('#bfefff')))
-COPING = mat('coping', (0.95, 0.95, 0.97), 0.3)
+POOLT = mat('tile_pool', (0.1, 0.6, 0.75), 0.25, node=lambda m, p: tiles(m, p, srgb('#2fc4e0'), srgb('#1fa8cc'), 20.0, srgb('#d8f6ff')))
+BAND = mat('tile_band', (0.05, 0.2, 0.4), 0.2, node=lambda m, p: tiles(m, p, srgb('#0d4a8a'), srgb('#1a6ab0'), 24.0, srgb('#c8e8ff')))
+COPING = mat('coping', (0.95, 0.95, 0.97), 0.35, node=lambda m, p: noise(m, p, srgb('#e9e2d6'), srgb('#f7f3ec'), 6))
 GRASS = mat('grass', (0.02, 0.08, 0.03), 0.9, node=lambda m, p: noise(m, p, srgb('#0d2a18'), srgb('#1f4a2a'), 0.6))
 STUCCO = mat('stucco', srgb('#ece6f2'), 0.8)
 ROOF = mat('roof', srgb('#2a2533'), 0.6)
@@ -154,6 +155,11 @@ for w, d, x, z in [[22.6, 0.4, 0, -5.2], [22.6, 0.4, 0, 5.2], [0.4, 10.8, -11.2,
 box((0, -1.8, 0), (22, 0.2, 10), POOLT, 'near')
 for w, d, x, z in [[22, 0.2, 0, -5.05], [22, 0.2, 0, 5.05], [0.2, 10, -11.05, 0], [0.2, 10, 11.05, 0]]:
     box((x, -0.8, z), (w, 2, d), POOLT, 'near')
+# полоса мозаики по линии воды и ступени в углу бассейна
+for w, d, x, z in [[22, 0.04, 0, -4.94], [22, 0.04, 0, 4.94], [0.04, 10, -10.94, 0], [0.04, 10, 10.94, 0]]:
+    box((x, -0.05, z), (w, 0.35, d), BAND, 'near')
+for i in range(4):   # ступени у левого торца: каждая следующая ниже и длиннее
+    box((-11 + 0.2 * (i + 1), -0.42 - i * 0.35, -3.4), (0.4 * (i + 1), 0.35, 2.2), POOLT, 'near')
 for zz in [-1.2, -2.0]:
     tube([(10.2, 1.3, zz), (10.7, 1.3, zz), (10.95, 0.9, zz), (10.95, -0.6, zz)], 0.045, METAL, 'near')
 for x in range(-9, 10, 3):
@@ -202,16 +208,12 @@ for z in (SZ + 2.4, SZ - 2.4): truss((-8, 9.2, z), (8, 9.2, z))
 for x in (-8, 8): truss((x, 9.2, SZ + 2.4), (x, 9.2, SZ - 2.4))
 box((0, 9.75, SZ), (17.2, 0.5, 5.6), ROOF, 'far', bevel=0.05)
 box((0, ST + 3.4, SZ - 2.55), (15.6, 6.6, 0.2), DARK, 'far')  # задник
-for i in range(9):
-    c = ['#ff3fb4', '#8a3dff', '#2fe6ff'][i % 3]
-    box((-6.4 + i * 1.6, ST + 3.6, SZ - 2.42), (0.5, 5.6, 0.06), neon('strip_' + c[1:], c, 7), 'neon')
 pars = ['pink', 'green', 'red', 'cyan', 'red', 'green', 'pink']
 for i, c in enumerate(pars):
     x = -6 + i * 2
     cyl((x, 8.95, SZ + 2.4), (x, 8.55, SZ + 2.75), 0.22, DARK, 'far', seg=12, r2=0.26)
     sph((x, 8.5, SZ + 2.8), 0.17, N_PAR[c], 'neon')
 box((0, ST + 0.55, SZ + 1.0), (3.4, 1.1, 0.9), DARK, 'far', bevel=0.03)
-box((0, ST + 1.13, SZ + 1.0), (2.9, 0.08, 0.6), SPEAK, 'far')
 logo((0, ST + 0.6, SZ + 1.47), 2.4, 0)
 for sx in (-1, 1):
     speaker(sx * 6.6, ST, SZ + 0.6, 1.8, 0); speaker(sx * 6.6, ST + 1.8, SZ + 0.6, 1.3, 0)
@@ -260,21 +262,13 @@ TENT = [
 for pts in TENT: tube(pts, 1.0, INF_OCTO, 'gloss', taper=(1.05, 0.22), res=10)
 
 # ---------- электро-сцена вдали справа ----------
-EX, EZ = 43.0, -4.0
+EX, EZ = 60.0, -4.0
 box((EX, 0.6, EZ), (8, 1.2, 14), DARK, 'far', bevel=0.04)
-box((EX, 0.03, EZ), (22, 0.06, 24), mat('asphalt', srgb('#15131c'), 0.7), 'far')
+box((EX - 4, 0.03, EZ), (30, 0.06, 26), mat('asphalt', srgb('#15131c'), 0.7), 'far')
 for z in (EZ - 7, EZ + 7):
     for x in (EX - 3.4, EX + 3.4): truss((x, 1.2, z), (x, 10, z))
 for x in (EX - 3.4, EX + 3.4): truss((x, 10, EZ - 7), (x, 10, EZ + 7))
 truss((EX - 3.4, 10, EZ - 7), (EX + 3.4, 10, EZ - 7)); truss((EX - 3.4, 10, EZ + 7), (EX + 3.4, 10, EZ + 7))
-# LED-стена из квадратов
-LED = {c: neon('led_' + c[1:], c, 9) for c in ('#2f6bff', '#2fe6ff', '#ffffff', '#8a3dff')}
-rnd = random.Random(3)
-for iy in range(7):
-    for iz in range(13):
-        r = rnd.random(); c = '#2f6bff' if r < 0.45 else '#2fe6ff' if r < 0.75 else '#8a3dff' if r < 0.93 else '#ffffff'
-        if r > 0.97: continue
-        box((EX + 3.7, 1.9 + iy * 1.05, EZ - 6.3 + iz * 1.05), (0.06, 0.9, 0.9), LED[c], 'neon')
 box((EX + 3.85, 5.6, EZ), (0.2, 8, 14), DARK, 'far')
 box((EX - 1.2, 1.2 + 0.55, EZ), (0.9, 1.1, 3.2), DARK, 'far', bevel=0.03)
 box((EX - 1.66, 1.2 + 0.85, EZ), (0.03, 0.06, 3.0), N_PAR['cyan'], 'neon')
@@ -285,30 +279,10 @@ for i in range(6):
     z = EZ - 5 + i * 2
     cyl((EX - 3.4, 9.75, z), (EX - 3.8, 9.35, z), 0.2, DARK, 'far', seg=12, r2=0.24)
     sph((EX - 3.86, 9.3, z), 0.16, N_PAR['cyan' if i % 2 else 'pink'], 'neon')
-# надувной шлем робота на крыше электро-сцены
-HB = mat('inf_helmet', srgb('#14141c'), 0.12, coat=1)
-RC = (EX + 0.5, 13.2, EZ)
-sph(RC, 3.2, HB, 'gloss', s=(1, 1.08, 1.05), seg=48)
-cu = sph((RC[0] - 2.25, RC[1] + 0.1, RC[2]), 1.0, neon('visor', '#2fe6ff', 12), 'neon', s=(0.45, 0.85, 2.7), seg=32)
-for sz in (-1, 1): cyl((RC[0], RC[1], RC[2] + sz * 3.2), (RC[0], RC[1], RC[2] + sz * 3.6), 0.9, METAL, 'gloss', seg=24)
+RC = (EX + 0.5, 15.5, EZ)   # Луна над сценой — на сайте
 inflated('ELECTRO', mat('inf_blue', srgb('#2f5bff'), 0.16, coat=1), (EX - 6.4, 0.05, EZ), 1.35, ry=math.radians(-90))
 
-# ---------- дом позади камеры: фасад на z = 19 ----------
-HZ = 19.0
-box((0, 4, HZ + 5), (32, 8, 10), STUCCO, 'far')
-box((-3, 10, HZ + 5.5), (22, 4, 9), STUCCO, 'far')
-box((0, 8.1, HZ + 5), (33, 0.4, 11), ROOF, 'far'); box((-3, 12.1, HZ + 5.5), (23, 0.4, 10), ROOF, 'far')
-box((0, 0.25, HZ - 2), (26, 0.5, 4), WOOD, 'far')
-for i, x in enumerate([-11, -5.2, 5.2, 11]):
-    box((x, 2.1, HZ - 0.03), (4.4, 3.2, 0.06), N_WARM if i % 2 else N_PINK, 'neon')
-    box((x, 2.1, HZ - 0.08), (0.15, 3.2, 0.12), ROOF, 'far')
-for i in range(5): box((-12 + i * 6, 6, HZ - 0.03), (3.4, 2, 0.06), N_VIO if i == 2 else N_WARM, 'neon')
-for i in range(3): box((-10 + i * 7, 10, HZ + 0.97), (4.5, 2.2, 0.06), N_WARM, 'neon')
-for sx in (-1, 1):
-    box((sx * 0.8, 2.4, HZ - 0.1), (1.55, 3.8, 0.16), DOOR, 'far', bevel=0.03)
-    box((sx * 0.15, 2.4, HZ - 0.22), (0.05, 0.6, 0.08), METAL, 'far')
-box((0, 4.42, HZ - 0.1), (3.6, 0.25, 0.3), ROOF, 'far')
-for sx in (-1, 1): sph((sx * 2.2, 3.6, HZ - 0.3), 0.16, N_BULB, 'neon')
+HZ = 19.0   # дома нет: за баром сад и забор
 
 # ---------- реквизит у бассейна ----------
 def lounger(x, z, ry):
@@ -320,22 +294,6 @@ def lounger(x, z, ry):
     for o in parts: o.matrix_world = m @ o.matrix_world
 for i in range(5): lounger(-9 + i * 3.4, 7.2, math.pi)
 for i in range(4): lounger(-14.5, -3.6 + i * 2.4, math.pi / 2)
-for i in range(40):
-    a = random.random() * math.tau; rr = 13 + random.random() * 6
-    x, z = math.cos(a) * rr, math.sin(a) * rr * 0.55
-    if 11.5 < x < 15.5: continue
-    cyl((x, T, z), (x, T + 0.13, z), 0.04, RED, 'near', seg=12, r2=0.055)
-for x, z, c in [(3, 6.4, '#2fe6ff'), (3.4, 6.5, '#2fe6ff'), (-4.5, -6.6, '#ff3fb4'), (-4.1, -6.4, '#ff3fb4')]:
-    box((x, T + 0.02, z), (0.12, 0.03, 0.3), mat('flip' + c, srgb(c), 0.4), 'near', bevel=0.01)
-def flamingo(x, z, s, ry, mm):
-    objs = [torus((0, 0.2, 0), 0.75, 0.32, mm, rot=(math.radians(90), 0, 0)), sph((0, 0.55, -0.55), 0.55, mm, 'gloss', s=(0.8, 0.7, 1.2)),
-            tube([(0, 0.7, 0.55), (0, 1.4, 0.75), (0, 2.0, 0.45), (0, 2.2, 0.1)], 0.16, mm, 'gloss'), sph((0, 2.25, 0.15), 0.25, mm, 'gloss')]
-    m = Matrix.Translation(P(x, 0.0, z)) @ Matrix.Rotation(ry, 4, 'Z') @ Matrix.Scale(s, 4)
-    for o in objs: o.matrix_world = m @ o.matrix_world
-flamingo(-7, 1, 1.1, 0.5, INF_FLAM)
-for (x, z), mm in zip([(-4, 3.2), (5, -2.6), (8, 2.8), (-8.5, -3)], [INF_PINK, INF_WHITE, INF_CYAN, INF_YEL]):
-    torus((x, 0.15, z), 0.6, 0.22, mm, rot=(math.radians(90), 0, 0))
-sph((6.5, 0.35, -1), 0.4, BALL, 'gloss')
 
 # ---------- пальмы, деревья, забор, гирлянды ----------
 def palm(x, z, h, lean, seed):
@@ -346,15 +304,14 @@ def palm(x, z, h, lean, seed):
     for i in range(10):
         a = i / 10 * math.tau + rnd.random() * 0.3; L = 3.2 + rnd.random(); dx, dz = math.cos(a), math.sin(a)
         tube([(top.x, top.y, top.z), (top.x + dx * L * 0.45, top.y + 0.5, top.z + dz * L * 0.45), (top.x + dx * L, top.y - 1.2, top.z + dz * L)], 1.0, LEAF, 'far', taper=(0.12, 0.02), res=6)
-for i, (x, z) in enumerate([(-24, -8), (-30, 6), (-26, 15), (26, -18), (24, 12), (-20, -18), (34, 10), (52, 8), (52, -16)]):
-    palm(x, z, 9 + (i % 3) * 1.6, (0.6 if i % 2 else -0.6, 0.3), i)
 for i in range(16):
-    sx = -1 if i % 3 else 1; x = sx * (36 + random.random() * 10) if sx < 0 else 60 + random.random() * 8; z = -30 + random.random() * 60; h = 6 + random.random() * 6
+    sx = -1 if i % 3 else 1; x = sx * (36 + random.random() * 10) if sx < 0 else 74 + random.random() * 10; z = -30 + random.random() * 60; h = 6 + random.random() * 6
     cyl((x, 0, z), (x, h * 0.4, z), 0.3, TRUNK, 'far', seg=8)
     sph((x, h * 0.75, z), 2.4 + random.random(), TREE, 'far', s=(1, 1.3, 1), seg=12)
-for x in range(-40, 66, 2): box((x, 1.2, -32), (1.85, 2.4, 0.12), FENCE, 'far')
-for z in range(-30, 34, 2): box((-40, 1.2, z), (0.12, 2.4, 1.85), FENCE, 'far')
-for x, z in [(-19, -6), (19, -7)]: cyl((x, 0, z), (x, 6.5, z), 0.08, METAL, 'far', seg=8)
+for x in range(-40, 80, 2): box((x, 1.2, -32), (1.85, 2.4, 0.12), FENCE, 'far')
+for x in range(-40, 80, 2): box((x, 1.2, 30), (1.85, 2.4, 0.12), FENCE, 'far')
+for z in range(-30, 30, 2): box((-40, 1.2, z), (0.12, 2.4, 1.85), FENCE, 'far')
+for x, z in [(-19, -6), (19, -7), (-16, HZ), (-6, HZ), (6, HZ), (16, HZ)]: cyl((x, 0, z), (x, 7.5, z), 0.08, METAL, 'far', seg=8)
 strings = [((-16, 7.5, HZ), (-19, 6.5, -6)), ((-6, 7.5, HZ), (-8, 9.0, SZ + 2.4)), ((6, 7.5, HZ), (8, 9.0, SZ + 2.4)), ((16, 7.5, HZ), (19, 6.5, -7)),
            ((-19, 6.5, -6), (-8, 9.0, SZ + 2.4)), ((19, 6.5, -7), (8, 9.0, SZ + 2.4))]
 BULBS = []
@@ -390,8 +347,8 @@ for i, c in enumerate(pars):
 light('AREA', (0, 6, SZ + 6), srgb('#ff4fb8'), 2200, size=8, target=(0, 4, SZ))
 light('AREA', (0, 22, SZ + 10), srgb('#b04dff'), 9000, size=10, target=OC)
 light('AREA', (EX - 10, 8, EZ), srgb('#2f6bff'), 9000, size=10, target=(EX, 4, EZ))
-light('AREA', (EX - 6, 18, EZ), srgb('#2fe6ff'), 3000, size=6, target=RC)
-light('AREA', (0, 4, HZ - 4), srgb('#ffb36b'), 1400, size=8, target=(0, 2, HZ))
+light('AREA', (EX - 8, 18, EZ), srgb('#2fe6ff'), 2000, size=6, target=(EX, 6, EZ))
+light('AREA', (12.6, 5, 8), srgb('#ffb36b'), 900, size=4, target=(12.6, 1, 13))   # свет над баром
 for q in BULBS[::6]: light('POINT', (q[0], q[1] - 0.3, q[2]), srgb('#ffd28a'), 60, size=0.2)
 
 sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'

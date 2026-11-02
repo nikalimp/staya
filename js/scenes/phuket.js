@@ -3,7 +3,7 @@
 // Путь: подъезд к вилле → сквозь вход и гостиную → терраса с инфинити-бассейном →
 // VIP-беседка с командой → за край утёса, лицом к восходу.
 const BASE = 'world/villa/';
-const GX = 15, GZ = -11, GY = 0.5; // VIP-беседка: центр и высота настила
+const Y2 = 5.2;   // пол второго этажа: терраса с бассейном и диджейской стойкой
 
 import { CREDITS, DEV } from '../credits.js';
 export async function build({ THREE, kit, renderer, mobile }) {
@@ -60,6 +60,10 @@ export async function build({ THREE, kit, renderer, mobile }) {
     pv = new THREE.Group(); pv.position.set(c.x, bb.min.y, c.z); scene.add(pv); pv.attach(o);
   }
 
+  /* --- обрыв к морю под садом виллы: каменная стена во всю ширину участка (скал и островов больше нет) --- */
+  const cliffM = new THREE.MeshStandardMaterial({ color: '#8a7460', roughness: 0.95 });
+  const cliff = (w, h, d, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), cliffM); m.position.set(x, y, z); scene.add(m); };
+  cliff(144, 30, 1.2, 0, -15.4, -19.8); for (const sx of [-1, 1]) cliff(1.2, 30, 66, sx * 72, -15.4, 13);
   /* --- живая вода: бассейн, джакузи, канал у входа --- */
   const pool = kit.water(18, 11, '#2aa6b0', { tile: 4, ei: 0.35, emissive: '#1a8a9a', opacity: 0.86 });
   pool.position.set(0, -0.1, -12); scene.add(pool);
@@ -67,20 +71,31 @@ export async function build({ THREE, kit, renderer, mobile }) {
   jac.geometry.dispose(); jac.geometry = new THREE.CircleGeometry(1.75, 40); jac.position.set(-14.5, 0.45, -9); scene.add(jac);
   const canal = kit.water(1.6, 22, '#3a3a40', { tile: 2, ei: 0.15, emissive: '#ffb070', rough: 0.03, metal: 0.6 });
   canal.position.set(4.6, 0.16, 27); scene.add(canal);
+  // бассейн на крыше второго этажа
+  const roof = kit.water(7.4, 7.0, '#2aa6b0', { tile: 3, ei: 0.4, emissive: '#1a8a9a', opacity: 0.86 });
+  roof.position.set(-8.8, Y2 + 0.72, 1.0); scene.add(roof);
+  /* --- второй этаж: пульт Pioneer и экран с видео; пальмы у виллы и на террасе (Sketchfab, CC BY) --- */
+  const props = [kit.decks(scene, [0, Y2 + 1.1, 6.0], Math.PI, 1.6)];
+  const vt = kit.canvasTex(1024, 512, (x, w, h) => { const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#ff9a6a'); g.addColorStop(1, '#5a6ab8'); x.fillStyle = g; x.fillRect(0, 0, w, h); kit.gradText(x, 'STAYA PHUKET', w / 2, h / 2, 110, '#ffffff', '#ffe2c4', { glow: '#ff8a5a' }); });
+  kit.videoScreen(scene, 'video/phuket.mp4', 7.6, 3.2, [0, Y2 + 1.95, 7.78], [0, Math.PI, 0], vt);
+  for (const [x, y, z, h, ry] of [[-13.6, Y2 + 0.8, 6.6, 6, 0.3], [13.4, Y2 + 0.8, 6.6, 6.5, 2.2], [4.6, Y2 + 0.8, -3.0, 5.5, 4.0],
+    [-24, 0, -12, 10, 0.5], [-23, 0, 6, 9, 1.7], [-25, 0, -18, 11, 3.1], [22, 0, -3, 10, 2.4], [23, 0, -17, 9.5, 0.9], [20, 0, 20, 10, 5.0], [-19, 0, 22, 9, 4.2], [26, 0, 8, 11, 1.1], [-30, 0, -4, 10, 2.8]])
+    props.push(kit.prop(scene, 'sf_palm', { p: [x, y, z], ry, h }));
+  await Promise.all(props);
 
   /* --- живой свет --- */
   scene.add(new THREE.HemisphereLight('#ffd2b0', '#5a4038', 1.0));
   // направленного света нет: он давал блик-дорожку на море под титрами
   const L = (c, i, p, d = 14) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
-  L('#ffd6a0', 40, [GX, 3.3, GZ]); L('#ff3fb4', 18, [GX - 3.2, 1.6, GZ], 8);
+  L('#ffd6a0', 30, [0, Y2 + 3.2, 4], 12); L('#ff3fb4', 14, [0, Y2 + 1.4, 4.8], 6);
 
   /* --- свечение: светильники, бассейн, гирлянда беседки --- */
   for (let x = -8; x <= 8; x += 4) glows.push([x, -0.9, -6.6, '#bff6ff', 1.6, 1.1]);
   glows.push([-14.5, 0.2, -9, '#2fe6ff', 2.5, 0.8], [-13.7, 0.9, 7, '#ff8a2a', 2.2, 0.8]);
   for (const z of [5.6, 7, 8.4]) glows.push([7.5, 2.2, z, '#ffd9a0', 0.9, 1.2]);
   for (let i = 0; i < 5; i++) glows.push([-2.3, 0.15, 17.4 + i * 4.6, '#ffc37a', 1.1, 1.2], [5.9, 0.15, 18.2 + i * 4.6, '#ffc37a', 1.1, 1.2]);
-  for (let i = 0; i < 26; i += 2) for (const z of [GZ - 3.4, GZ + 3.4]) glows.push([GX - 4 + (i / 26) * 8, 3.72, z, '#ffd9a0', 0.45, 1.4]);
-  glows.push([GX - 4.25, 4.3, GZ, '#ff3fb4', 3, 0.7], [GX - 2.9, 1.05, GZ, '#ff3fb4', 1.6, 0.8]);
+  for (const x of [-11, -8.8, -6.6]) glows.push([x, Y2 + 0.5, -2.4, '#bff6ff', 1.2, 1.1]);
+  glows.push([0, Y2 + 0.85, 5.5, '#ff3fb4', 1.6, 0.8]);
   scene.add(kit.glowPoints(glows));
   kit.haze(scene, { box: [-60, 80, -24, -8, -160, -40], colors: ['#ffd2b0', '#ffb07a'], n: 14, size: 60, opacity: 0.08 });
 
@@ -130,7 +145,6 @@ export async function build({ THREE, kit, renderer, mobile }) {
   const credY = (k) => (yH - CHH / 2) + (endBottom + CHH / 2 - (yH - CHH / 2)) * k;
 
   /* --- камера: пролёт сквозь виллу к морю и восходу --- */
-  const GAZ = [GX, 1.7, GZ];
   const far = (k) => SD.clone().multiplyScalar(k).toArray();
   const fin = (k) => CP.clone().addScaledVector(VD, k).setY(CP.y + k * 0.035).toArray();
   const keys = [
@@ -143,20 +157,24 @@ export async function build({ THREE, kit, renderer, mobile }) {
     { p: [-1, 1.8, 9.6], l: [-8, 1.3, 5.5], t: 0.277 },
     { p: [1.4, 1.8, 5.6], l: [8, 1.3, 6.5], t: 0.336 },
     { p: [0, 1.8, 1.6], l: [0, 1.4, -14], t: 0.386 },
-    // на террасу через раздвинутое стекло, над бассейном к беседке
-    { p: [0.4, 2.0, -3], l: [5, 1.2, -13], t: 0.437 },
-    { p: [4.4, 3.0, -8], l: GAZ, t: 0.504 },
-    { p: [7.0, 3.1, -10.4], l: GAZ, t: 0.554 },
-    { p: [7.2, 3.0, -11.8], l: [GX, 1.5, GZ - 0.5], t: 0.622 },
-    // разворот к морю и полёт за край утёса — в восход
-    { p: [3.6, 2.7, -16], l: far(600), t: 0.697 },
-    { p: [0.8, 2.6, -19.4], l: fin(1000), t: 0.773 },
-    { p: CP.toArray(), l: fin(1000), t: 0.82 },
+    // на террасу через раздвинутое стекло и над бассейном к краю утёса
+    { p: [0.4, 2.0, -3], l: [0, 1.4, -30], t: 0.437 },
+    { p: [0, 2.8, -13], l: [0, 2, -60], t: 0.49 },
+    // разворот над морем: второй этаж виллы
+    { p: [-3.5, 4.6, -19.5], l: [-40, 4.5, -16], t: 0.525 },
+    { p: [-6, 6.4, -23], l: [-6, 6.2, 2], t: 0.56 },
+    // боковой пролёт вдоль террасы: бассейн на крыше → диджейская стойка с экраном → балкон
+    { p: [-13, 7.3, -12.5], l: [-9, 5.6, 2], t: 0.61 },
+    { p: [-2, 7.5, -11.5], l: [0, 6.6, 7], t: 0.67 },
+    { p: [9.5, 7.2, -12.5], l: [11.5, 5.8, -5], t: 0.72 },
+    // разворот к морю — в восход
+    { p: [5.5, 4.4, -18.5], l: far(600), t: 0.77 },
+    { p: CP.toArray(), l: fin(1000), t: 0.83 },
     { p: CP.toArray(), l: fin(1000), t: 1 },
   ];
   const update = (t) => {
-    const ck = Math.min(1, Math.max(0, (t - 0.8) / 0.18));
-    cred.position.y = credY(ck); cred.visible = t > 0.78;
+    const ck = Math.min(1, Math.max(0, (t - 0.82) / 0.16));
+    cred.position.y = credY(ck); cred.visible = t > 0.8;
     if (!pv) return;
     const k = Math.min(1, Math.max(0, (t - 0.37) / 0.08));
     const e = k === 1 ? 1 : 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2);

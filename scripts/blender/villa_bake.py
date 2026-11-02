@@ -88,7 +88,7 @@ for g, (asz, lsz, spp, mode) in GROUPS.items():
     if g == 'gloss':
         keep = [o for o in objs if o.name.startswith('letters_')]
         rest = [o for o in objs if o not in keep]
-        objs = keep + [join(rest, 'gloss_static')]
+        objs = keep + ([join(rest, 'gloss_static')] if rest else [])
     else:
         objs = [join(objs, g)]
     uv_project(objs)

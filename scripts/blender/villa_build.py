@@ -111,13 +111,7 @@ for sx in (-1, 1): box((sx * 20.5, -0.2, -12.95), (23, 0.4, 12.9), TRAV, 'ground
 box((0, -0.2, 45), (90, 0.4, 36), GRASS, 'ground')                 # газон перед въездом
 for sx in (-1, 1): box((sx * 52, -0.2, 4), (40, 0.4, 46), GRASS, 'ground')
 box((0, -15, -19.2), (64, 30, 0.6), STONE, 'far')                  # подпорная стена утёса
-# утёс под террасой и мысы над морем — сканы скал Poly Haven
-asset('coastal_cliff_02', (-90, -12, -50), ry=0.5, s=2.4, tris=50000, top=True)
-asset('coastal_cliff_02', (95, -12, -50), ry=-0.6, s=2.4, tris=50000, top=True)
-asset('coast_rocks_01', (-30, SEA - 1.2, -36), ry=0.3, s=1.2, tris=25000)
-asset('coast_rocks_01', (30, SEA - 1.2, -38), ry=2.4, s=1.1, tris=25000)
-for (x, z, ry, s) in [(-250, -210, 0.9, 3.0), (-230, -470, 0.35, 3.5), (290, -230, -0.9, 3.0), (430, -520, -0.45, 3.5)]:
-    asset('coastal_cliff_04', (x, SEA - 4, z), ry=ry, s=s, tris=60000)
+# скал и островов в море нет: чистый горизонт для финала
 
 # ---------- вилла: два объёма, консоли, стекло ----------
 VZ0, VZ1, VX = 0.0, 14.0, 14.0     # фасад к морю z=0, вход z=14
@@ -144,13 +138,40 @@ for x0, x1 in [(-VX, -4.2), (4.2, VX)]: box(((x0 + x1) / 2, H1 / 2, VZ0), (x1 - 
 # раздвинутые створки сложены у края проёма
 for sx in (-1, 1):
     for k in range(2): box((sx * (4.5 + k * 0.12), H1 / 2, VZ0 - 0.2 - k * 0.1), (0.06, H1 - 0.1, 0.06), BRONZE, 'near')
-# второй этаж: спальни со стеклянной лентой
-box((-3, H1 + 0.6 + 1.8, 6), (18, 3.6, 10), STONE, 'far')
-box((-3, H1 + 0.6 + 1.8, 0.95), (16.4, 3.2, 0.06), GLASSM, 'glass')
-box((-3, H1 + 0.6 + 1.8, 1.0), (16.6, 3.0, 0.08), mat('bedroom_glow', srgb('#3a2a1e'), 0.6), 'far')
-box((-3, H1 + 0.6 + 3.75, 5.5), (21, 0.35, 13.5), PLASTER, 'far')
-box((-3, H1 + 0.6 + 3.52, 5.5), (20.8, 0.12, 13.3), OAK, 'far')
-for x in (-10, -6, -2, 2): box((x, H1 + 0.62, 0.7), (1.6, 0.04, 0.06), N_WARM, 'neon')
+# ---------- второй этаж: открытая терраса с бассейном и диджейской стойкой ----------
+Y2 = H1 + 0.6                                   # пол второго этажа (верх плиты над гостиной)
+box((0, Y2 + 0.02, 7), (2 * VX + 1.2, 0.04, 21.8), OAKF, 'near')
+# закрытый объём сзади (z 8…14): каменные стены, стекло, плоская крыша
+for sx in (-1, 1): box((sx * (VX - 0.25), Y2 + 1.8, 11), (0.5, 3.6, 6.4), STONE, 'near')
+box((0, Y2 + 1.8, 14.0), (2 * VX, 3.6, 0.5), STONE, 'near')
+box((0, Y2 + 3.75, 11), (2 * VX + 1.6, 0.3, 7.2), PLASTER, 'far'); box((0, Y2 + 3.58, 11), (2 * VX + 1.4, 0.06, 7), OAK, 'far')
+box((0, Y2 + 1.8, 8.0), (8.4, 3.6, 0.4), STONE, 'near')           # простенок под экран с видео (экран — на сайте)
+for x0, x1 in [(-VX + 0.5, -4.2), (4.2, VX - 0.5)]:
+    box(((x0 + x1) / 2, Y2 + 1.8, 8.0), (x1 - x0, 3.6, 0.03), GLASSM, 'glass')
+    box(((x0 + x1) / 2, Y2 + 1.8, 8.05), (x1 - x0, 3.4, 0.06), mat('bedroom_glow', srgb('#3a2a1e'), 0.6), 'far')
+for x in (-10, -7, 7, 10): box((x, Y2 + 3.5, 8.3), (1.6, 0.04, 0.06), N_WARM, 'neon')
+# диджейская стойка лицом к морю (пульт ставится на сайте)
+box((0, Y2 + 0.55, 6.0), (3.2, 1.1, 0.9), mat('booth', srgb('#f4efe6'), 0.35), 'near', bevel=0.03)
+box((0, Y2 + 0.85, 5.54), (3.0, 0.05, 0.02), N_VIP, 'neon')
+for sx in (-1, 1): box((sx * 3.0, Y2 + 0.9, 6.4), (0.7, 1.8, 0.7), CHAR, 'near', bevel=0.03)
+# бассейн на крыше слева: приподнятая чаша с каменным бортом, вода — на сайте
+RX0, RX1, RZ0, RZ1 = -12.6, -5.0, -2.6, 4.6
+box(((RX0 + RX1) / 2, Y2 + 0.06, (RZ0 + RZ1) / 2), (RX1 - RX0, 0.08, RZ1 - RZ0), POOLT, 'near')
+for (cx, cz, w, d) in [((RX0 + RX1) / 2, RZ0, RX1 - RX0 + 0.5, 0.25), ((RX0 + RX1) / 2, RZ1, RX1 - RX0 + 0.5, 0.25), (RX0, (RZ0 + RZ1) / 2, 0.25, RZ1 - RZ0), (RX1, (RZ0 + RZ1) / 2, 0.25, RZ1 - RZ0)]:
+    box((cx, Y2 + 0.45, cz), (w, 0.9, d), TRAV, 'near')
+for x in (-11, -8.8, -6.6): sph((x, Y2 + 0.5, RZ0 + 0.14), 0.09, N_POOLL, 'neon', s=(1, 1, 0.3))
+for i in range(3): lounger((-3.4 + i * 0.0, Y2, -1.6 + i * 2.0), math.radians(-90), FABRIC2)
+# стеклянное ограждение по краю террасы
+box((0, Y2 + 0.55, -3.95), (2 * VX + 1.0, 1.1, 0.03), GLASSM, 'glass')
+box((0, Y2 + 1.12, -3.95), (2 * VX + 1.0, 0.05, 0.08), BRONZE, 'near')
+for sx in (-1, 1): box((sx * (VX + 0.55), Y2 + 0.55, 3), (0.03, 1.1, 13.8), GLASSM, 'glass')
+# балкон-консоль справа над террасой у бассейна
+box((11.5, Y2 - 0.15, -6.0), (5.5, 0.3, 4.0), PLASTER, 'far'); box((11.5, Y2 + 0.02, -6.0), (5.3, 0.04, 3.8), OAKF, 'near')
+box((11.5, Y2 + 0.55, -7.95), (5.5, 1.1, 0.03), GLASSM, 'glass'); box((11.5, Y2 + 1.12, -7.95), (5.5, 0.05, 0.08), BRONZE, 'near')
+for sx in (-1, 1): box((11.5 + sx * 2.73, Y2 + 0.55, -6.0), (0.03, 1.1, 4.0), GLASSM, 'glass')
+lounger((10.4, Y2, -6.0), 0, FABRIC); lounger((12.6, Y2, -6.0), 0, FABRIC)
+# кадки для пальм на террасе (пальмы — на сайте)
+for x, z in [(-13.6, 6.6), (13.4, 6.6), (4.6, -3.0)]: cyl((x, Y2, z), (x, Y2 + 0.8, z), 0.6, STONE, 'near', seg=24, r2=0.5)
 
 # ---------- интерьер: гостиная, камин, кухня ----------
 box((-5, 0.05, 6.5), (7, 0.02, 5), RUG, 'inner')
@@ -223,47 +244,6 @@ for x in (-5.4, 7.6):
     cyl((x, 0, -3.3), (x, 2.6, -3.3), 0.04, BRONZE, 'near', seg=8)
     cyl((x, 2.5, -3.3), (x, 2.9, -3.3), 1.6, FABRIC, 'near', seg=24, r2=0.05)
 
-# ---------- VIP-беседка справа над бассейном ----------
-GX, GZ = 15.0, -11.0
-box((GX, 0.25, GZ), (8, 0.5, 7), OAK, 'near')
-for sx in (-1, 1):
-    for sz in (-1, 1): box((GX + sx * 3.7, 2.15, GZ + sz * 3.2), (0.25, 3.3, 0.25), mat('white_post', srgb('#f1ece2'), 0.5), 'near')
-box((GX, 3.95, GZ), (8.4, 0.35, 7.4), mat('white_post', srgb('#f1ece2'), 0.5), 'near')
-for i in range(16): box((GX - 3.6 + i * 0.48, 3.7, GZ), (0.1, 0.18, 6.6), OAK, 'near')
-# шторы, подхваченные у стоек
-for sx in (-1, 1):
-    for sz in (-1, 1):
-        cyl((GX + sx * 3.55, 0.5, GZ + sz * 2.95), (GX + sx * 3.55, 3.75, GZ + sz * 2.95), 0.32, CURT, 'near', seg=14, r2=0.22)
-box((GX + 3.9, 2.1, GZ), (0.04, 3.2, 6), CURT, 'near')
-# неоновая надпись VIP над краем к бассейну
-for i, ch in enumerate('VIP'):
-    bpy.ops.object.text_add(location=(0, 0, 0)); t = bpy.context.object
-    t.data.body = 'VIP'; t.data.align_x = 'CENTER'; t.data.size = 0.8; t.data.extrude = 0.03
-    break
-t.rotation_euler = (math.radians(90), 0, math.radians(-90)); t.location = P(GX - 4.25, 4.0, GZ)
-bpy.ops.object.convert(target='MESH'); done(bpy.context.object, N_VIP, 'neon')
-# диджейская стойка лицом к бассейну (−X)
-box((GX - 2.4, 1.05, GZ), (0.9, 1.1, 2.8), mat('booth', srgb('#f4efe6'), 0.35), 'near', bevel=0.03)
-box((GX - 2.4, 1.63, GZ), (0.7, 0.06, 2.4), CHAR, 'near')
-box((GX - 2.86, 1.05, GZ), (0.02, 0.06, 2.6), N_VIP, 'neon')
-for sz in (-0.7, 0.7): cyl((GX - 2.4, 1.66, GZ + sz), (GX - 2.4, 1.7, GZ + sz), 0.22, STEEL, 'near', seg=24)
-for sz in (-1, 1): box((GX - 2.6, 0.5 + 0.9, GZ + sz * 2.6), (0.6, 1.8, 0.6), CHAR, 'near', bevel=0.03)
-# шезлонг для отдыхающего
-lounger((GX + 1.8, 0.5, GZ - 2.0), math.radians(-90), FABRIC2)
-# стол, кейсы и пачки денег
-box((GX + 1.4, 0.5 + 0.72, GZ + 1.8), (1.8, 0.06, 1.0), MARBLE, 'near'); box((GX + 1.4, 0.5 + 0.36, GZ + 1.8), (0.3, 0.72, 0.6), BRONZE, 'near')
-for k, dz in enumerate((-0.45, 0.45)):
-    cx, cy, cz = GX + 1.4, 0.5 + 0.75, GZ + 1.8 + dz
-    box((cx, cy + 0.06, cz), (0.5, 0.12, 0.38), CASE, 'gloss'); box((cx, cy + 0.08, cz), (0.44, 0.1, 0.32), CASEIN, 'near')
-    lid = box((cx + 0.27, cy + 0.3, cz), (0.06, 0.5, 0.38), CASE, 'gloss')
-    for i in range(3):
-        for j in range(2): box((cx - 0.12 + i * 0.12, cy + 0.14, cz - 0.07 + j * 0.14), (0.1, 0.05, 0.12), CASH, 'near')
-for i in range(4): box((GX + 0.7, 0.5 + 0.78 + i * 0.03, GZ + 1.8 + (i % 2) * 0.05), (0.15, 0.03, 0.08), CASH, 'near')
-# гирлянда по периметру крыши
-for i in range(26):
-    a = i / 26
-    for zz in (GZ - 3.4, GZ + 3.4): sph((GX - 4 + a * 8, 3.72, zz), 0.05, N_LAMP, 'neon', seg=8)
-
 # надувное STAYA в бассейне и круги
 def inflated(word, m, center, size, ry=0.0, pressure=16):
     bpy.ops.object.text_add(location=(0, 0, 0)); t = bpy.context.object
@@ -288,12 +268,8 @@ def inflated(word, m, center, size, ry=0.0, pressure=16):
     o.name = 'letters_' + word
     return done(o, m, 'gloss', smooth=True)
 inflated('STAYA', INF_GOLD, (-4.5, -0.25, -13.5), 1.2, ry=math.radians(8))
-for (x, z), mm in zip([(3.5, -9.5), (6.5, -14), (-7.5, -9.2)], [INF_PINKV, INF_WHITE, INF_PINKV]):
-    torus((x, 0.0, z), 0.6, 0.22, mm, rot=(math.radians(90), 0, 0))
 
-# ---------- пальмы ----------
-for i, (x, z) in enumerate([(-24, -12), (-23, 6), (-25, -18), (22, -3), (23, -17), (20, 20), (-19, 22), (26, 8), (-30, -4)]):
-    palm(x, z, 8 + (i % 3) * 1.8, (0.7 if i % 2 else -0.7, -0.4), i)
+# пальмы — модели на сайте (Sketchfab «Coconut Palm», CC BY)
 
 # ---------- свет: рассвет над морем ----------
 SUN_DIR = Vector((0.3, 0.07, -1.0)).normalized()   # в координатах three: откуда светит солнце
@@ -323,8 +299,9 @@ for i in range(5): light('POINT', (-2.3, 0.3, 17.4 + i * 4.6), srgb('#ffc37a'), 
 light('AREA', (0, 6, 22), srgb('#ffc890'), 1600, size=10, target=(0, 2, VZ1))
 for x in range(-8, 9, 4): light('POINT', (x, -1.0, PZ0 - 0.3), srgb('#9fe8ff'), 220, size=0.3)
 light('POINT', (JX, 0.2, JZ), srgb('#2fe6ff'), 160, size=0.3)
-light('AREA', (GX, 3.4, GZ), srgb('#ffd6a0'), 500, size=5, target=(GX, 0, GZ))
-light('POINT', (GX - 3.4, 1.2, GZ), srgb('#ff3fb4'), 35, size=0.3)
+light('AREA', (0, Y2 + 4.5, 2), srgb('#ffd6a0'), 900, size=8, target=(0, Y2, 4))
+light('POINT', (0, Y2 + 1.2, 5.2), srgb('#ff3fb4'), 40, size=0.3)
+for x in (-11, -8.8, -6.6): light('POINT', (x, Y2 + 0.4, RZ0 + 0.6), srgb('#9fe8ff'), 60, size=0.2)
 
 sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'
 sc.view_settings.view_transform = 'AgX'; sc.view_settings.look = 'AgX - Punchy'

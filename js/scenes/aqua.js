@@ -50,7 +50,8 @@ export async function build({ THREE, kit, font, renderer }) {
   b.add(G.box(18, 0.08, 0.08), PINK, 'neon', M([0, top + 1.6, SZ + 3.27]));
   b.add(G.box(18, 0.06, 0.06), CYAN, 'neon', M([0, top + 0.15, SZ + 3.27]));
   const ST = top + 1.6;
-  kit.djBooth(b, [0, ST, SZ + 1.2], 0, { w: 3.4 });
+  kit.djBooth(b, [0, ST, SZ + 1.2], 0, { w: 3.4, decks: false });
+  const props = [kit.decks(scene, [0, ST + 1.05, SZ + 1.2], 0, 1.7)];
   // ферма над сценой
   const TY = 11.5, x0 = -9, x1 = 9, zf = SZ + 3, zb = SZ - 2.6;
   for (const x of [x0, x1]) for (const z of [zf, zb]) kit.truss(b, [x, ST, z], [x, TY, z], 0.5);
@@ -73,7 +74,8 @@ export async function build({ THREE, kit, font, renderer }) {
     x.fillStyle = '#12052a'; for (let i = 0; i < 9; i++) x.fillRect(w / 2 - 200, h * 0.6 + i * 22, 400, 9);
     kit.gradText(x, 'AQUA', w / 2, h * 0.3, 200, '#ffffff', '#7ff2ff', { glow: '#2fe6ff' });
   });
-  scene.add(kit.screen(15, 7.5, tex, [0, ST + 4.4, SZ - 3.0]));
+  // экран за пультом: видео с вечеринки (video/aqua.mp4), пока его нет — заставка
+  kit.videoScreen(scene, 'video/aqua.mp4', 15, 7.5, [0, ST + 4.4, SZ - 3.0], [0, 0, 0], tex);
   // надувные буквы
   kit.text3d(b, font, 'STAYA', { size: 2.4, color: '#ff4fb8', p: [0, TY + 0.6, SZ - 0.4] });
 
@@ -110,7 +112,16 @@ export async function build({ THREE, kit, font, renderer }) {
     b.add(G.tor(1.46, 0.05, 5, 36), i % 2 ? PINK : CYAN, 'neon', new THREE.Matrix4().compose(p, q, V(1, 1, 1)));
     if (!isWin(u)) glows.push([p.x, p.y + 1.3, p.z, i % 2 ? PINK : CYAN, 1.2, 0.5]);
   }
-  // остальные горки, надувные игрушки, лежаки и пальмы убраны: их заменят модели из библиотек рядом с траекторией
+  /* --- надувные круги и пальмы (Sketchfab, CC BY) — у траектории камеры после горки, чтобы детали было видно --- */
+  props.push(
+    kit.prop(scene, 'sf_floats', { p: [-6.5, -0.2, 5.6], ry: 0.4, w: 8.5 }),
+    kit.prop(scene, 'sf_duck', { p: [-9.6, -0.12, 1.6], ry: 2.2, w: 1.7 }),
+    kit.prop(scene, 'sf_flamingo', { p: [-2.6, -0.12, -1.2], ry: -0.7, w: 1.6 }),
+    kit.prop(scene, 'sf_duck', { p: [5.5, -0.12, 3.5], ry: -1.2, w: 1.5 }),
+    kit.prop(scene, 'sf_flamingo', { p: [9.5, -0.12, -3.5], ry: 1.9, w: 1.7 }),
+  );
+  for (const [x, z, ry, h] of [[-18.5, 1.5, 0.3, 9], [-17.5, 10.5, 2.1, 8], [-18, -7.5, 4.0, 8.5], [18, -7, 1.2, 9], [18.5, 5, 3.3, 8]]) props.push(kit.prop(scene, 'sf_palm', { p: [x, top, z], ry, h }));
+
 
   /* --- свет --- */
   scene.add(new THREE.HemisphereLight('#5b4bdf', '#12061f', 0.55));
@@ -118,6 +129,7 @@ export async function build({ THREE, kit, font, renderer }) {
   L(PINK, 380, [0, 9, -9]); L(CYAN, 300, [-8, 4, 4]); L(VIOLET, 360, [10, 7, 6]); L(CYAN, 260, [-24, 12, 14], 40);
   scene.add(kit.stars(700, 300, 0.3));
   scene.add(kit.glowPoints(glows));
+  await Promise.all(props);
   const built = b.build(); scene.add(built);
   kit.haze(scene, { box: [-26, 26, 4, 14, -22, 10], colors: ['#8a4dff', '#2fe6ff', '#ff2fa8'], n: 16, size: 16, opacity: 0.05 });
   await kit.applyBake(scene, built, 'aqua', { k: 32 });   // свет запечён в Blender (scripts/blender/bake_scene.py)

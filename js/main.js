@@ -194,13 +194,32 @@ function apply(g) {
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
   if (composer) { renderPass.scene = s.scene; bloomPass.strength = s.bloom ?? 0.42; composer.render(); } else renderer.render(s.scene, camera);
-  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); dropBehind(i); }
+  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); dropBehind(i); kit.playVideos(s.scene); }
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
   return true;
 }
 const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 500 }) : setTimeout(fn, 50));
 
+/* ---------- клавиатура: ↑ / W — вперёд по траектории, ↓ / S — назад (как в играх) ---------- */
+const keyDir = { ArrowUp: 1, KeyW: 1, ArrowDown: -1, KeyS: -1 };
+const held = new Set();
+addEventListener('keydown', (e) => {
+  if (!started || e.metaKey || e.ctrlKey || e.altKey || !(e.code in keyDir) || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return;
+  e.preventDefault(); held.add(e.code);
+});
+addEventListener('keyup', (e) => held.delete(e.code));
+addEventListener('blur', () => held.clear());
+let keyVel = 0;
+function keyScroll() {
+  let dir = 0; for (const c of held) dir += keyDir[c];
+  dir = Math.sign(dir);
+  // плавный разгон и торможение; скорость — доля высоты окна за кадр
+  keyVel += (dir * innerHeight * 0.022 - keyVel) * 0.12;
+  if (Math.abs(keyVel) > 0.3) scrollBy(0, keyVel); else keyVel = 0;
+}
+
 function loop() {
+  keyScroll();
   target = scrollToG(scrollY);
   if (reduced || jumping) cur = target;
   else {
