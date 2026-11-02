@@ -6,6 +6,17 @@
 <title>STAYA — тусовки, о которых говорят</title>
 <meta name="description" content="STAYA — организаторы вечеринок в России: ночь в аквапарке, STAYA 2K17, вечеринка у бассейна, Halloween во дворце и вилла на Пхукете.">
 <meta name="theme-color" content="#000000">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://staya.nikalimp.ru/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="STAYA">
+<meta property="og:title" content="STAYA — тусовки, о которых говорят">
+<meta property="og:description" content="Путешествие по вечеринкам STAYA: ночь в аквапарке, вечеринка у бассейна, 2K17, Halloween во дворце и рассвет на вилле на Пхукете.">
+<meta property="og:url" content="https://staya.nikalimp.ru/">
+<meta property="og:image" content="https://staya.nikalimp.ru/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@600;800&display=swap" rel="stylesheet">
@@ -69,6 +80,14 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 #final a.dev{font-weight:600;color:var(--muted);background:none;border-color:transparent}
 #final a:focus-visible{outline:2px solid #fff;outline-offset:3px}
 
+ /* ---------- подсказка «листайте»: появляется после старта, исчезает с первым скроллом ---------- */
+#scrollhint{position:fixed;z-index:9;left:50%;bottom:calc(30px + var(--safe-b));transform:translate(-50%,10px);display:flex;flex-direction:column;align-items:center;gap:10px;
+  font:800 12px Manrope,sans-serif;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.85);opacity:0;transition:opacity .6s,transform .6s;pointer-events:none;text-shadow:0 1px 10px rgba(0,0,0,.5)}
+#scrollhint.on{opacity:1;transform:translate(-50%,0)}
+#scrollhint .mouse{width:24px;height:38px;border:2px solid rgba(255,255,255,.85);border-radius:12px;position:relative}
+#scrollhint .mouse::after{content:"";position:absolute;left:50%;top:7px;width:4px;height:8px;margin-left:-2px;border-radius:2px;background:#fff;animation:wheel 1.6s ease-in-out infinite}
+@keyframes wheel{0%{opacity:0;transform:translateY(-2px)}30%{opacity:1}100%{opacity:0;transform:translateY(12px)}}
+@media (prefers-reduced-motion:reduce){#scrollhint .mouse::after{animation:none}}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 </style>
 <script type="importmap">
@@ -115,9 +134,10 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
   <section><h2>STAYA HALLOWEEN — бал во дворце</h2><p>Дворец XIX века, парадная лестница, оперный вокал и персонажи в костюмах.</p></section>
   <section><h2>STAYA PHUKET — вилла на Пхукете</h2><p>Вилла на утёсе: инфинити-бассейн над морем, джакузи, барбекю и рассвет над морем.</p></section>
   <section><h2>Команда STAYA</h2><p>Пять человек делают вечеринки, о которых говорят. Проводим тусовки с 2020 года: 100 500 гостей, 548 мероприятий, 124 артиста. Делаем рекламные кампании и готовы к коллаборациям. Хочешь вечеринку — напиши нам в Instagram.</p></section>
-  <section><h2>Источники и лицензии</h2><p>Шрифты Unbounded и Manrope (SIL OFL 1.1), Helvetiker (MgOpen), three.js (MIT), MediaPipe Face Detector (Apache 2.0), Blender. Разработка сайта — <a href="https://nikalimp.ru">nikalimp.ru</a>.</p></section>
+  <section><h2>Источники и лицензии</h2><p>Шрифты Unbounded и Manrope (SIL OFL 1.1), three.js (MIT), MediaPipe Face Detector (Apache 2.0), Blender. Разработка сайта — <a href="https://nikalimp.ru">nikalimp.ru</a>.</p></section>
 </main>
 
+<div id="scrollhint" aria-hidden="true"><span class="mouse"></span><span id="scrolltxt">Листайте</span></div>
 <nav id="final" aria-label="Связаться со STAYA"><div class="row"></div></nav>
 <div id="spacer"></div>
 

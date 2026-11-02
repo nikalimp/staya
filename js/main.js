@@ -6,20 +6,25 @@ import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import * as kit from './kit.js';
 import { startHeadTrack } from './headtrack.js';
+import { makeSfx } from './sfx.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const SCENES = [
-  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.35, out: 'water' },
-  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.5, out: 'black' },
-  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black' },
-  { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut' },
-  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975 },
+  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.35, out: 'water', sfx: [[0.02, 'whoosh'], [0.37, 'whoosh'], [0.95, 'splash']] },
+  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.5, out: 'black', sfx: [[0.0, 'bubbles'], [0.1, 'bubbles'], [0.36, 'splash'], [0.86, 'clink'], [0.95, 'gulp']] },
+  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black', sfx: [[0.03, 'clink'], [0.97, 'door']] },
+  { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.03, 'door'], [0.9, 'whoosh']] },
+  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975, sfx: [[0.7, 'whoosh'], [0.81, 'chime']] },
 ];
 // Кнопки финала. Пустой href — кнопка не показывается.
 const LINKS = [
   { label: 'Instagram', href: 'https://www.instagram.com/stayaekb/', cls: 'main' },
   { label: 'Telegram', href: 'https://t.me/+JP1gsoNXGpkzZDIy' },
-  { label: 'VK', href: '' },
-  { label: 'Почта', href: '' },          // mailto:…
+  { label: 'VK', href: 'https://vk.ru/stayaekb' },
+  { label: 'Почта', href: 'mailto:contact@stayaekb.ru' },
 ];
 
 const N = SCENES.length;
@@ -46,15 +51,25 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.setClearColor(0x000000, 1);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
+// десктоп: настоящее свечение неона и солнца (bloom); телефон — лёгкие ореолы-спрайты без постобработки
+let composer = null, renderPass = null;
+if (!mobile) {
+  composer = new EffectComposer(renderer);
+  renderPass = new RenderPass(new THREE.Scene(), camera);
+  composer.addPass(renderPass);
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(1024, 1024), 0.55, 0.55, 0.82));
+  composer.addPass(new OutputPass());
+}
 
-let VH = innerHeight, lastW = innerWidth, glowScale = 600, dirty = true;
+let VH = innerHeight, lastW = innerWidth, glowScale = 600, dirty = true, baseFov = 60;
 const totalW = SCENES.reduce((a, s) => a + s.w, 0);
 const cum = []; SCENES.reduce((a, s, i) => ((cum[i] = a), a + s.w), 0);
 const fovFor = (aspect) => (aspect < 0.8 ? 72 : aspect < 1.2 ? 64 : 54);
 function layout() {
   const w = innerWidth, h = isTouch ? Math.max(VH, innerHeight) : innerHeight;
   renderer.setSize(w, h, false); canvas.style.height = h + 'px';
-  camera.aspect = w / h; camera.fov = fovFor(camera.aspect); camera.updateProjectionMatrix();
+  if (composer) { composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(w, h); }
+  camera.aspect = w / h; camera.fov = baseFov = fovFor(camera.aspect); camera.updateProjectionMatrix();
   glowScale = renderer.getDrawingBufferSize(new THREE.Vector2()).y / (2 * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2));
   kit.glowMats.forEach((m) => (m.uniforms.uScale.value = glowScale));
   spacer.style.height = (totalW * VH_PER_UNIT * VH + VH) + 'px';
@@ -137,8 +152,10 @@ function apply(g) {
   if (s.roll) camera.rotateZ(s.roll(t));
   // погружение: камера чуть поворачивается за головой зрителя, кивки в такт качают сцену
   // сдвиг головы — как взгляд в окно (камера уходит в обратную сторону), поворот головы — камера смотрит туда же
+  const fv = baseFov * (1 - Math.max(-0.6, Math.min(1, head.z)) * 0.2);   // зритель ближе к экрану — кадр приближается
+  if (Math.abs(camera.fov - fv) > 1e-3) { camera.fov = fv; camera.updateProjectionMatrix(); }
   if (head.x || head.y || head.yaw || head.pitch) { camera.rotateY(head.x * 0.13 - head.yaw * 0.3); camera.rotateX(-head.y * 0.09 + head.pitch * 0.2); camera.translateY(-head.y * 0.05); }
-  renderer.render(s.scene, camera);
+  if (composer) { renderPass.scene = s.scene; composer.render(); } else renderer.render(s.scene, camera);
   if (i !== curIdx) { curIdx = i; audio.go(i); }
   if (t > 0.3 && i < N - 1 && !built.has(i + 1)) idle(() => buildScene(i + 1));
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
@@ -154,13 +171,17 @@ function loop() {
     cur += Math.sign(d) * Math.min(Math.abs(d) * 0.12, 0.02);
     if (Math.abs(target - cur) < 1e-5) cur = target;
   }
-  if (head.on || head.x || head.y || head.yaw || head.pitch) {
+  {
     let moved = 0;
-    for (const q of ['x', 'y', 'yaw', 'pitch']) {
-      const to = head.on ? head.tgt[q] : 0, d = to - head[q];
+    for (const q of HQ) {
+      const to = head.tgt[q], d = to - head[q];
       if (Math.abs(d) > 0.0005) { head[q] += d * 0.075; moved = 1; } else head[q] = to;
     }
     if (moved) dirty = true;
+  }
+  if (started && cur > lastG && lastG >= 0 && audio.on && audio.fx) {
+    // звуковые эффекты: срабатывают, когда скролл проходит точку вперёд
+    for (let i = Math.floor(lastG); i <= Math.min(N - 1, Math.floor(cur)); i++) for (const [t, k] of SCENES[i].sfx || []) { const g = i + t; if (g > lastG && g <= cur) audio.fx[k]?.(); }
   }
   if (started && (cur !== lastG || dirty)) { if (apply(cur)) { lastG = cur; dirty = false; } }
   requestAnimationFrame(loop);
@@ -189,10 +210,19 @@ canvas.addEventListener('click', (e) => { const l = linkAt(e); if (l) window.ope
 
 /* ---------- погружение: слежение за головой (только десктоп) ---------- */
 // tgt — последние значения с камеры (~18 раз в секунду), x/y/yaw/pitch — плавно догоняют их каждый кадр
-const head = { on: false, x: 0, y: 0, yaw: 0, pitch: 0, tgt: { x: 0, y: 0, yaw: 0, pitch: 0 }, ctl: null };
+const head = { on: false, x: 0, y: 0, yaw: 0, pitch: 0, z: 0, tgt: { x: 0, y: 0, yaw: 0, pitch: 0, z: 0 }, ctl: null };
+const HQ = ['x', 'y', 'yaw', 'pitch', 'z'];
+// без погружения на десктопе камера мягко смотрит в сторону курсора
+if (!mobile) {
+  addEventListener('pointermove', (e) => {
+    if (head.on || e.pointerType !== 'mouse') return;
+    head.tgt.yaw = ((e.clientX / innerWidth) * 2 - 1) * 0.55; head.tgt.pitch = -((e.clientY / innerHeight) * 2 - 1) * 0.45;
+  });
+  document.documentElement.addEventListener('pointerleave', () => { if (!head.on) { head.tgt.yaw = 0; head.tgt.pitch = 0; } });
+}
 if (!mobile && navigator.mediaDevices?.getUserMedia) headBtn.hidden = false;
 headBtn.addEventListener('click', async () => {
-  if (head.ctl) { head.ctl.stop(); head.ctl = null; head.on = false; dirty = true; headBtn.setAttribute('aria-pressed', 'false'); hintEl.textContent = ''; return; }
+  if (head.ctl) { head.ctl.stop(); head.ctl = null; head.on = false; for (const q of HQ) head.tgt[q] = 0; dirty = true; headBtn.setAttribute('aria-pressed', 'false'); hintEl.textContent = ''; return; }
   headBtn.classList.add('busy'); hintEl.textContent = 'Включаем камеру… видео остаётся на вашем устройстве';
   try {
     head.ctl = await startHeadTrack((v) => Object.assign(head.tgt, v));
@@ -217,6 +247,7 @@ const audio = {
   init() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC || this.ctx) return;
     this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination);
+    this.fx = makeSfx(this.ctx, this.master);
     // одна дорожка на файл: если у соседних сцен один трек (когда трек повторяется), музыка не прерывается
     const bySrc = {};
     this.tracks = SCENES.map((s) => {
@@ -272,7 +303,7 @@ const setReal = (v) => (real = Math.max(real, v));
 
 async function boot() {
   layout(); setReal(8);
-  const fontP = new FontLoader().loadAsync('fonts/helvetiker_bold.typeface.json').then((f) => { font = f; setReal(35); });
+  const fontP = new FontLoader().loadAsync('fonts/unbounded_black.typeface.json').then((f) => { font = f; setReal(35); });
   const cssFontP = (document.fonts ? Promise.all([document.fonts.load('900 64px Unbounded'), document.fonts.load('700 32px Unbounded')]) : Promise.resolve()).then(() => setReal(45));
   const firstTrack = new Promise((res) => {
     const a = new Audio(); a.preload = 'auto'; a.src = SCENES[0].track;
@@ -291,6 +322,12 @@ ring.addEventListener('click', () => {
   pre.classList.add('out'); document.body.classList.remove('locked');
   scrollTo(0, 0); cur = target = 0; started = true; dirty = true;
   setTimeout(() => tweenScroll(gToScroll(FADE * 1.4), reduced ? 0 : 2600), 350);
+  // подсказка «листайте» — пока зритель сам не прокрутит дальше вступления
+  const sh = $('#scrollhint'), lim = () => gToScroll(FADE * 2.2);
+  if (isTouch) $('#scrolltxt').textContent = 'Свайпайте вверх';
+  setTimeout(() => { if (scrollY < lim()) sh.classList.add('on'); }, 3200);
+  const offHint = () => { if (scrollY > lim()) { sh.classList.remove('on'); removeEventListener('scroll', offHint); } };
+  addEventListener('scroll', offHint, { passive: true });
 });
 boot().catch((e) => { console.error(e); pctEl.textContent = '!'; });
 requestAnimationFrame(loop);
