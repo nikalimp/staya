@@ -633,3 +633,29 @@ export async function prop(scene, name, o = {}) {
   m.position.y += o.anchor === 'top' ? o.p[1] - bb.max.y : (o.p?.[1] ?? 0) - bb.min.y;
   scene.add(m); return m;
 }
+
+/* ---------- запечённый свет для сцен, собранных в коде (AQUA, клуб) ---------- */
+// world/<id>/<id>.glb — та же геометрия Builder (без неона) с UV под карту света; <id>_light.webp — свет (L·0.5, sRGB).
+// Меши Builder этих видов заменяются запечёнными; неон, стекло, лучи и люди остаются как были.
+const BAKED_KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome'];
+export async function applyBake(scene, group, id, o = {}) {
+  if (globalThis.__noBake) return;   // dev/export.html выгружает исходную геометрию
+  try {
+    const [g, lm] = await Promise.all([loadGLB(`world/${id}/${id}.glb`), new THREE.TextureLoader().loadAsync(`world/${id}/${id}_light.webp`)]);
+    lm.flipY = false; lm.colorSpace = THREE.SRGBColorSpace; lm.channel = 0;
+    const LM = (o.k ?? 1.6) * Math.PI, env = scene.environment;
+    const mk = (kind) => {
+      const m = new THREE.MeshBasicMaterial({ vertexColors: true, lightMap: lm, lightMapIntensity: LM });
+      // отражения неонового окружения: глянец и пластик — поверх, металл — вместо цвета
+      if (env && kind !== 'matte') {
+        m.envMap = env; m.combine = kind === 'metal' || kind === 'chrome' ? THREE.MixOperation : THREE.AddOperation;
+        m.reflectivity = { gloss: 0.2, plastic: 0.07, metal: 0.45, chrome: 0.75 }[kind];
+      }
+      return m;
+    };
+    group.children.filter((c) => BAKED_KINDS.includes(c.name)).forEach((c) => { group.remove(c); c.geometry.dispose(); });
+    const mats = {};
+    g.scene.traverse((c) => { if (c.isMesh) { const k = (c.material.name || 'plastic').split('.')[0]; c.material = mats[k] ||= mk(k); } });
+    scene.add(g.scene);
+  } catch (e) { console.warn('[staya] bake', id, e); }
+}

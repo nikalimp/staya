@@ -2,7 +2,7 @@
 // Камера скатывается по тёмной трубе горки (в ней светятся только ленты, в «окнах» видно аквапарк),
 // облетает диджейский пульт, проходит между спинами диджеев и прыгает в бассейн.
 import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
-export function build({ THREE, kit, font, renderer }) {
+export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M, V } = kit;
   const scene = new THREE.Scene();
   scene.background = new THREE.Color('#04020c');
@@ -154,7 +154,8 @@ export function build({ THREE, kit, font, renderer }) {
   L(PINK, 380, [0, 9, -9]); L(CYAN, 300, [-8, 4, 4]); L(VIOLET, 360, [10, 7, 6]); L(CYAN, 260, [-24, 12, 14], 40);
   scene.add(kit.stars(700, 300, 0.3));
   scene.add(kit.glowPoints(glows));
-  scene.add(b.build());
+  const built = b.build(); scene.add(built);
+  await kit.applyBake(scene, built, 'aqua', { k: 32 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
   const w = kit.water(30, 18, '#0b8fc0', { tile: 5, ei: 0.5, opacity: 0.88, emissive: '#0a6fa8' });
   w.position.y = 0.1; scene.add(w);
 
