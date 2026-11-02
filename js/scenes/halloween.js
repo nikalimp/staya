@@ -1,5 +1,6 @@
 // 04 · STAYA HALLOWEEN — двухэтажный дворец XIX века с парадной лестницей посередине.
 // Портал: камера поднимается по лестнице и влетает в приоткрытые двери.
+import { person as human, guest as castGuest } from '../people.js';
 export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M, V } = kit;
   const scene = new THREE.Scene();
@@ -122,27 +123,27 @@ export async function build({ THREE, kit, font, renderer }) {
   const props = [];
   [['Chandelier_01', 14], ['Chandelier_02', 3], ['Chandelier_03', -9]].forEach(([n, z]) => {
     kit.rod(b, [0, 24, z], [0, 18.1, z], 0.05, GOLD, 'metal');
-    props.push(kit.prop(scene, n, { p: [0, 18.2, z], s: 4.2, anchor: 'top', emissive: '#ffb15a', ei: 0.35 }));
+    props.push(kit.prop(scene, n, { p: [0, 18.2, z], s: 6.2, anchor: 'top', emissive: '#ffb15a', ei: 0.35 }));
     for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; glows.push([Math.cos(a) * 1.4, 16.2, z + Math.sin(a) * 1.4, '#ffc27a', 0.6, 2]); }
     glows.push([0, 15.8, z, '#ffb15a', 7, 0.5]);
   });
   // фонари-люстры под галереями
   for (const sx of [-1, 1]) for (const z of [-20, -8, 4, 16]) {
-    props.push(kit.prop(scene, 'lantern_chandelier_01', { p: [sx * 16.5, 9.6, z], s: 1.5, anchor: 'top', emissive: '#ffb15a', ei: 0.3 }));
+    props.push(kit.prop(scene, 'lantern_chandelier_01', { p: [sx * 16.5, 9.6, z], s: 2.3, anchor: 'top', emissive: '#ffb15a', ei: 0.3 }));
     glows.push([sx * 16.5, 8.4, z, '#ffc27a', 2.2, 0.8]);
   }
   // готические статуи вдоль зала, шкафы под галереями, комоды с лампами на площадке
   for (const sx of [-1, 1]) {
-    for (const z of [17.5, 6]) props.push(kit.prop(scene, 'gothic_statue', { p: [sx * 8, 0, z], ry: -sx * Math.PI / 2, s: 1.35 }));
-    for (const z of [-12, -1, 10]) props.push(kit.prop(scene, 'GothicCabinet_01', { p: [sx * 19.4, 0, z], ry: -sx * Math.PI / 2, s: 1.35 }));
-    props.push(kit.prop(scene, 'GothicCommode_01', { p: [sx * 9.5, 6, -19.6], s: 1.3 }));
-    props.push(kit.prop(scene, 'vintage_oil_lamp', { p: [sx * 9.1, 6 + 1.58, -19.6], s: 1.4, emissive: '#ffb15a', ei: 0.6 }));
-    props.push(kit.prop(scene, 'horse_statue_01', { p: [sx * 10.1, 6 + 1.58, -19.6], ry: sx * 0.6, s: 2.2 }));
-    glows.push([sx * 9.1, 6 + 2.3, -19.6, '#ffb15a', 1.4, 1.4]);
+    for (const z of [17.5, 6]) props.push(kit.prop(scene, 'gothic_statue', { p: [sx * 8, 0, z], ry: -sx * Math.PI / 2, s: 2.4 }));
+    for (const z of [-12, -1, 10]) props.push(kit.prop(scene, 'GothicCabinet_01', { p: [sx * 19.2, 0, z], ry: -sx * Math.PI / 2, s: 2.1 }));
+    props.push(kit.prop(scene, 'GothicCommode_01', { p: [sx * 9.5, 6, -19.4], s: 1.9 }));
+    props.push(kit.prop(scene, 'vintage_oil_lamp', { p: [sx * 8.9, 6 + 2.3, -19.4], s: 2.2, emissive: '#ffb15a', ei: 0.6 }));
+    props.push(kit.prop(scene, 'horse_statue_01', { p: [sx * 10.2, 6 + 2.3, -19.4], ry: sx * 0.6, s: 4.0 }));
+    glows.push([sx * 8.9, 6 + 3.4, -19.4, '#ffb15a', 1.8, 1.4]);
   }
 
   /* --- тыквы, летучие мыши, гости --- */
-  [[-5, 0, 1], [5, 0, 1.5], [-6, 0, 6], [6.5, 0, 8], [-3.6, 0, -0.6], [3.6, 0, -0.4], [-9, 6, -15], [9, 6, -15.5], [-6.5, 6, -19], [6.5, 6, -19], [-14, 10.4, 4], [14, 10.4, -3]].forEach((p, i) => kit.pumpkin(b, p, 0.9 + (i % 3) * 0.35, i % 2 === 0, (R() - 0.5) * 0.8));
+  [[-5, 0, 1], [5, 0, 1.5], [-6, 0, 6], [6.5, 0, 8], [-3.6, 0, -0.6], [3.6, 0, -0.4], [-9, 6, -15], [9, 6, -15.5], [-6.5, 6, -19], [6.5, 6, -19], [-14, 10.4, 4], [14, 10.4, -3]].forEach((p, i) => kit.pumpkin(b, p, 0.5 + (i % 3) * 0.18, i % 2 === 0, (R() - 0.5) * 0.8));
   const bat = new THREE.Shape();
   bat.moveTo(0, 0.2); bat.quadraticCurveTo(0.6, 0.6, 1.4, 0.4); bat.quadraticCurveTo(1.1, 0.1, 1.2, -0.2); bat.quadraticCurveTo(0.8, 0, 0.6, -0.3); bat.quadraticCurveTo(0.3, -0.1, 0, -0.35);
   bat.quadraticCurveTo(-0.3, -0.1, -0.6, -0.3); bat.quadraticCurveTo(-0.8, 0, -1.2, -0.2); bat.quadraticCurveTo(-1.1, 0.1, -1.4, 0.4); bat.quadraticCurveTo(-0.6, 0.6, 0, 0.2);
@@ -160,7 +161,9 @@ export async function build({ THREE, kit, font, renderer }) {
     { p: [-15, 10.4, -10], ry: 1.3, top: '#120d16', skirt: '#120d16', mask: '#f2f2f2', pose: 'stand' },
     { p: [15.5, 10.4, 6], ry: -1.4, top: '#7a0010', skirt: '#7a0010', mask: '#f2f2f2', hair: '#0e0e12', longHair: 2, pose: 'wave' },
   ];
-  guests.forEach((g, i) => kit.figure(b, { ...g, bottom: g.bottom ?? '#120d16', i }));
+  // гости бала — силуэты с тёплым контровым светом свечей
+  b.rim = ['#ff8a2a', '#ff4a1a', '#ffb15a'];
+  guests.forEach((g, i) => human(b, castGuest(i * 3 + 1), { p: g.p, ry: g.ry, pose: g.pose === 'stand' ? 'talk' : g.pose, s: g.s ? Math.min(g.s, 1.1) : 1 }));
 
   /* --- свет --- */
   scene.add(new THREE.HemisphereLight('#ff6a4a', '#1a0505', 0.45));
@@ -223,6 +226,7 @@ export async function build({ THREE, kit, font, renderer }) {
 
   await Promise.all(props);
   scene.add(kit.glowPoints(glows));
+  kit.haze(scene, { box: [-18, 18, 0.5, 6, -18, 26], colors: ['#ff5a1f', '#ff8a2a', '#3b4bff'], n: 22, size: 10, opacity: 0.1 });
   scene.add(b.build());
 
   const P = (k) => [photoC[0] + nrm.x * k, photoC[1] + nrm.y * k, photoC[2] + nrm.z * k];
@@ -254,5 +258,6 @@ export async function build({ THREE, kit, font, renderer }) {
   };
   // у экрана смартфона камера подходит на сантиметры — ближняя плоскость отсечения меньше
   const near = (t) => (t > 0.9 ? 0.004 : 0.05);
-  return { scene, cam: kit.camPath(keys), update, near, preview: { mesh: photo, w: 512, h: 512 } };
+  const calm = (t) => Math.min(1, Math.max(0, (t - 0.84) / 0.05));   // к экрану смартфона — без влияния головы и курсора
+  return { scene, cam: kit.camPath(keys), update, near, calm, preview: { mesh: photo, w: 512, h: 512 } };
 }

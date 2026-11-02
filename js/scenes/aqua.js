@@ -9,6 +9,7 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.fog = new THREE.FogExp2('#0b0626', 0.011);
   scene.environment = kit.env(renderer, ['#ff2fa8', '#2fe6ff', '#8a4dff', '#ffffff', '#2f6bff', '#ff8ad8']);
   const b = new Builder(), glows = [], R = kit.rng(11);
+  b.rim = ['#2fe6ff', '#ff3fb4', '#7ff2ff'];   // контровой свет силуэтов
   const PINK = '#ff2fa8', CYAN = '#2fe6ff', VIOLET = '#8a4dff', YEL = '#ffd84a';
 
   /* --- зал: палуба вокруг бассейна (бассейн x[-15,15], z[-9,9]) --- */
@@ -90,7 +91,8 @@ export async function build({ THREE, kit, font, renderer }) {
   b.add(G.box(9, 0.08, 0.08), CYAN, 'neon', M([TW[0], 19.3, TW[2] + 4.5]));
   // горка камеры (прозрачная, с неоновыми кольцами)
   const S = [];
-  for (let i = 0; i <= 16; i++) { const a = (i / 16) * Math.PI * 3.5; S.push(V(TW[0] + 6 * Math.cos(a), 18 - (i / 16) * 13, TW[2] + 6 * Math.sin(a))); }
+  // короткая горка: один виток с вышки и сразу к бассейну
+  for (let i = 0; i <= 10; i++) { const a = (i / 10) * Math.PI * 2; S.push(V(TW[0] + 6 * Math.cos(a), 18 - (i / 10) * 13, TW[2] + 6 * Math.sin(a))); }
   S.push(V(-19, 3.2, 6.6), V(-14.6, 1.7, 5.0), V(-12.6, 1.35, 4.4));
   const slide = new THREE.CatmullRomCurve3(S, false, 'centripetal');
   // труба непрозрачная; несколько коротких «окон» — спойлер того, что снаружи
@@ -155,6 +157,7 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.add(kit.stars(700, 300, 0.3));
   scene.add(kit.glowPoints(glows));
   const built = b.build(); scene.add(built);
+  kit.haze(scene, { box: [-26, 26, 4, 14, -22, 10], colors: ['#8a4dff', '#2fe6ff', '#ff2fa8'], n: 16, size: 16, opacity: 0.05 });
   await kit.applyBake(scene, built, 'aqua', { k: 32 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
   const w = kit.water(30, 18, '#0b8fc0', { tile: 5, ei: 0.5, opacity: 0.88, emissive: '#0a6fa8' });
   w.position.y = 0.1; scene.add(w);
@@ -164,30 +167,30 @@ export async function build({ THREE, kit, font, renderer }) {
   for (let i = 0; i <= 14; i++) {
     const u = (i / 14) * 0.97;
     const p = slide.getPointAt(u), l = slide.getPointAt(Math.min(1, u + 0.05));
-    keys.push({ p: [p.x, p.y + 0.35, p.z], l: [l.x, l.y + 0.2, l.z], t: i === 0 ? 0 : i === 14 ? 0.38 : undefined });
+    keys.push({ p: [p.x, p.y + 0.35, p.z], l: [l.x, l.y + 0.2, l.z], t: i === 0 ? 0 : i === 14 ? 0.2 : undefined });
   }
   keys.push(
     { p: [-8.5, 2.6, 3.3], l: [0, 6, -14] },
     { p: [-4, 3.6, 0.5], l: [0, 7.5, -15] },
-    { p: [0.5, 4.6, -3], l: [0, 8.5, -16], t: 0.54 },
+    { p: [0.5, 4.6, -3], l: [0, 8.5, -16], t: 0.406 },
     // облёт пульта справа и заход за спины диджеев
     { p: [6.5, 4.2, -9.5], l: [0, 3.2, -15] },
     { p: [7.6, 3.7, -15.6], l: [0, 3.2, -16] },
     { p: [4.6, 3.5, -17.8], l: [0, 3.3, -15] },
-    { p: [1.6, 3.45, -17.7], l: [0.85, 3.3, -12], t: 0.78 },
+    { p: [1.6, 3.45, -17.7], l: [0.85, 3.3, -12], t: 0.716 },
     // между спинами диджеев, над пультом — и прыжок в бассейн
     { p: [0.85, 3.5, -15.9], l: [0.85, 3.1, -10] },
-    { p: [0.85, 3.75, -13.6], l: [0.85, 2, -6], t: 0.87 },
-    { p: [0.85, 3.4, -10.6], l: [0.85, 0, -5], t: 0.92 },
+    { p: [0.85, 3.75, -13.6], l: [0.85, 2, -6], t: 0.832 },
+    { p: [0.85, 3.4, -10.6], l: [0.85, 0, -5], t: 0.897 },
     { p: [0.85, 1.2, -7.6], l: [0.85, -3, -3] },
     { p: [0.85, -1.0, -6.0], l: [0.85, -5, -2], t: 1 },
   );
   // под водой — плотная синяя дымка (нырок)
   const fogC = scene.fog.color.clone(), fogD = scene.fog.density, blue = new THREE.Color('#0a5f8f');
   const update = (t) => {
-    const u = Math.min(0.97, (t / 0.38) * 0.97);
+    const u = Math.min(0.97, (t / 0.2) * 0.97);
     tl1.position.copy(slide.getPointAt(Math.min(1, u + 0.012))); tl2.position.copy(slide.getPointAt(Math.min(1, u + 0.03)));
-    tl1.intensity = tl2.intensity = t < 0.4 ? 14 : 0;
+    tl1.intensity = tl2.intensity = t < 0.22 ? 14 : 0;
     const k = Math.min(1, Math.max(0, (t - 0.955) / 0.03));
     scene.fog.color.copy(fogC).lerp(blue, k); scene.fog.density = fogD + k * 0.25;
   };

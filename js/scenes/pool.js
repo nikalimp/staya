@@ -135,6 +135,8 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     glows.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t - sag - 0.12, a[2] + (c[2] - a[2]) * t, i % 3 ? '#ffd28a' : '#ff3fb4', 0.7, 1.5]);
   }
   scene.add(kit.glowPoints(glows));
+  kit.haze(scene, { box: [-20, 20, 2, 12, -16, 8], colors: ['#8a3dff', '#ff3fb4', '#2fe6ff'], n: 18, size: 16, opacity: 0.09 });
+  kit.haze(scene, { box: [32, 50, 2, 11, -11, 3], colors: ['#2f6bff', '#2fe6ff'], n: 10, size: 14, opacity: 0.12, seed: 8 });
 
   /* --- камера: от первого лица --- */
   const STAGE = [0, 6.5, SZ], EYE = T + 1.62;
@@ -188,5 +190,6 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     placeGlass(t);
   };
   const near = (t) => (t > 0.84 ? 0.01 : 0.05);
-  return { scene, cam, update, near };
+  const calm = (t) => Math.min(1, Math.max(0, (t - 0.8) / 0.05));   // стакан ко рту — кадр по центру
+  return { scene, cam, update, near, calm };
 }

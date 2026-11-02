@@ -83,7 +83,7 @@ export class Builder {
   build() {
     const group = new THREE.Group();
     // люди, добавленные через people.person(), собираются в инстансы (см. js/people.js)
-    if (this.people?.length && Builder.peopleBuild) { group.add(Builder.peopleBuild(this.people)); this.people = []; }
+    if (this.people?.length && Builder.peopleBuild) { group.add(Builder.peopleBuild(this.people, this)); this.people = []; }
     for (const [kind, list] of Object.entries(this.b)) {
       if (!list.length) continue;
       const geo = mergeGeometries(list, false);
@@ -658,4 +658,30 @@ export async function applyBake(scene, group, id, o = {}) {
     g.scene.traverse((c) => { if (c.isMesh) { const k = (c.material.name || 'plastic').split('.')[0]; c.material = mats[k] ||= mk(k); } });
     scene.add(g.scene);
   } catch (e) { console.warn('[staya] bake', id, e); }
+}
+
+/* ---------- дымка: мягкие полупрозрачные облака-спрайты в объёме сцены ---------- */
+let _hazeTex = null;
+function hazeTex() {
+  if (_hazeTex) return _hazeTex;
+  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), R = rng(77);
+  for (let i = 0; i < 26; i++) {
+    const px = 128 + (R() - 0.5) * 120, py = 128 + (R() - 0.5) * 90, r = 30 + R() * 70;
+    const g = x.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, 'rgba(255,255,255,0.18)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+  }
+  const g = x.createRadialGradient(128, 128, 60, 128, 128, 128); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
+  x.globalCompositeOperation = 'destination-out'; x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+  _hazeTex = new THREE.CanvasTexture(c); _hazeTex.colorSpace = THREE.SRGBColorSpace; return _hazeTex;
+}
+// box: [x0, x1, y0, y1, z0, z1]; colors — массив цветов; size — размер облака в метрах
+export function haze(scene, { box, colors = ['#ffffff'], n = 18, size = 14, opacity = 0.16, seed = 5 } = {}) {
+  const R = rng(seed), g = new THREE.Group(); g.name = 'haze';
+  for (let i = 0; i < n; i++) {
+    const m = new THREE.SpriteMaterial({ map: hazeTex(), color: pick(colors, i), transparent: true, opacity: opacity * (0.6 + R() * 0.8), depthWrite: false, blending: THREE.AdditiveBlending, fog: false, rotation: R() * 6.28 });
+    const s = new THREE.Sprite(m), k = size * (0.6 + R() * 0.9);
+    s.position.set(box[0] + R() * (box[1] - box[0]), box[2] + R() * (box[3] - box[2]), box[4] + R() * (box[5] - box[4])); s.scale.set(k, k * 0.6, 1); s.renderOrder = 3;
+    g.add(s);
+  }
+  scene.add(g); return g;
 }

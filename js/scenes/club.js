@@ -233,6 +233,8 @@ export async function build({ THREE, kit, font, renderer }) {
     kit.prop(scene, 'wine_bottles_01', { p: [-12.9, 0.58, 9.2], ry: 1.2, s: 1.6 }),
   ]);
   const built = b.build(); scene.add(built);
+  kit.haze(scene, { box: [-15, 15, 3, 9.5, -15, 14], colors: ['#ff2fd0', '#8a3dff', '#2fe6ff'], n: 20, size: 12, opacity: 0.16 });
+  kit.haze(scene, { box: [17, 39, -5, 2.8, -8.6, -6.4], colors: ['#ff3fb4'], n: 8, size: 4, opacity: 0.14, seed: 9 });
   await kit.applyBake(scene, built, 'club', { k: 26 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
 
   /* --- камера --- */
@@ -272,5 +274,6 @@ export async function build({ THREE, kit, font, renderer }) {
     hero.at(c, [0.16 * m, -0.03 - 0.29 * m - 0.4 * d, -0.125 - 0.425 * m], 1.25 * (1 - m));
   };
   const near = (t) => (t < 0.06 ? 0.01 : 0.05);
-  return { scene, cam: path, roll, update, near };
+  const calm = (t) => Math.min(1, Math.max(0, (0.12 - t) / 0.05));   // голова поднимается от стакана — кадр по центру
+  return { scene, cam: path, roll, update, near, calm };
 }
