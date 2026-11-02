@@ -140,16 +140,11 @@ function renderPreview(owner, next) {
   mesh.material.map = rt.texture; mesh.material.needsUpdate = true;
   owner.scene.userData.rt = rt; owner.previewDone = true; dirty = true;
 }
-// Подгрузка по ходу: на прелоадере — первая сцена (вторая сразу следом в фоне); в сцене i готовятся i+1 и i+2.
+// Загрузка: прелоадер ждёт первые две сцены, остальные грузятся следом по порядку и остаются в памяти.
+// prefetch — страховка, если зритель обогнал фоновую загрузку.
 // Сцены на две и больше позади (и дальше двух впереди при скролле назад) выгружаются из памяти и при возврате собираются снова.
 const AHEAD = 2;
 function prefetch(i) { for (let k = 1; k <= AHEAD; k++) if (i + k < N && !built.has(i + k)) idle(() => buildScene(i + k)); }
-function dropBehind(i) {
-  for (const [j, s] of built) if (j <= i - 2 || j > i + AHEAD) {
-    s.scene.userData.rt?.dispose(); kit.dropVideos(s.scene); kit.disposeScene(s.scene); built.delete(j);
-    if (DEBUG) console.log('[staya] dropped', SCENES[j].id);
-  }
-}
 
 /* ---------- скролл → позиция ---------- */
 function scrollToG(y) {
@@ -196,7 +191,7 @@ function apply(g) {
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
   if (composer) { renderPass.scene = s.scene; bloomPass.strength = s.bloom ?? 0.42; composer.render(); } else renderer.render(s.scene, camera);
-  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); dropBehind(i); kit.playVideos(s.scene); }
+  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); kit.playVideos(s.scene); }
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
   return true;
 }
@@ -371,9 +366,10 @@ async function boot() {
   });
   await Promise.all([fontP, cssFontP, loadPeople().then(() => setReal(45))]);
   // все сцены — сразу, пока крутится кольцо: дальше путешествие идёт без подгрузок
-  // на прелоадере собираем только первую сцену; вторая грузится в фоне сразу после неё
-  await buildScene(0); setReal(95);
-  idle(() => buildScene(1));
+  // на прелоадере собираем первые две сцены; остальные — сразу следом по порядку, без остановки
+  await buildScene(0); setReal(70);
+  await buildScene(1); setReal(95);
+  (async () => { for (let i = 2; i < N; i++) { await buildScene(i).catch(() => {}); await new Promise((r) => idle(r)); } })();
   await firstTrack;
   setReal(100);
 }
