@@ -1,7 +1,6 @@
 // 01 · STAYA AQUA — ночной аквапарк под куполом.
 // Камера скатывается по тёмной трубе горки (в ней светятся только ленты, в «окнах» видно аквапарк),
 // облетает диджейский пульт, проходит между спинами диджеев и прыгает в бассейн.
-import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
 export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M, V } = kit;
   const scene = new THREE.Scene();
@@ -52,9 +51,6 @@ export async function build({ THREE, kit, font, renderer }) {
   b.add(G.box(18, 0.06, 0.06), CYAN, 'neon', M([0, top + 0.15, SZ + 3.27]));
   const ST = top + 1.6;
   kit.djBooth(b, [0, ST, SZ + 1.2], 0, { w: 3.4 });
-  human(b, RESIDENTS.pronto, { p: [0, ST, SZ + 0.3], pose: 'dj' });
-  human(b, RESIDENTS.dierouzze, { p: [-1.6, ST, SZ - 0.2], pose: 'up' });
-  human(b, RESIDENTS.gulidic, { p: [1.7, ST, SZ - 0.1], pose: 'wave' });
   // ферма над сценой
   const TY = 11.5, x0 = -9, x1 = 9, zf = SZ + 3, zb = SZ - 2.6;
   for (const x of [x0, x1]) for (const z of [zf, zb]) kit.truss(b, [x, ST, z], [x, TY, z], 0.5);
@@ -86,9 +82,10 @@ export async function build({ THREE, kit, font, renderer }) {
 
   /* --- горки --- */
   const TW = [-26, 0, 14];
-  for (const dx of [-3.5, 3.5]) for (const dz of [-3.5, 3.5]) b.add(G.cyl(0.35, 0.35, 19, 10), '#e8e2f6', 'metal', M([TW[0] + dx, 9.5, TW[2] + dz]));
-  b.add(G.rbox(9, 0.5, 9, 0.1), '#e8e2f6', 'gloss', M([TW[0], 19, TW[2]]));
-  b.add(G.box(9, 0.08, 0.08), CYAN, 'neon', M([TW[0], 19.3, TW[2] + 4.5]));
+  // опоры вышки — внутри витка горки (радиус витка 6, труба 1.5), чтобы не протыкать трубу
+  for (const dx of [-2.4, 2.4]) for (const dz of [-2.4, 2.4]) b.add(G.cyl(0.32, 0.32, 19, 10), '#e8e2f6', 'metal', M([TW[0] + dx, 9.5, TW[2] + dz]));
+  b.add(G.rbox(6.6, 0.5, 6.6, 0.1), '#e8e2f6', 'gloss', M([TW[0], 19.6, TW[2]]));
+  b.add(G.box(6.6, 0.08, 0.08), CYAN, 'neon', M([TW[0], 19.9, TW[2] + 3.3]));
   // горка камеры (прозрачная, с неоновыми кольцами)
   const S = [];
   // короткая горка: один виток с вышки и сразу к бассейну
@@ -113,42 +110,7 @@ export async function build({ THREE, kit, font, renderer }) {
     b.add(G.tor(1.46, 0.05, 5, 36), i % 2 ? PINK : CYAN, 'neon', new THREE.Matrix4().compose(p, q, V(1, 1, 1)));
     if (!isWin(u)) glows.push([p.x, p.y + 1.3, p.z, i % 2 ? PINK : CYAN, 1.2, 0.5]);
   }
-  // другие горки — глянцевые и цветные
-  const others = [
-    { c: '#ff5fc0', pts: [[-26, 18.5, 18], [-30, 15, 24], [-22, 11, 27], [-14, 8, 22], [-12, 5, 16], [-8, 2.6, 11], [-5, 1.0, 8]] },
-    { c: '#ffd23f', pts: [[-22, 18.5, 12], [-14, 16, 16], [-8, 14, 22], [-2, 11, 24], [4, 7, 20], [6, 3.2, 13], [6, 1.1, 8.5]] },
-    { c: '#7a5cff', pts: [[-30, 18.5, 10], [-36, 14, 4], [-34, 9, -6], [-26, 6, -10], [-19, 3, -8], [-15.5, 1.2, -5.5]] },
-  ];
-  for (const s of others) {
-    b.add(G.tube(s.pts, 1.2, 140, 14), s.c, 'gloss');
-    const cv = new THREE.CatmullRomCurve3(s.pts.map((p) => V(...p)));
-    for (let i = 1; i < 14; i++) { const p = cv.getPointAt(i / 14); glows.push([p.x, p.y + 1.25, p.z, s.c, 1.2, 1]); }
-  }
-  // большая горка-воронка справа
-  b.add(G.cyl(8, 1.8, 6, 32, true), '#ff5fc0', 'gloss', M([28, 10, 12]));
-  b.add(G.tube([[28, 7, 12], [26, 5, 6], [20, 3, 3], [15.5, 1.2, 1.5]], 1.4, 60, 14), '#ff5fc0', 'gloss');
-  for (const dx of [-5, 5]) for (const dz of [-5, 5]) b.add(G.cyl(0.3, 0.3, 10, 8), '#e8e2f6', 'metal', M([28 + dx, 5, 12 + dz]));
-
-  /* --- люди в бассейне --- */
-  const swim = ['#ff2f8f', '#2fe6ff', '#ffe14a', '#b45cff', '#ffffff', '#ff7a3a', '#39ff9a', '#111111'];
-  const hairs = ['#1a1210', '#3a2216', '#e9c27a', '#7a2a12', '#0e0e12', '#c9a0ff'];
-  const spots = [[-9, 2], [-6, -3], [-3, 4], [0, -5], [-11, -4], [7, -2], [9, 4], [11, -5], [5, 5.5], [-7, 6.5], [12, 1.5], [-1, 0.5], [3.5, -6.5], [-4, -7]];
-  spots.forEach(([x, z], i) => {
-    if (Math.abs(x - 0.85) < 2.2 && z < -1.5) return; // место для прыжка камеры
-    const ry = i % 3 === 0 ? Math.PI : -0.6 + R() * 1.2;
-    human(b, castGuest(i), { p: [x, -0.85, z], ry, pose: i % 4 === 1 ? 'wave' : 'up', barefoot: true });
-    if (i % 2 === 0) kit.ring(b, [x, 0.12, z], kit.pick(['#ff5fc0', '#ffd23f', '#2fe6ff', '#ffffff'], i), 0.5, 0.17);
-  });
-  kit.flamingo(b, [-5.5, 0, -0.5], 0.9, 0.7);
-  kit.flamingo(b, [9.5, 0, 0.5], 0.75, -2.2, '#ffd23f');
-  for (let i = 0; i < 6; i++) kit.ring(b, [-12 + i * 4.6, 0.12, 7.5 - (i % 2) * 14], kit.pick(['#2fe6ff', '#ff5fc0', '#ffd23f'], i), 0.55, 0.2, 0.12 * (i % 2 ? 1 : -1));
-  for (let i = 0; i < 5; i++) b.add(G.sph(0.4, 14, 10), kit.pick(['#ffffff', '#ff5fc0', '#ffd23f'], i), 'gloss', M([-10 + i * 5, 0.25, -6 + (i % 3) * 5]));
-  // люди на бортике
-  const deckSpots = [[-17, -6, 1.2], [-17.5, 3, 1.8], [17, -5, -1.4], [17.5, 4, -2], [-8, 11, 3.1], [6, 11.2, 3.3], [-12, -11, 0], [11, -11, 0], [13.5, -11.5, 0.3]];
-  deckSpots.forEach(([x, z, ry], i) => human(b, castGuest(i + 7), { p: [x, top, z], ry, pose: kit.pick(['up', 'wave', 'hips', 'peace'], i) }));
-  for (let i = 0; i < 10; i++) kit.lounger(b, [-24 + (i % 5) * 2.4 + (i > 4 ? 40 : 0), top, 12 + (i % 2)], Math.PI, kit.pick(['#ffffff', '#ff8ad8', '#8ef0ff'], i));
-  // пальмы под куполом
-  [[-22, -12], [22, -12], [-26, 4], [24, 22], [-14, 22], [14, 24], [30, -2]].forEach(([x, z], i) => kit.palm(b, [x, top, z], 8 + (i % 3), [0.6 * (i % 2 ? 1 : -1), 0.3], { seed: i, leaf: '#1f6a48' }));
+  // остальные горки, надувные игрушки, лежаки и пальмы убраны: их заменят модели из библиотек рядом с траекторией
 
   /* --- свет --- */
   scene.add(new THREE.HemisphereLight('#5b4bdf', '#12061f', 0.55));
@@ -170,7 +132,9 @@ export async function build({ THREE, kit, font, renderer }) {
     keys.push({ p: [p.x, p.y + 0.35, p.z], l: [l.x, l.y + 0.2, l.z], t: i === 0 ? 0 : i === 14 ? 0.2 : undefined });
   }
   keys.push(
-    { p: [-8.5, 2.6, 3.3], l: [0, 6, -14] },
+    // плавный выход из горки: сначала по ходу движения, потом поворот к сцене
+    { p: [-10.4, 1.75, 3.9], l: [-4, 3, -1.5] },
+    { p: [-7.6, 2.7, 2.6], l: [0, 6, -14] },
     { p: [-4, 3.6, 0.5], l: [0, 7.5, -15] },
     { p: [0.5, 4.6, -3], l: [0, 8.5, -16], t: 0.406 },
     // облёт пульта справа и заход за спины диджеев

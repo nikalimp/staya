@@ -83,6 +83,7 @@ if (!mobile) {
 let VH = innerHeight, lastW = innerWidth, glowScale = 600, dirty = true, baseFov = 60;
 const totalW = SCENES.reduce((a, s) => a + s.w, 0);
 const cum = []; SCENES.reduce((a, s, i) => ((cum[i] = a), a + s.w), 0);
+const lidsEl = document.getElementById('lids'); let lastSq = -1;
 const fovFor = (aspect) => (aspect < 0.8 ? 72 : aspect < 1.2 ? 64 : 54);
 function layout() {
   const w = innerWidth, h = isTouch ? Math.max(VH, innerHeight) : innerHeight;
@@ -182,7 +183,9 @@ function apply(g) {
   // сдвиг головы — как взгляд в окно (камера уходит в обратную сторону), поворот головы — камера смотрит туда же
   // у переходов (телефон, стакан) кадр центрируется: влияние головы и курсора плавно гаснет
   const cw = 1 - (s.calm?.(t) ?? 0), hx = head.x * cw, hy = head.y * cw, hyaw = head.yaw * cw, hp = head.pitch * cw;
-  const fv = baseFov * (1 - Math.max(-0.6, Math.min(1, head.z * cw)) * 0.2);   // зритель ближе к экрану — кадр приближается
+  const sq = s.squint?.(t) ?? 0;   // «прищур»: сцена просит приблизить дальний объект
+  const fv = baseFov * (1 - 0.42 * sq) * (1 - Math.max(-0.6, Math.min(1, head.z * cw)) * 0.2);   // зритель ближе к экрану — кадр приближается
+  if (sq !== lastSq) { lastSq = sq; lidsEl.style.setProperty('--sq', sq.toFixed(3)); }
   if (Math.abs(camera.fov - fv) > 1e-3) { camera.fov = fv; camera.updateProjectionMatrix(); }
   if (hx || hy || hyaw || hp) {
     // сдвиг головы → камера сдвигается туда же и чуть поворачивается вслед; поворот головы → камера смотрит туда же

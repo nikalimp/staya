@@ -6,7 +6,6 @@ const BASE = 'world/villa/';
 const GX = 15, GZ = -11, GY = 0.5; // VIP-беседка: центр и высота настила
 
 import { CREDITS, DEV } from '../credits.js';
-import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
 export async function build({ THREE, kit, renderer, mobile }) {
   const { Builder } = kit;
   const scene = new THREE.Scene();
@@ -25,14 +24,6 @@ export async function build({ THREE, kit, renderer, mobile }) {
   const SEA = -30;
   const sea = kit.water(3600, 3600, '#2a5a7a', { tile: 30, ei: 0.12, emissive: '#c07a5a', rough: 0.1, metal: 0.4, ns: 0.35 });
   sea.position.y = SEA; scene.add(sea);
-  // солнечная дорожка на воде
-  const path = kit.canvasTex(64, 512, (x, w, h) => {
-    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,226,170,.95)'); g.addColorStop(1, 'rgba(255,140,90,0)'); x.fillStyle = g;
-    for (let y = 0; y < h; y += 5) { const ww = w * (0.25 + 0.75 * (1 - y / h)) * (0.55 + Math.random() * 0.45); x.fillRect((w - ww) / 2, y, ww, 2.5); }
-  });
-  const pm = new THREE.Mesh(new THREE.PlaneGeometry(90, 1000), new THREE.MeshBasicMaterial({ map: path, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false }));
-  pm.rotation.x = -Math.PI / 2; pm.rotation.z = -Math.atan2(SV.x, -SV.z);
-  pm.position.set(SV.x * 560, SEA + 0.05, SV.z * 560); scene.add(pm);
 
   /* --- вилла из Blender: GLB + запечённые текстуры --- */
   const sz = mobile ? '-m' : '';
@@ -77,32 +68,9 @@ export async function build({ THREE, kit, renderer, mobile }) {
   const canal = kit.water(1.6, 22, '#3a3a40', { tile: 2, ei: 0.15, emissive: '#ffb070', rough: 0.03, metal: 0.6 });
   canal.position.set(4.6, 0.16, 27); scene.add(canal);
 
-  /* --- люди: команда в VIP-беседке и гости у бассейна --- */
-  const b = new Builder(), R = kit.rng(5);
-  b.rim = ['#ffb070', '#ff7a5a', '#ffd9a8'];   // силуэты в лучах рассвета
-  // команда STAYA: двое за диджейской стойкой играют для толпы у бассейна
-  human(b, RESIDENTS.gulidic, { p: [GX - 1.7, GY, GZ - 0.6], ry: -Math.PI / 2, pose: 'dj' });
-  human(b, RESIDENTS.klen, { p: [GX - 1.7, GY, GZ + 0.6], ry: -Math.PI / 2, pose: 'up' });
-  // один отдыхает на шезлонге
-  human(b, RESIDENTS.sixphrases, { p: [GX + 2.15, GY + 0.36, GZ - 2.0], ry: -Math.PI / 2, pose: 'behindHead', legs: 'feetUp' });
-  // двое считают деньги у кейсов
-  human(b, RESIDENTS.dierouzze, { p: [GX + 0.2, GY, GZ + 1.35], ry: Math.PI / 2, pose: 'count' });
-  human(b, RESIDENTS.pronto, { p: [GX + 0.2, GY, GZ + 2.25], ry: Math.PI / 2, pose: 'count' });
-  // гости: толпа у беседки лицом к диджеям, на террасе и в бассейне
-  let k = 0;
-  const guest = (x, y, z, ry, o = {}) => {
-    human(b, castGuest(k), { p: [x, y, z], ry, pose: kit.pick(['up', 'wave', 'up', 'hips', 'phone', 'peace'], k), s: 0.95 + R() * 0.1, lo: true, barefoot: y < 0, ...o });
-    k++;
-  };
-  for (let x = 9.6; x < 10.9; x += 0.7) for (let z = -14; z <= -8; z += 0.75) if (R() > 0.2) guest(x + (R() - 0.5) * 0.3, 0, z + (R() - 0.5) * 0.3, Math.PI / 2 + (R() - 0.5) * 0.7);
-  [[-3, -11], [-6.5, -14.5], [1.5, -15], [5.5, -9], [-1, -8.6], [7.2, -12.5]].forEach(([x, z], i) => guest(x, -1.0, z, Math.PI / 2 + (i % 2 ? 0.6 : -0.3), { pose: i % 2 ? 'up' : 'wave' }));
-  [[-14.5, -8.2], [-15.3, -9.6]].forEach(([x, z], i) => guest(x, -0.35, z, i ? 0.4 : 2.6, { pose: 'relax', legs: 'sit' }));
-  [[-16.4, -1.4, 1.6], [-18.6, -3, 1.4], [-11.8, -4.2, 3.2], [11.5, -4.4, -2.6]].forEach(([x, z, ry]) => guest(x, 0, z, ry, { pose: 'hips' }));
-  scene.add(b.build());
-
-  /* --- свет для людей --- */
+  /* --- живой свет --- */
   scene.add(new THREE.HemisphereLight('#ffd2b0', '#5a4038', 1.0));
-  const dl = new THREE.DirectionalLight('#ffb27a', 2.2); dl.position.set(SD.x * 50, 12, SD.z * 50); scene.add(dl);
+  // направленного света нет: он давал блик-дорожку на море под титрами
   const L = (c, i, p, d = 14) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
   L('#ffd6a0', 40, [GX, 3.3, GZ]); L('#ff3fb4', 18, [GX - 3.2, 1.6, GZ], 8);
 
@@ -116,37 +84,11 @@ export async function build({ THREE, kit, renderer, mobile }) {
   scene.add(kit.glowPoints(glows));
   kit.haze(scene, { box: [-60, 80, -24, -8, -160, -40], colors: ['#ffd2b0', '#ffb07a'], n: 14, size: 60, opacity: 0.08 });
 
-  /* --- финальная композиция: солнце слева, гидроциклы справа, по центру титры встают из-за горизонта --- */
+  /* --- финальная композиция: солнце слева, по центру титры встают ровно из-за горизонта --- */
   const CP = new THREE.Vector3(0, 2.6, -21.5);
   const VD = SV.clone().setY(0).applyAxisAngle(new THREE.Vector3(0, 1, 0), mobile ? -0.17 : -0.3).normalize();   // взгляд финала: солнце левее центра
   const RT = new THREE.Vector3(-VD.z, 0, VD.x);                                                    // вправо от взгляда
   const at = (dist, side, y) => CP.clone().addScaledVector(VD, dist).addScaledVector(RT, side).setY(y);
-  // гидроциклы с райдерами и пенным следом
-  const jb = new Builder(); jb.rim = ['#ffb070'];
-  const wakeT = kit.canvasTex(64, 512, (x, w, h) => {
-    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g;
-    for (let y = 0; y < h; y += 3) { const ww = w * (0.35 + 0.65 * (y / h)) * (0.7 + Math.random() * 0.3); x.globalAlpha = 0.5 + Math.random() * 0.5; x.fillRect((w - ww) / 2, y, ww, 2); }
-  });
-  const ski = (pos, heading, hull, k) => {
-    const M = kit.M, G = kit.G;
-    jb.push(M(pos.toArray(), [0, heading, 0], 1.35));
-    jb.add(G.rbox(1.15, 0.55, 3.1, 0.22), hull, 'gloss', M([0, 0.2, 0]));
-    jb.add(G.cone(0.57, 0.9, 16), hull, 'gloss', M([0, 0.2, 1.95], [Math.PI / 2, 0, 0], [1, 1, 0.55]));
-    jb.add(G.rbox(0.62, 0.3, 1.3, 0.12), '#111116', 'gloss', M([0, 0.62, -0.25]));
-    jb.add(G.rbox(1.18, 0.12, 3.12, 0.05), '#ffffff', 'gloss', M([0, 0.0, 0]));
-    jb.add(G.cyl(0.03, 0.03, 0.8, 8), '#222', 'metal', M([0, 0.95, 0.65], [0, 0, Math.PI / 2]));
-    human(jb, castGuest(k), { p: [0, 0.48, -0.15], ry: 0, pose: 'dj', legs: 'sit', s: 1.05 });
-    jb.pop();
-    const wk = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 40), new THREE.MeshBasicMaterial({ map: wakeT, transparent: true, depthWrite: false, toneMapped: false, opacity: 0.85 }));
-    wk.rotation.set(-Math.PI / 2, 0, heading, 'YXZ'); wk.rotation.order = 'YXZ'; wk.rotation.set(-Math.PI / 2, heading, 0);
-    const back = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading)).multiplyScalar(-21.5);
-    wk.position.copy(pos).add(back).setY(SEA + 0.08); scene.add(wk);
-  };
-  const hd = Math.atan2(-VD.x, -VD.z) + 0.5; // идут влево-вдаль, к солнцу
-  const js = mobile ? [[56, 6], [84, 12]] : [[64, 11], [96, 21]];
-  ski(at(js[0][0], js[0][1], SEA - 0.05), hd, '#ff3fb4', 4);
-  ski(at(js[1][0], js[1][1], SEA - 0.05), hd + 0.15, '#2fe6ff', 13);
-  scene.add(jb.build());
   // титры — большой «щит» вдали по центру, поднимается из-за горизонта
   const CW = 1024, CH = 2400 + CREDITS.length * 112 + 420, links = []; let yEnd = CH;
   const credT = kit.canvasTex(CW, CH, (x, w, h) => {
@@ -179,7 +121,13 @@ export async function build({ THREE, kit, renderer, mobile }) {
   // в конце титры замирают: ссылки на источники и тег разработчика — в верхней половине кадра, кнопки — под ними
   const below = (CH - yEnd) / CH * CHH;                                   // пустое поле под последней строкой
   const endBottom = CP.y + CDIST * Math.tan(THREE.MathUtils.degToRad(1.5)) - below;
-  const credY = (k) => (SEA - 12 - CHH / 2) + (endBottom + CHH / 2 - (SEA - 12 - CHH / 2)) * k;
+  // линия горизонта на дистанции титров: луч из глаза к дальнему краю моря (море 3600×3600 с центром в 0)
+  const toEdge = 1800 / Math.max(Math.abs(VD.x), Math.abs(VD.z)) - CP.clone().projectOnVector(VD).length() * Math.sign(CP.dot(VD));
+  const yH = CP.y + (SEA - CP.y) * CDIST / toEdge;
+  // всё, что ниже горизонта, срезается: титры выезжают именно из линии горизонта, а не из воды перед ней
+  renderer.localClippingEnabled = true;
+  cred.material.clippingPlanes = [new THREE.Plane(new THREE.Vector3(0, 1, 0), -yH)];
+  const credY = (k) => (yH - CHH / 2) + (endBottom + CHH / 2 - (yH - CHH / 2)) * k;
 
   /* --- камера: пролёт сквозь виллу к морю и восходу --- */
   const GAZ = [GX, 1.7, GZ];

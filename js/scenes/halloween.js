@@ -192,7 +192,9 @@ export async function build({ THREE, kit, font, renderer }) {
   /* --- гость на галерее держит смартфон: пост с фото следующей сцены --- */
   const GP = [13.4, 10.4, -0.5], gry = 0.96, cs = Math.cos(gry), sn = Math.sin(gry);
   const W = (x, y, z) => [GP[0] + x * cs + z * sn, GP[1] + y, GP[2] - x * sn + z * cs];
-  kit.figure(b, { p: GP, ry: gry, pose: 'hold', top: '#120d16', skirt: '#120d16', mask: '#f2f2f2', horns: '#c0101a', hair: '#0e0e12', longHair: 2, i: 4 });
+  // телефон лежит на высокой подставке у перил (людей в сцене нет)
+  b.add(G.cyl(0.05, 0.07, 1.2, 12), GOLD, 'metal', M(W(0, 0.6, 0.38)));
+  b.add(G.cyl(0.22, 0.24, 0.05, 20), GOLD, 'metal', M(W(0, 0.025, 0.38)));
   // телефон в руках: экран смотрит на лицо (наклон вверх)
   const phone = new THREE.Group(); phone.rotation.order = 'YXZ';
   phone.position.set(...W(0, 1.27, 0.38)); phone.rotation.set(-1.03, gry + Math.PI, 0);
@@ -222,7 +224,6 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.add(phone); phone.updateMatrixWorld(true);
   const photoC = photo.getWorldPosition(new THREE.Vector3()).toArray();
   const nrm = new THREE.Vector3(0, 0, 1).applyQuaternion(phone.quaternion);
-  glows.push([...W(0, 1.45, 0.25), '#9fb2ff', 0.6, 0.5]);
 
   await Promise.all(props);
   scene.add(kit.glowPoints(glows));
