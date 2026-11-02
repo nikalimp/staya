@@ -111,9 +111,11 @@ async function buildScene(i) {
     res.scene.traverse((o) => { if ((o.isMesh || o.isPoints) && !o.userData.dynamic) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
     res.scene.updateMatrixWorld(true);
     kit.glowMats.forEach((m) => (m.uniforms.uScale.value = glowScale));
-    try { renderer.compile(res.scene, camera); } catch (e) { /* noop */ }
+    // шейдеры компилируются параллельно (KHR_parallel_shader_compile), видео сцены грузятся вместе с ней
+    await Promise.all([renderer.compileAsync ? renderer.compileAsync(res.scene, camera).catch(() => {}) : Promise.resolve(renderer.compile(res.scene, camera)), kit.videosReady(res.scene)]);
     if (DEBUG) console.log(`[staya] ${SCENES[i].id} built in ${(performance.now() - t0).toFixed(0)} ms`);
     built.set(i, res); building.delete(i);
+    if (i === curIdx) kit.playVideos(res.scene);   // сцена догрузилась, когда мы уже в ней
     // превью следующей сцены (фото в телефоне во дворце)
     const prev = built.get(i - 1); if (prev?.preview) renderPreview(prev, res);
     if (res.preview && built.has(i + 1)) renderPreview(res, built.get(i + 1));
@@ -138,13 +140,13 @@ function renderPreview(owner, next) {
   mesh.material.map = rt.texture; mesh.material.needsUpdate = true;
   owner.scene.userData.rt = rt; owner.previewDone = true; dirty = true;
 }
-// Подгрузка по ходу: на прелоадере — первые две сцены; в сцене i готовятся i+1 и i+2.
+// Подгрузка по ходу: на прелоадере — первая сцена (вторая сразу следом в фоне); в сцене i готовятся i+1 и i+2.
 // Сцены на две и больше позади (и дальше двух впереди при скролле назад) выгружаются из памяти и при возврате собираются снова.
 const AHEAD = 2;
 function prefetch(i) { for (let k = 1; k <= AHEAD; k++) if (i + k < N && !built.has(i + k)) idle(() => buildScene(i + k)); }
 function dropBehind(i) {
   for (const [j, s] of built) if (j <= i - 2 || j > i + AHEAD) {
-    s.scene.userData.rt?.dispose(); kit.disposeScene(s.scene); built.delete(j);
+    s.scene.userData.rt?.dispose(); kit.dropVideos(s.scene); kit.disposeScene(s.scene); built.delete(j);
     if (DEBUG) console.log('[staya] dropped', SCENES[j].id);
   }
 }
@@ -239,6 +241,7 @@ function loop() {
     // звуковые эффекты: срабатывают, когда скролл проходит точку вперёд
     for (let i = Math.floor(lastG); i <= Math.min(N - 1, Math.floor(cur)); i++) for (const [t, k] of SCENES[i].sfx || []) { const g = i + t; if (g > lastG && g <= cur) audio.fx[k]?.(); }
   }
+  if (started && curIdx >= 0 && built.has(curIdx) && kit.videosPlaying(built.get(curIdx).scene)) dirty = true;
   if (started && (cur !== lastG || dirty)) { if (apply(cur)) { lastG = cur; dirty = false; } }
   requestAnimationFrame(loop);
 }
@@ -368,7 +371,9 @@ async function boot() {
   });
   await Promise.all([fontP, cssFontP, loadPeople().then(() => setReal(45))]);
   // все сцены — сразу, пока крутится кольцо: дальше путешествие идёт без подгрузок
-  for (let i = 0; i < Math.min(N, AHEAD); i++) { await buildScene(i); setReal(45 + (50 * (i + 1)) / AHEAD); await new Promise((r) => setTimeout(r, 0)); }
+  // на прелоадере собираем только первую сцену; вторая грузится в фоне сразу после неё
+  await buildScene(0); setReal(95);
+  idle(() => buildScene(1));
   await firstTrack;
   setReal(100);
 }

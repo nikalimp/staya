@@ -648,7 +648,7 @@ export async function painting(scene, img, o = {}) {
   if (o.video) {
     // видео в золотой раме: кадр 9:16, играет вместе с остальными видео сцены
     const v = document.createElement('video');
-    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'metadata', crossOrigin: 'anonymous' });
+    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous' });
     v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.src = img; _videos.push({ scene, v });
     tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex._aspect = 9 / 16;
   } else {
@@ -714,7 +714,7 @@ export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null)
   const m = screen(w, h, fallback, p, r);
   if (!fallback) m.material.color.set('#050508');
   const v = document.createElement('video');
-  Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'metadata', crossOrigin: 'anonymous' });
+  Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous' });
   v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
   v.addEventListener('loadeddata', () => {
     const t = new THREE.VideoTexture(v); t.colorSpace = THREE.SRGBColorSpace;
@@ -729,9 +729,20 @@ export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null)
 }
 export function playVideos(scene) {
   for (const x of _videos) {
-    if (x.scene === scene) { if (x.v.paused && x.v.readyState >= 1) x.v.play().catch(() => {}); else if (x.v.readyState < 1) { x.v.preload = 'auto'; x.v.play().catch(() => {}); } }
+    if (x.scene === scene) { if (x.v.paused) x.v.play().catch(() => {}); }
     else if (!x.v.paused) x.v.pause();
   }
+}
+// видео сцены загружены до первого кадра (или вышло время) — сцену можно показывать
+export function videosReady(scene, ms = 4000) {
+  const list = _videos.filter((x) => x.scene === scene && x.v.readyState < 2).map((x) => new Promise((r) => { x.v.addEventListener('loadeddata', r, { once: true }); x.v.addEventListener('error', r, { once: true }); }));
+  return Promise.race([Promise.all(list), new Promise((r) => setTimeout(r, ms))]);
+}
+// идёт ли сейчас хоть одно видео сцены: тогда кадр перерисовывается постоянно (иначе видео «замирает»)
+export function videosPlaying(scene) { return _videos.some((x) => x.scene === scene && !x.v.paused && x.v.readyState >= 2); }
+// сцена выгружена — её видео останавливаются и освобождают память
+export function dropVideos(scene) {
+  for (let k = _videos.length - 1; k >= 0; k--) if (_videos[k].scene === scene) { const v = _videos[k].v; v.pause(); v.removeAttribute('src'); v.load(); _videos.splice(k, 1); }
 }
 
 /* ---------- вертикальный экран 9:16 в тёмной рамке с неоновым контуром ---------- */
