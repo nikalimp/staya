@@ -12,7 +12,7 @@ const SCENES = [
   { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.5, out: 'black' },
   { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black' },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut' },
-  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.965, credits: [0.83, 0.97] },
+  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975 },
 ];
 // Кнопки финала. Пустой href — кнопка не показывается.
 const LINKS = [
@@ -32,7 +32,7 @@ const DEBUG = new URLSearchParams(location.search).has('debug');
 
 const $ = (s) => document.querySelector(s);
 const canvas = $('#gl'), fadeEl = $('#fade'), pctEl = $('#pct'), arc = $('#arc'), ring = $('#ring'), pre = $('#pre');
-const spacer = $('#spacer'), finalEl = $('#final'), creditsEl = $('#credits'), sndBtn = $('#snd'), headBtn = $('#head'), hintEl = $('#hint');
+const spacer = $('#spacer'), finalEl = $('#final'), sndBtn = $('#snd'), headBtn = $('#head'), hintEl = $('#hint');
 LINKS.filter((l) => l.href).forEach((l) => {
   const a = document.createElement('a'); a.href = l.href; a.textContent = l.label; if (l.cls) a.className = l.cls;
   if (l.href.startsWith('http')) { a.target = '_blank'; a.rel = 'noopener'; }
@@ -136,17 +136,11 @@ function apply(g) {
   camera.position.copy(c.p); camera.lookAt(c.l);
   if (s.roll) camera.rotateZ(s.roll(t));
   // погружение: камера чуть поворачивается за головой зрителя, кивки в такт качают сцену
-  if (head.on) { camera.rotateY(-head.x * 0.13); camera.rotateX(head.y * 0.09); camera.translateY(head.y * 0.05); }
+  // сдвиг головы — как взгляд в окно (камера уходит в обратную сторону), поворот головы — камера смотрит туда же
+  if (head.x || head.y || head.yaw || head.pitch) { camera.rotateY(head.x * 0.13 - head.yaw * 0.3); camera.rotateX(-head.y * 0.09 + head.pitch * 0.2); camera.translateY(-head.y * 0.05); }
   renderer.render(s.scene, camera);
   if (i !== curIdx) { curIdx = i; audio.go(i); }
   if (t > 0.3 && i < N - 1 && !built.has(i + 1)) idle(() => buildScene(i + 1));
-  // финал: титры снизу вверх, затем кнопки
-  const cr = SCENES[i].credits;
-  if (cr) {
-    const k = (t - cr[0]) / (cr[1] - cr[0]), on = k > -0.02 && k < 1.05;
-    creditsEl.classList.toggle('on', on);
-    if (on) { const hh = creditsEl.offsetHeight; creditsEl.style.transform = `translateY(${(VH - (VH + hh) * Math.max(0, k)).toFixed(1)}px)`; }
-  } else creditsEl.classList.remove('on');
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
   return true;
 }
@@ -160,7 +154,14 @@ function loop() {
     cur += Math.sign(d) * Math.min(Math.abs(d) * 0.12, 0.02);
     if (Math.abs(target - cur) < 1e-5) cur = target;
   }
-  if (head.on && (Math.abs(head.x - head.dx) > 0.002 || Math.abs(head.y - head.dy) > 0.002)) { head.dx = head.x; head.dy = head.y; dirty = true; }
+  if (head.on || head.x || head.y || head.yaw || head.pitch) {
+    let moved = 0;
+    for (const q of ['x', 'y', 'yaw', 'pitch']) {
+      const to = head.on ? head.tgt[q] : 0, d = to - head[q];
+      if (Math.abs(d) > 0.0005) { head[q] += d * 0.075; moved = 1; } else head[q] = to;
+    }
+    if (moved) dirty = true;
+  }
   if (started && (cur !== lastG || dirty)) { if (apply(cur)) { lastG = cur; dirty = false; } }
   requestAnimationFrame(loop);
 }
@@ -174,14 +175,27 @@ function tweenScroll(toY, ms = 1400) {
   requestAnimationFrame(step);
 }
 
+/* ---------- ссылки в 3D-титрах: клик по строке открывает источник ---------- */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2();
+function linkAt(ev) {
+  const i = curIdx, s = built.get(i), pk = s?.pick; if (!pk || !pk.mesh.visible || lastG - i < pk.from) return null;
+  ndc.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / canvas.clientHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObject(pk.mesh, false)[0]; if (!hit?.uv) return null;
+  return pk.links.find((l) => hit.uv.y >= l.v0 && hit.uv.y <= l.v1) || null;
+}
+canvas.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') canvas.style.cursor = linkAt(e) ? 'pointer' : ''; });
+canvas.addEventListener('click', (e) => { const l = linkAt(e); if (l) window.open(l.href, '_blank', 'noopener'); });
+
 /* ---------- погружение: слежение за головой (только десктоп) ---------- */
-const head = { on: false, x: 0, y: 0, dx: 0, dy: 0, ctl: null };
+// tgt — последние значения с камеры (~18 раз в секунду), x/y/yaw/pitch — плавно догоняют их каждый кадр
+const head = { on: false, x: 0, y: 0, yaw: 0, pitch: 0, tgt: { x: 0, y: 0, yaw: 0, pitch: 0 }, ctl: null };
 if (!mobile && navigator.mediaDevices?.getUserMedia) headBtn.hidden = false;
 headBtn.addEventListener('click', async () => {
   if (head.ctl) { head.ctl.stop(); head.ctl = null; head.on = false; dirty = true; headBtn.setAttribute('aria-pressed', 'false'); hintEl.textContent = ''; return; }
   headBtn.classList.add('busy'); hintEl.textContent = 'Включаем камеру… видео остаётся на вашем устройстве';
   try {
-    head.ctl = await startHeadTrack((x, y) => { head.x = x; head.y = y; });
+    head.ctl = await startHeadTrack((v) => Object.assign(head.tgt, v));
     head.on = true; headBtn.setAttribute('aria-pressed', 'true');
     hintEl.textContent = 'Погружение включено: смотрите по сторонам и качайте головой в такт';
   } catch (e) {

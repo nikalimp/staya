@@ -157,7 +157,7 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     { p: [12.5, EYE, 10.9], l: [12.45, 1.2, 12.1], t: 0.83 },
     { p: [12.5, EYE, 11.0], l: [12.45, 1.1, 11.9], t: 1 },
   ];
-  const path = kit.humanize(kit.camPath(keys), { walk: [[0.41, 0.83]], swim: [[0.24, 0.36]] });
+  const path = kit.camPath(keys);
   // стакан: со стойки в руку (0.84–0.89), затем ко рту (до 0.97) — кадр тонет в тёмном напитке
   const ease = (x) => x * x * (3 - 2 * x), cl = (x) => Math.min(1, Math.max(0, x));
   const placeGlass = (t) => {

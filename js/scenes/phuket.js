@@ -5,6 +5,7 @@
 const BASE = 'world/villa/';
 const GX = 15, GZ = -11, GY = 0.5; // VIP-беседка: центр и высота настила
 
+import { CREDITS, DEV } from '../credits.js';
 import { person as human, guest as castGuest, RESIDENTS } from '../people.js';
 export async function build({ THREE, kit, renderer, mobile }) {
   const { Builder } = kit;
@@ -15,8 +16,9 @@ export async function build({ THREE, kit, renderer, mobile }) {
   const glows = [];
 
   /* --- солнце над горизонтом и море --- */
-  const SD = new THREE.Vector3(0.3, 0.07, -1).normalize();
-  const SUN = SD.clone().multiplyScalar(1100).toArray();
+  const SD = new THREE.Vector3(0.3, 0.07, -1).normalize();          // солнце, по которому запечён свет виллы
+  const SV = new THREE.Vector3(0.02, 0.07, -1).normalize();         // видимый диск: левее, над чистым горизонтом
+  const SUN = SV.clone().multiplyScalar(1100).toArray();
   const sun = new THREE.Mesh(new THREE.SphereGeometry(26, 32, 16), new THREE.MeshBasicMaterial({ color: '#fff0c8', toneMapped: false, fog: false }));
   sun.position.set(...SUN); scene.add(sun);
   scene.add(kit.halo(SUN, 900, '#ff9a5a', 0.75)); scene.add(kit.halo(SUN, 260, '#ffe2a8', 0.9));
@@ -29,8 +31,8 @@ export async function build({ THREE, kit, renderer, mobile }) {
     for (let y = 0; y < h; y += 5) { const ww = w * (0.25 + 0.75 * (1 - y / h)) * (0.55 + Math.random() * 0.45); x.fillRect((w - ww) / 2, y, ww, 2.5); }
   });
   const pm = new THREE.Mesh(new THREE.PlaneGeometry(90, 1000), new THREE.MeshBasicMaterial({ map: path, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, fog: false }));
-  pm.rotation.x = -Math.PI / 2; pm.rotation.z = -Math.atan2(SD.x, -SD.z);
-  pm.position.set(SD.x * 560, SEA + 0.05, SD.z * 560); scene.add(pm);
+  pm.rotation.x = -Math.PI / 2; pm.rotation.z = -Math.atan2(SV.x, -SV.z);
+  pm.position.set(SV.x * 560, SEA + 0.05, SV.z * 560); scene.add(pm);
 
   /* --- вилла из Blender: GLB + запечённые текстуры --- */
   const sz = mobile ? '-m' : '';
@@ -112,9 +114,75 @@ export async function build({ THREE, kit, renderer, mobile }) {
   glows.push([GX - 4.25, 4.3, GZ, '#ff3fb4', 3, 0.7], [GX - 2.9, 1.05, GZ, '#ff3fb4', 1.6, 0.8]);
   scene.add(kit.glowPoints(glows));
 
+  /* --- финальная композиция: солнце слева, гидроциклы справа, по центру титры встают из-за горизонта --- */
+  const CP = new THREE.Vector3(0, 2.6, -21.5);
+  const VD = SV.clone().setY(0).applyAxisAngle(new THREE.Vector3(0, 1, 0), mobile ? -0.17 : -0.3).normalize();   // взгляд финала: солнце левее центра
+  const RT = new THREE.Vector3(-VD.z, 0, VD.x);                                                    // вправо от взгляда
+  const at = (dist, side, y) => CP.clone().addScaledVector(VD, dist).addScaledVector(RT, side).setY(y);
+  // гидроциклы с райдерами и пенным следом
+  const jb = new Builder();
+  const wakeT = kit.canvasTex(64, 512, (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, 'rgba(255,255,255,.95)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g;
+    for (let y = 0; y < h; y += 3) { const ww = w * (0.35 + 0.65 * (y / h)) * (0.7 + Math.random() * 0.3); x.globalAlpha = 0.5 + Math.random() * 0.5; x.fillRect((w - ww) / 2, y, ww, 2); }
+  });
+  const ski = (pos, heading, hull, k) => {
+    const M = kit.M, G = kit.G;
+    jb.push(M(pos.toArray(), [0, heading, 0], 1.35));
+    jb.add(G.rbox(1.15, 0.55, 3.1, 0.22), hull, 'gloss', M([0, 0.2, 0]));
+    jb.add(G.cone(0.57, 0.9, 16), hull, 'gloss', M([0, 0.2, 1.95], [Math.PI / 2, 0, 0], [1, 1, 0.55]));
+    jb.add(G.rbox(0.62, 0.3, 1.3, 0.12), '#111116', 'gloss', M([0, 0.62, -0.25]));
+    jb.add(G.rbox(1.18, 0.12, 3.12, 0.05), '#ffffff', 'gloss', M([0, 0.0, 0]));
+    jb.add(G.cyl(0.03, 0.03, 0.8, 8), '#222', 'metal', M([0, 0.95, 0.65], [0, 0, Math.PI / 2]));
+    human(jb, castGuest(k), { p: [0, 0.48, -0.15], ry: 0, pose: 'dj', legs: 'sit', s: 1.05 });
+    jb.pop();
+    const wk = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 40), new THREE.MeshBasicMaterial({ map: wakeT, transparent: true, depthWrite: false, toneMapped: false, opacity: 0.85 }));
+    wk.rotation.set(-Math.PI / 2, 0, heading, 'YXZ'); wk.rotation.order = 'YXZ'; wk.rotation.set(-Math.PI / 2, heading, 0);
+    const back = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading)).multiplyScalar(-21.5);
+    wk.position.copy(pos).add(back).setY(SEA + 0.08); scene.add(wk);
+  };
+  const hd = Math.atan2(-VD.x, -VD.z) + 0.5; // идут влево-вдаль, к солнцу
+  const js = mobile ? [[56, 6], [84, 12]] : [[64, 11], [96, 21]];
+  ski(at(js[0][0], js[0][1], SEA - 0.05), hd, '#ff3fb4', 4);
+  ski(at(js[1][0], js[1][1], SEA - 0.05), hd + 0.15, '#2fe6ff', 13);
+  scene.add(jb.build());
+  // титры — большой «щит» вдали по центру, поднимается из-за горизонта
+  const CW = 1024, CH = 3900, links = []; let yEnd = CH;
+  const credT = kit.canvasTex(CW, CH, (x, w, h) => {
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = 'rgba(120,40,0,.55)'; x.shadowBlur = 30;
+    let y = 150;
+    const line = (txt, size, c1 = '#ffffff', c2 = '#ffe2c4', gap = 1.25) => { kit.gradText(x, txt, w / 2, y + size / 2, size, c1, c2, { glow: 'rgba(255,170,110,.7)' }); y += size * gap; };
+    const cap = (txt) => { x.shadowBlur = 18; x.font = `800 44px Manrope, sans-serif`; x.fillStyle = 'rgba(255,255,255,.9)'; x.fillText(txt.toUpperCase().split('').join(String.fromCharCode(8202)), w / 2, y + 10); y += 140; };
+    const small = (txt, size = 36, alpha = 0.92, weight = 700) => { x.shadowBlur = 14; x.font = `${weight} ${size}px Manrope, sans-serif`; x.fillStyle = `rgba(255,255,255,${alpha})`; x.fillText(txt, w / 2, y + size / 2); y += size * 1.35; };
+    line('STAYA', 230, '#ffffff', '#ffd1ee', 1.35);
+    line('Проводим тусовки', 70); line('с 2020 года', 70, '#ffffff', '#ffe2c4', 2.2);
+    line('100 500', 190, '#ffffff', '#ffe2c4', 1.0); cap('гостей');
+    line('548', 190, '#ffffff', '#ffe2c4', 1.0); cap('мероприятий');
+    line('124', 190, '#ffffff', '#ffe2c4', 1.0); cap('артиста');
+    y += 40; line('Делаем рекламные', 70); line('кампании', 70, '#ffffff', '#ffe2c4', 1.6);
+    line('и готовы', 70); line('к коллаборациям', 70, '#ffffff', '#ffe2c4', 2.6);
+    // источники и лицензии: каждая строка — ссылка (клик по титрам открывает источник)
+    small('ИСТОЧНИКИ И ЛИЦЕНЗИИ', 34, 0.75, 800); y += 18;
+    for (const c of CREDITS) {
+      const y0 = y; small(c.what, 36, 0.95); small(`${c.who} · ${c.lic}`, 30, 0.7, 600); y += 16;
+      links.push({ y0, y1: y, href: c.url });
+    }
+    y += 90; const y0 = y;
+    small(DEV.label, 40, 0.8, 600); line(DEV.name, 96, '#ffffff', '#ffd1ee', 1.2);
+    links.push({ y0, y1: y, href: DEV.url }); yEnd = y + 20;
+  });  credT.anisotropy = 8;
+  const CDIST = 700, CWW = mobile ? 380 : 300, CHH = CWW * CH / CW;
+  const cred = new THREE.Mesh(new THREE.PlaneGeometry(CWW, CHH), new THREE.MeshBasicMaterial({ map: credT, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
+  const cbase = CP.clone().addScaledVector(VD, CDIST);
+  cred.position.copy(cbase); cred.lookAt(CP.x, cbase.y, CP.z); cred.userData.dynamic = true; cred.renderOrder = 1; scene.add(cred);
+  // в конце титры замирают: ссылки на источники и тег разработчика — в верхней половине кадра, кнопки — под ними
+  const below = (CH - yEnd) / CH * CHH;                                   // пустое поле под последней строкой
+  const endBottom = CP.y + CDIST * Math.tan(THREE.MathUtils.degToRad(1.5)) - below;
+  const credY = (k) => (SEA - 12 - CHH / 2) + (endBottom + CHH / 2 - (SEA - 12 - CHH / 2)) * k;
+
   /* --- камера: пролёт сквозь виллу к морю и восходу --- */
   const GAZ = [GX, 1.7, GZ];
   const far = (k) => SD.clone().multiplyScalar(k).toArray();
+  const fin = (k) => CP.clone().addScaledVector(VD, k).setY(CP.y + k * 0.035).toArray();
   const keys = [
     // подъезд: вдоль канала к входу
     { p: [0, 2.2, 44], l: [0, 3, 10], t: 0.0 },
@@ -132,15 +200,19 @@ export async function build({ THREE, kit, renderer, mobile }) {
     { p: [7.2, 3.0, -11.8], l: [GX, 1.5, GZ - 0.5], t: 0.622 },
     // разворот к морю и полёт за край утёса — в восход
     { p: [3.6, 2.7, -16], l: far(600), t: 0.697 },
-    { p: [0.8, 2.6, -19.4], l: far(1000), t: 0.773 },
-    { p: [0, 2.6, -21.5], l: far(1100), t: 0.84 },
-    { p: [0, 2.6, -21.5], l: far(1100), t: 1 },
+    { p: [0.8, 2.6, -19.4], l: fin(1000), t: 0.773 },
+    { p: CP.toArray(), l: fin(1000), t: 0.82 },
+    { p: CP.toArray(), l: fin(1000), t: 1 },
   ];
   const update = (t) => {
+    const ck = Math.min(1, Math.max(0, (t - 0.8) / 0.18));
+    cred.position.y = credY(ck); cred.visible = t > 0.78;
     if (!pv) return;
     const k = Math.min(1, Math.max(0, (t - 0.37) / 0.08));
     const e = k === 1 ? 1 : 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2);
     const s = 0.05 + 0.95 * e; pv.scale.set(s, s, s);
   };
-  return { scene, cam: kit.camPath(keys), update };
+  // ссылки в титрах: доли высоты текстуры → v-координата плоскости
+  const pick = { mesh: cred, links: links.map((l) => ({ v0: 1 - l.y1 / CH, v1: 1 - l.y0 / CH, href: l.href })), from: 0.9 };
+  return { scene, cam: kit.camPath(keys), update, pick };
 }

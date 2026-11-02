@@ -251,9 +251,9 @@ export function build({ THREE, kit, font, renderer }) {
     { p: [34, LY + EYE, -7.5], l: [X3, LY + 1.5, -7.5], t: 0.94 },
     { p: [X3 - 0.65, LY + EYE, -7.5], l: [X3, LY + 1.45, -7.5], t: 1 },
   ];
-  const path = kit.humanize(kit.camPath(keys), { walk: [[0.1, 1]] });
+  const path = kit.camPath(keys);
   // покачивание в толпе — эффект «протискивания»
-  const roll = (t) => (t > 0.14 && t < 0.48 ? Math.sin(t * 95) * 0.07 * Math.sin(((t - 0.14) / 0.34) * Math.PI) : 0);
+  const roll = (t) => (t > 0.14 && t < 0.48 ? Math.sin(t * 34) * 0.045 * Math.sin(((t - 0.14) / 0.34) * Math.PI) : 0);
   // стакан из прошлой сцены: опускается от лица и уходит из кадра
   const hero = kit.drink(); scene.add(hero.group);
   const ease = (x) => x * x * (3 - 2 * x), cl = (x) => Math.min(1, Math.max(0, x));
