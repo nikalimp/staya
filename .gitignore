@@ -5,3 +5,4 @@ scripts/ph
 scripts/blender/*.blend
 scripts/blender/vout/
 scripts/blender/*_points.json
+scripts/blender/*.blend1
