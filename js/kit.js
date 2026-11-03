@@ -7,6 +7,7 @@ import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 
 export { THREE };
 
@@ -577,9 +578,13 @@ export function moonMesh(radius, lightDir = null, o = {}) {
 }
 
 /* ---------- GLB из Blender (сжатие meshopt через gltfpack) ---------- */
-let _gltf;
+// текстуры моделей — KTX2 (Basis Universal): видеокарта получает их сжатыми, без распаковки на основном потоке
+let _gltf, _ktx2;
+export function useRenderer(renderer) {
+  _ktx2 = new KTX2Loader().setTranscoderPath(new URL('../vendor/addons/libs/basis/', import.meta.url).href).detectSupport(renderer);
+}
 export function loadGLB(url) {
-  if (!_gltf) { _gltf = new GLTFLoader(); _gltf.setMeshoptDecoder(MeshoptDecoder); }
+  if (!_gltf) { _gltf = new GLTFLoader(); _gltf.setMeshoptDecoder(MeshoptDecoder); if (_ktx2) _gltf.setKTX2Loader(_ktx2); }
   return _gltf.loadAsync(url);
 }
 
@@ -633,6 +638,11 @@ export async function prop(scene, name, o = {}) {
     if (o.tint) c.material.color.multiply(new THREE.Color(o.tint));
     if (o.emissive && c.material.emissive) { c.material.emissive = new THREE.Color(o.emissive); c.material.emissiveIntensity = o.ei ?? 0.4; }
   });
+  // dropFlat — спрятать «пол» модели (плоскую подложку из сцены автора)
+  if (o.dropFlat) {
+    const all = new THREE.Box3().setFromObject(m).getSize(new THREE.Vector3());
+    m.traverse((c) => { if (!c.isMesh) return; const z = new THREE.Box3().setFromObject(c).getSize(new THREE.Vector3()); if (z.y < all.y * 0.03 && Math.max(z.x, z.z) > Math.max(all.x, all.z) * 0.6) c.visible = false; });
+  }
   // anchor: 'top' — верх модели на высоте p.y (люстры), 'bottom' — низ на p.y (по умолчанию)
   const bb = new THREE.Box3().setFromObject(m), c = bb.getCenter(new THREE.Vector3());
   m.position.x += m.position.x - c.x; m.position.z += m.position.z - c.z;

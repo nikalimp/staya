@@ -1,7 +1,7 @@
 // 03 · STAYA 2K17 — клуб в духе 2017 года. Камера от первого лица.
-// Голова поднимается от коктейля на барной стойке (память тусовщика всё перемешала: только что был бассейн) →
-// разворот — а вокруг клуб → танцпол мимо стола для бир-понга к сцене → выход под табличкой WC →
-// лестница вниз → коридор → парадная двустворчатая дверь, как во дворце.
+// Белая вспышка дискошара под высоким потолком → боковой отлёт с дискошаром по центру кадра → облёт клуба:
+// круговая сцена 360° в центре, бар, бир-понг, VIP-зона → выход под табличкой WC → лестница вниз →
+// коридор с видео с вечеринок → парадная двустворчатая дверь, как во дворце.
 export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M } = kit;
   const scene = new THREE.Scene();
@@ -57,24 +57,24 @@ export async function build({ THREE, kit, font, renderer }) {
   b.add(G.tube(rail, 0.05, 40, 6), '#7a1040', 'gloss');
   for (const z of [30, 23]) { b.add(G.box(0.6, 0.08, 0.3), '#fff', 'neon', M([0, 10.35, z])); glows.push([0, 10.1, z, PINK, 3, 1.2]); }
 
-  /* --- клуб: x[-16,16], z[-16,16], высота 10 --- */
-  const WALL = '#120a1c';
-  b.add(G.box(14.2, 10, 0.4), WALL, 'matte', M([-8.9, 5, 16])); b.add(G.box(14.2, 10, 0.4), WALL, 'matte', M([8.9, 5, 16]));
-  b.add(G.box(3.6, 5.6, 0.4), WALL, 'matte', M([0, 7.2, 16]));
+  /* --- клуб: x[-16,16], z[-16,16], высокий потолок H --- */
+  const WALL = '#120a1c', H = 16;
+  b.add(G.box(14.2, H, 0.4), WALL, 'matte', M([-8.9, H / 2, 16])); b.add(G.box(14.2, H, 0.4), WALL, 'matte', M([8.9, H / 2, 16]));
+  b.add(G.box(3.6, H - 4.4, 0.4), WALL, 'matte', M([0, 4.4 + (H - 4.4) / 2, 16]));
   b.add(G.box(3.6, 0.1, 0.1), PINK, 'neon', M([0, 4.35, 15.75]));
-  b.add(G.box(0.4, 10, 32), WALL, 'matte', M([-16, 5, 0]));
+  b.add(G.box(0.4, H, 32), WALL, 'matte', M([-16, H / 2, 0]));
   // правая стена: проём в коридор к туалетам (z −8.8…−6.2, высота 3.2)
   const CZ = -7.5, CW = 2.6, CH = 3.2, CX = 30;
-  b.add(G.box(0.4, 10, 7.2), WALL, 'matte', M([16, 5, -12.4])); b.add(G.box(0.4, 10, 22.2), WALL, 'matte', M([16, 5, 4.9]));
-  b.add(G.box(0.4, 10 - CH, CW), WALL, 'matte', M([16, CH + (10 - CH) / 2, CZ]));
-  b.add(G.box(32, 10, 0.4), WALL, 'matte', M([0, 5, -16]));
-  b.add(G.box(32, 0.4, 32), '#07050c', 'matte', M([0, 10.2, 0]));
+  b.add(G.box(0.4, H, 7.2), WALL, 'matte', M([16, H / 2, -12.4])); b.add(G.box(0.4, H, 22.2), WALL, 'matte', M([16, H / 2, 4.9]));
+  b.add(G.box(0.4, H - CH, CW), WALL, 'matte', M([16, CH + (H - CH) / 2, CZ]));
+  b.add(G.box(32, H, 0.4), WALL, 'matte', M([0, H / 2, -16]));
+  b.add(G.box(32, 0.4, 32), '#07050c', 'matte', M([0, H + 0.2, 0]));
   b.add(G.box(32, 0.2, 32), '#0b0812', 'gloss', M([0, -0.1, 0]));
   for (let ix = -7; ix < 7; ix++) for (let iz = -7; iz < 6; iz++) {
     const r = R(), c = r < 0.38 ? '#1a0f2a' : r < 0.6 ? PINK : r < 0.78 ? VIO : r < 0.93 ? CY : YEL;
     b.add(G.box(1.1, 0.05, 1.1), c, r < 0.38 ? 'gloss' : 'neon', M([ix * 1.2 + 0.6, 0.03, iz * 1.2 - 0.6]));
   }
-  for (const sx of [-1, 1]) for (const y of [2.5, 7.5]) {
+  for (const sx of [-1, 1]) for (const y of [2.5, 7.5, 12.5]) {
     if (sx > 0 && y < 3) { b.add(G.box(0.06, 0.08, 6.2), CY, 'neon', M([15.75, y, -11.9])); b.add(G.box(0.06, 0.08, 21.2), CY, 'neon', M([15.75, y, 4.4])); continue; }
     b.add(G.box(0.06, 0.08, 30), sx < 0 ? PINK : CY, 'neon', M([sx * 15.75, y, 0]));
   }
@@ -120,35 +120,53 @@ export async function build({ THREE, kit, font, renderer }) {
     glows.push([x, LY + CH - 0.25, CZ + sz * 0.6, sz < 0 ? '#21e0ff' : '#ff2fd0', 0.9, 0.9]);
   }
   for (const sz of [-1, 1]) b.add(G.box(X3 - X2, 0.03, 0.05), '#ff2fd0', 'neon', M([(X2 + X3) / 2, LY + 0.02, CZ + sz * (CW / 2 - 0.05)]));
-  // постеры 2017 на стенах нижнего коридора
-  const poster = (txt, c1, c2) => kit.canvasTex(256, 360, (x, w, h) => {
-    const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, c1); g.addColorStop(1, c2); x.fillStyle = g; x.fillRect(0, 0, w, h);
-    kit.gradText(x, txt, w / 2, h * 0.45, 64, '#ffffff', '#ffe0f4', { glow: '#ff2fd0' });
-    x.font = `700 20px ${kit.FONT}`; x.fillStyle = '#fff'; x.textAlign = 'center'; x.fillText('STAYA · EKB', w / 2, h * 0.86);
-  });
-  [['2K17', '#ff2fd0', '#4a0060', 29.6, -1], ['SPIN', '#2f7bff', '#16002e', 31.2, 1], ['LOVE', '#ff2a55', '#3a0020', 32.8, -1], ['VIBE', '#39ff6a', '#08301a', 34.4, 1], ['EKB', '#ffe14a', '#3a2a00', 36, -1], ['STAYA', '#21e0ff', '#002a3a', 37.6, 1]].forEach(([t, a, c, x, sz]) =>
-    scene.add(kit.screen(0.8, 1.12, poster(t, a, c), [x, LY + 1.75, CZ + sz * (CW / 2 - 0.01)], [0, sz < 0 ? 0 : Math.PI, 0])));
-  for (let x = -12; x <= 12; x += 6) kit.truss(b, [x, 9.2, -14], [x, 9.2, 14], 0.45);
+  // видео с вечеринок вместо постеров на стенах нижнего коридора
+  [['video/2k17-v.mp4', 30.4, -1], ['video/2k17-v2.mp4', 33.4, 1], ['video/2k17-v3.mp4', 36.4, -1]].forEach(([src, x, sz], i) =>
+    kit.vScreen(scene, src, [x, LY + 0.45, CZ + sz * (CW / 2 - 0.06)], sz < 0 ? 0 : Math.PI, 2.3, { edge: [PINK, CY, PINK][i], stand: false, bezel: 0.06 }));
+  for (let x = -12; x <= 12; x += 6) if (x) kit.truss(b, [x, H - 1.6, -14], [x, H - 1.6, 14], 0.45);
   for (let i = 0; i < 10; i++) {
     const x = -12 + (i % 5) * 6, z = i < 5 ? -6 : 8, c = kit.pick([PINK, CY, VIO, '#ffffff'], i);
-    b.add(G.cyl(0.2, 0.26, 0.45, 10), '#1a1a20', 'metal', M([x, 8.7, z]));
-    glows.push([x, 8.45, z, c, 2, 1.8]);
-    kit.beam(b, [x, 8.45, z], [x * 0.6 + (i % 2 ? 2 : -2), 0, z * 0.4 - 2], 1.8, c);
+    if (!x) continue;
+    b.add(G.cyl(0.2, 0.26, 0.45, 10), '#1a1a20', 'metal', M([x, H - 2.1, z]));
+    glows.push([x, H - 2.35, z, c, 2, 1.8]);
+    kit.beam(b, [x, H - 2.35, z], [x * 0.6 + (i % 2 ? 2 : -2), 0, z * 0.4 - 2], 1.8, c);
   }
-  // сцена, диджей, экран
-  b.add(G.rbox(14, 1, 4.4, 0.08), '#0e0a16', 'gloss', M([0, 0.5, -13.4]));
-  b.add(G.box(14, 0.07, 0.07), PINK, 'neon', M([0, 1.0, -11.2]));
-  kit.djBooth(b, [0, 1, -12.4], 0, { w: 3.2, front: VIO, front2: PINK, decks: false });
-  for (const sx of [-1, 1]) { kit.speaker(b, [sx * 6, 1, -13], 0, 1.8, 1.3); kit.speaker(b, [sx * 6, 2.8, -13], 0, 1.4, 1.1); }
-  // три вертикальных видео с вечеринки рядом друг с другом на сцене
-  [['video/2k17-v.mp4', -4.2], ['video/2k17-v2.mp4', 0], ['video/2k17-v3.mp4', 4.2]].forEach(([src, x], i) => kit.vScreen(scene, src, [x, 2.3, -15.55], 0, 5.6, { edge: [PINK, CY, PINK][i] }));
-  kit.text3d(b, font, 'STAYA', { size: 1.3, color: '#ff4fe0', p: [0, 8.3, -14.6] });
-  for (let i = 0; i < 9; i++) { const a = -0.9 + i * 0.22; kit.laser(b, [(i % 2 ? 1 : -1) * 6.5, 3.6, -12.6], [Math.sin(a) * 30, 6 + (i % 3), -12.6 + Math.cos(a) * 30], i % 2 ? '#39ff6a' : PINK); }
+  /* --- круговая сцена 360° в центре танцпола: диджей лицом во все стороны --- */
+  const SC = [0, 0, -1], SR = 3.6;
+  b.add(G.cyl(SR, SR + 0.15, 0.9, 48), '#0e0a16', 'gloss', M([SC[0], 0.45, SC[2]]));
+  b.add(G.tor(SR + 0.08, 0.05, 6, 64), PINK, 'neon', M([SC[0], 0.9, SC[2]], [Math.PI / 2, 0, 0]));
+  b.add(G.tor(SR + 0.16, 0.04, 6, 64), CY, 'neon', M([SC[0], 0.12, SC[2]], [Math.PI / 2, 0, 0]));
+  b.add(G.cyl(1.25, 1.25, 1.1, 40), '#120a1c', 'gloss', M([SC[0], 0.9 + 0.55, SC[2]]));
+  b.add(G.tor(1.27, 0.035, 6, 48), VIO, 'neon', M([SC[0], 1.75, SC[2]], [Math.PI / 2, 0, 0]));
+  for (let k = 0; k < 4; k++) { const a = Math.PI / 4 + (k * Math.PI) / 2; kit.speaker(b, [SC[0] + Math.cos(a) * (SR - 0.6), 0.9, SC[2] + Math.sin(a) * (SR - 0.6)], -a + Math.PI / 2, 1.5, 0.9); }
+  // круглая ферма над сценой со световыми приборами и лазерами
+  b.add(G.tor(4.6, 0.12, 8, 64), '#2a2a34', 'metal', M([SC[0], 8.6, SC[2]], [Math.PI / 2, 0, 0]));
+  for (let k = 0; k < 12; k++) {
+    const a = (k / 12) * Math.PI * 2, x = SC[0] + Math.cos(a) * 4.6, z = SC[2] + Math.sin(a) * 4.6, c = kit.pick([PINK, CY, VIO, '#ffffff'], k);
+    kit.rod(b, [x, 8.6, z], [x, H, z], 0.02, '#c8c8d0', 'metal', 4);
+    glows.push([x, 8.3, z, c, 1.6, 1.8]);
+    if (k % 2) kit.beam(b, [x, 8.3, z], [x * 2.4, 0, z * 2.4 + SC[2]], 1.4, c);
+    else kit.laser(b, [x, 8.3, z], [Math.cos(a) * 30, 2 + (k % 3), SC[2] + Math.sin(a) * 30], k % 4 ? '#39ff6a' : PINK);
+  }
+  /* --- VIP-зона у задней стены: подиум, диваны, ограждение, неон --- */
+  b.add(G.rbox(13, 0.45, 5, 0.06), '#1a0f22', 'gloss', M([0, 0.22, -13.4]));
+  b.add(G.box(13, 0.05, 0.05), YEL, 'neon', M([0, 0.46, -10.9]));
+  for (const x of [-4.5, 0, 4.5]) {
+    b.add(G.rbox(3.2, 0.5, 1.1, 0.15), '#3a0a2a', 'plastic', M([x, 0.7, -15.1])); b.add(G.rbox(3.2, 1.0, 0.35, 0.12), '#3a0a2a', 'plastic', M([x, 1.2, -15.55]));
+    b.add(G.cyl(0.55, 0.55, 0.05, 24), '#d9a441', 'metal', M([x, 0.95, -13.6])); b.add(G.cyl(0.08, 0.1, 0.5, 8), '#d9a441', 'metal', M([x, 0.7, -13.6]));
+  }
+  for (let x = -6; x <= 6; x += 1.5) { b.add(G.cyl(0.04, 0.05, 0.95, 8), '#d9a441', 'metal', M([x, 0.45 + 0.47, -10.9])); b.add(G.sph(0.07, 10, 8), '#d9a441', 'metal', M([x, 1.43, -10.9])); }
+  for (let x = -6; x < 6; x += 1.5) b.add(G.tube([[x, 1.3, -10.9], [x + 0.75, 1.05, -10.85], [x + 1.5, 1.3, -10.9]], 0.035, 12, 6), '#8a0a1a', 'plastic');
+  kit.text3d(b, font, 'VIP', { size: 1.4, color: YEL, kind: 'neon', p: [0, 4.6, -15.7], bevel: 0.02, depth: 0.08 });
+  kit.text3d(b, font, 'STAYA', { size: 1.3, color: '#ff4fe0', p: [0, 11.5, -15.2] });
+  glows.push([0, 4.6, -15.3, YEL, 6, 0.4]);
 
   /* --- диско-шар под потолком --- */
-  const MR = 1.3, MC = [0, 7.4, 3];
-  kit.rod(b, [MC[0], 10, MC[2]], [MC[0], MC[1] + MR, MC[2]], 0.025, '#c8c8d0', 'metal', 6);
-  b.add(new THREE.IcosahedronGeometry(MR, 3).toNonIndexed(), '#e8e8f0', 'chrome', M(MC));
+  const MR = 1.6, MC = [0, 12.8, -1];
+  kit.rod(b, [MC[0], H, MC[2]], [MC[0], MC[1] + MR, MC[2]], 0.025, '#c8c8d0', 'metal', 6);
+  // дискошар — отдельная зеркальная модель (не запекается): гранёный, крутится, отражает огни клуба
+  const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(MR, 4), new THREE.MeshStandardMaterial({ color: '#f4f4fa', metalness: 1, roughness: 0.08, flatShading: true, envMapIntensity: 2.2 }));
+  ball.position.set(...MC); ball.userData.dynamic = true; scene.add(ball);
   glows.push([MC[0], MC[1], MC[2], '#fff1d6', 4.5, 0.3]);
   for (let i = 0; i < 14; i++) { const a = i * 2.4, y = Math.cos(i * 1.7) * 0.9; glows.push([MC[0] + Math.cos(a) * MR * 0.95, MC[1] + y, MC[2] + Math.sin(a) * MR * 0.95, '#ffffff', 0.5, 2]); }
 
@@ -170,17 +188,17 @@ export async function build({ THREE, kit, font, renderer }) {
   /* --- свет --- */
   scene.add(new THREE.HemisphereLight('#6a3bd0', '#0c0614', 0.55));
   const L = (c, i, p, d = 45) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
-  L(PINK, 200, [0, 11.5, 37.5], 18); L(PINK, 120, [0, 8, 27], 18); L(VIO, 380, [0, 8, -8]); L(CY, 220, [-10, 5, 0]); L(PINK, 220, [10, 5, 0]); L('#fff1d6', 40, [0, 5, 0], 10); L(PINK, 70, [18, 2.8, -7.5], 9); L('#ff2a55', 90, [24, -2, -7.5], 10); L(PINK, 90, [33, LY + 2.8, -7.5], 11);
+  L(PINK, 200, [0, 11.5, 37.5], 18); L(PINK, 120, [0, 8, 27], 18); L(VIO, 380, [0, 10, -8]); L(YEL, 260, [0, 3.2, -12.4], 11); L('#ff6fd0', 160, [-5, 3, -13], 8); L('#21e0ff', 160, [5, 3, -13], 8); L('#ffffff', 90, [2.5, 12.2, 2.5], 8); L('#ffe6f4', 160, [-9.2, 3.2, 6.4], 7); L(CY, 120, [-6, 2.5, 8], 6); L('#fff1d6', 120, [0, 11, 2], 16); L(CY, 220, [-10, 5, 0]); L(PINK, 220, [10, 5, 0]); L('#fff1d6', 40, [0, 5, 0], 10); L(PINK, 70, [18, 2.8, -7.5], 9); L('#ff2a55', 90, [24, -2, -7.5], 10); L(PINK, 90, [33, LY + 2.8, -7.5], 11);
   // свет для моделей: бар с вывеской и парадная дверь в конце коридора
   L('#ffd0a0', 260, [7, 3.0, 9.6], 10); L(PINK, 220, [7, 2.8, 14.8], 9); L('#ffb15a', 140, [X3 - 1.6, LY + 2.7, CZ], 6);
   scene.add(kit.glowPoints(glows));
   // реквизит 2017 (Poly Haven, CC0): бумбокс на сцене, кассетники и бутылки на столиках лаунжа
   await Promise.all([
-    kit.prop(scene, 'boombox', { p: [-4.6, 1.0, -11.9], ry: 0.25, s: 2.2 }),
-    kit.prop(scene, 'boombox', { p: [4.8, 1.0, -11.8], ry: -0.3, s: 2.2 }),
+    kit.prop(scene, 'boombox', { p: [-13.6, 0.5, 5.6], ry: 1.4, s: 2.2 }),
     kit.prop(scene, 'portable_cassette_player', { p: [-14.4, 0.5, 2.4], ry: 0.8, s: 2.4 }),
     kit.prop(scene, 'wine_bottles_01', { p: [-14.4, 0.5, 9.4], ry: 1.2, s: 1.6 }),
-    kit.decks(scene, [0, 2.05, -12.4], 0, 1.6),
+    kit.decks(scene, [SC[0], 2.0, SC[2] + 0.35], 0, 1.4), kit.decks(scene, [SC[0], 2.0, SC[2] - 0.35], Math.PI, 1.4),
+    kit.prop(scene, 'wine_bottles_01', { p: [-4.5, 0.97, -13.6], ry: 0.5, s: 1.4 }), kit.prop(scene, 'wine_bottles_01', { p: [4.5, 0.97, -13.6], ry: 2.0, s: 1.4 }),
     kit.prop(scene, 'sf_indbar', { p: [BX, 0.0, BZ], w: 4.8 }),
     kit.prop(scene, 'sf_summer', { p: GL, h: 0.24, ry: 0.6 }),
     // подсвеченные полки с бутылками за баром
@@ -189,7 +207,7 @@ export async function build({ THREE, kit, font, renderer }) {
     kit.prop(scene, 'sf_martini', { p: [BX - 1.4, BTOP, BZ - 0.6], h: 0.18 }),
     ...[-1.6, -0.5, 0.6, 1.7].map((dx, i) => kit.prop(scene, 'bar_chair_round_01', { p: [BX + dx, 0, BZ - 1.75], ry: i % 2 ? 0.3 : -0.3, s: 1.05 })),
     // бир-понг на краю танцпола (Sketchfab «Beer Pong Table», CC BY)
-    kit.prop(scene, 'sf_beerpong', { p: [-4.6, 0.05, 2.2], ry: 0.35, w: 2.5 }),
+    kit.prop(scene, 'sf_beerpong', { p: [-9.2, 0.05, 6.4], ry: 0.25, w: 2.5 }),
   ]);
   glows.push([BX, 3.6, 15.4, '#ffe14a', 3, 0.45], [BX, 2.6, BZ, '#ff2fd0', 3.2, 0.5]);
   const built = b.build(); scene.add(built);
@@ -200,32 +218,35 @@ export async function build({ THREE, kit, font, renderer }) {
   /* --- камера --- */
   const EYE = 1.62;
   const keys = [
-    // голова поднимается от коктейля на стойке
-    { p: [GL[0], GL[1] + 0.3, GL[2] - 0.02], l: [GL[0], GL[1] - 0.5, GL[2] + 0.004], t: 0 },
-    { p: [GL[0], GL[1] + 0.45, GL[2] - 0.3], l: [GL[0], GL[1] + 0.05, GL[2]], t: 0.05 },
-    { p: [GL[0], EYE, GL[2] - 0.95], l: [BX, 2.2, 15.7], t: 0.12 },
-    // разворот: вокруг — клуб
-    { p: [GL[0] - 0.2, EYE, GL[2] - 1.2], l: [-2, 1.9, 10], t: 0.2 },
-    { p: [GL[0] - 0.5, EYE, GL[2] - 1.5], l: [0, 2.4, -13], t: 0.28 },
-    // по танцполу мимо бир-понга к сцене
-    { p: [1.5, EYE, 5.5], l: [-4.6, 0.9, 2.2], t: 0.36 },
-    { p: [-0.6, EYE, 0.5], l: [0, 2.6, -13] },
-    { p: [0.3, 1.6, -6.8], l: [0, 2.7, -14], t: 0.56 },
+    // белая вспышка дискошара: камера у самого шара
+    { p: [MC[0], MC[1] + 0.1, MC[2] + 3.0], l: MC, t: 0 },
+    // боковой отлёт, дискошар по центру кадра
+    { p: [4.2, 12.0, 4.6], l: MC, t: 0.08 },
+    { p: [9.6, 9.2, 7.6], l: [0, 10.4, -1], t: 0.17 },
+    // облёт: бар
+    { p: [10.2, 4.6, 5.0], l: [7, 1.2, 11.6], t: 0.26 },
+    // круговая сцена 360°
+    { p: [4.6, 3.6, 3.4], l: [0, 2.0, -1], t: 0.33 },
+    // бир-понг
+    { p: [-4.2, 3.2, 3.4], l: [-9.2, 0.9, 6.4], t: 0.41 },
+    // VIP-зона
+    { p: [-6.4, 3.2, -6.2], l: [0, 1.2, -13.6], t: 0.5 },
+    { p: [1.5, 2.6, -8.6], l: [0, 1.6, -14.4], t: 0.56 },
     // к выходу под WC
-    { p: [2.4, EYE, -7.6], l: [16, 2.4, -7.5], t: 0.61 },
-    { p: [9, EYE, -7.5], l: [20, 1.8, -7.5] },
-    { p: [15.4, EYE, -7.5], l: [21, 0.6, -7.5], t: 0.72 },
+    { p: [9, EYE, -7.6], l: [16, 2.4, -7.5], t: 0.63 },
+    { p: [15.4, EYE, -7.5], l: [21, 0.6, -7.5], t: 0.7 },
     // лестница вниз
-    { p: [19.3, EYE, -7.5], l: [26, -3.2, -7.5], t: 0.77 },
-    { p: [X2 - 0.4, LY + EYE + 0.15, -7.5], l: [X3, LY + 1.5, -7.5], t: 0.87 },
-    // коридор и парадная дверь
-    { p: [34, LY + EYE, -7.5], l: [X3, LY + 1.5, -7.5], t: 0.94 },
+    { p: [19.3, EYE, -7.5], l: [26, -3.2, -7.5], t: 0.76 },
+    { p: [X2 - 0.4, LY + EYE + 0.15, -7.5], l: [X3, LY + 1.5, -7.5], t: 0.83 },
+    // коридор с видео: налево, направо, налево
+    { p: [29.2, LY + EYE, -7.5], l: [30.4, LY + 1.6, CZ - 1.3], t: 0.875 },
+    { p: [32.2, LY + EYE, -7.5], l: [33.4, LY + 1.6, CZ + 1.3], t: 0.915 },
+    { p: [35.2, LY + EYE, -7.5], l: [36.4, LY + 1.6, CZ - 1.3], t: 0.955 },
     { p: [X3 - 1.1, LY + EYE, -7.5], l: [X3, LY + 1.45, -7.5], t: 1 },
   ];
   const path = kit.camPath(keys);
   const sm = (a, c, t) => { const k = Math.min(1, Math.max(0, (t - a) / (c - a))); return k * k * (3 - 2 * k); };
-  const update = (t) => door.open(0.35 * sm(0.93, 1, t));
-  const near = (t) => (t < 0.06 ? 0.005 : 0.05);
-  const calm = (t) => Math.min(1, Math.max(0, (0.14 - t) / 0.06));   // голова поднимается от коктейля — кадр по центру
-  return { scene, cam: path, update, near, calm };
+  const update = (t) => { door.open(0.35 * sm(0.93, 1, t)); ball.rotation.y = t * 9; };
+  const calm = (t) => Math.min(1, Math.max(0, (0.12 - t) / 0.06));   // отлёт от дискошара — кадр по центру
+  return { scene, cam: path, update, calm };
 }
