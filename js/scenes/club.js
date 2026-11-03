@@ -1,7 +1,8 @@
 // 03 · STAYA 2K17 — клуб в духе 2017 года. Камера от первого лица.
-// Белая вспышка дискошара под высоким потолком → боковой отлёт с дискошаром по центру кадра → облёт клуба:
-// круговая сцена 360° в центре, бар, бир-понг, VIP-зона → выход под табличкой WC → лестница вниз →
-// коридор с видео с вечеринок → парадная двустворчатая дверь, как во дворце.
+// Белая вспышка: взгляд вверх на диско-шар, вращение продолжается из POOL → опускаемся к пульту в центре круговой сцены →
+// круговой обзор: толпа слушает наш сет → свободный проход к гримёрке (BACKSTAGE) → лестница вниз →
+// коридор с видео на одной стене → парадная двустворчатая дверь, как во дворце.
+import { crowd, scatter } from '../crowd.js';
 export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M } = kit;
   const scene = new THREE.Scene();
@@ -70,10 +71,6 @@ export async function build({ THREE, kit, font, renderer }) {
   b.add(G.box(32, H, 0.4), WALL, 'matte', M([0, H / 2, -16]));
   b.add(G.box(32, 0.4, 32), '#07050c', 'matte', M([0, H + 0.2, 0]));
   b.add(G.box(32, 0.2, 32), '#0b0812', 'gloss', M([0, -0.1, 0]));
-  for (let ix = -7; ix < 7; ix++) for (let iz = -7; iz < 6; iz++) {
-    const r = R(), c = r < 0.38 ? '#1a0f2a' : r < 0.6 ? PINK : r < 0.78 ? VIO : r < 0.93 ? CY : YEL;
-    b.add(G.box(1.1, 0.05, 1.1), c, r < 0.38 ? 'gloss' : 'neon', M([ix * 1.2 + 0.6, 0.03, iz * 1.2 - 0.6]));
-  }
   for (const sx of [-1, 1]) for (const y of [2.5, 7.5, 12.5]) {
     if (sx > 0 && y < 3) { b.add(G.box(0.06, 0.08, 6.2), CY, 'neon', M([15.75, y, -11.9])); b.add(G.box(0.06, 0.08, 21.2), CY, 'neon', M([15.75, y, 4.4])); continue; }
     b.add(G.box(0.06, 0.08, 30), sx < 0 ? PINK : CY, 'neon', M([sx * 15.75, y, 0]));
@@ -81,7 +78,7 @@ export async function build({ THREE, kit, font, renderer }) {
   // рамка проёма и табличка
   b.add(G.box(0.08, 0.08, CW), PINK, 'neon', M([15.7, CH, CZ]));
   for (const sz of [-1, 1]) b.add(G.box(0.08, CH, 0.08), PINK, 'neon', M([15.7, CH / 2, CZ + sz * CW / 2]));
-  kit.text3d(b, font, 'WC', { size: 0.45, color: '#ffffff', kind: 'neon', p: [15.7, CH + 0.35, CZ], r: [0, -Math.PI / 2, 0], bevel: 0.01, depth: 0.04 });
+  kit.text3d(b, font, 'BACKSTAGE', { size: 0.24, color: '#ffffff', kind: 'neon', p: [15.7, CH + 0.35, CZ], r: [0, -Math.PI / 2, 0], bevel: 0.01, depth: 0.04 });
   glows.push([15.5, CH + 0.55, CZ, '#ffffff', 1.6, 0.8]);
 
   /* --- выход под WC: короткий коридор → лестница вниз → коридор с парочками → красная двойная дверь --- */
@@ -129,7 +126,7 @@ export async function build({ THREE, kit, font, renderer }) {
   }
   for (const sz of [-1, 1]) b.add(G.box(X3 - X2, 0.03, 0.05), '#ff2fd0', 'neon', M([(X2 + X3) / 2, LY + 0.02, CZ + sz * (CW / 2 - 0.05)]));
   // видео с вечеринок вместо постеров на стенах нижнего коридора
-  [['video/2k17-v.mp4', 30.4, -1], ['video/2k17-v2.mp4', 33.4, 1], ['video/2k17-v3.mp4', 36.4, -1]].forEach(([src, x, sz], i) =>
+  [['video/2k17-v.mp4', 30.4, -1], ['video/2k17-v2.mp4', 33.4, -1], ['video/2k17-v3.mp4', 36.4, -1]].forEach(([src, x, sz], i) =>
     kit.vScreen(scene, src, [x, LY + 0.45, CZ + sz * (CW / 2 - 0.06)], sz < 0 ? 0 : Math.PI, 2.3, { edge: [PINK, CY, PINK][i], stand: false, bezel: 0.06 }));
   for (let x = -12; x <= 12; x += 6) if (x) kit.truss(b, [x, H - 1.6, -14], [x, H - 1.6, 14], 0.45);
   for (let i = 0; i < 10; i++) {
@@ -156,18 +153,7 @@ export async function build({ THREE, kit, font, renderer }) {
     if (k % 2) kit.beam(b, [x, 8.3, z], [x * 2.4, 0, z * 2.4 + SC[2]], 1.4, c);
     else kit.laser(b, [x, 8.3, z], [Math.cos(a) * 30, 2 + (k % 3), SC[2] + Math.sin(a) * 30], k % 4 ? '#39ff6a' : PINK);
   }
-  /* --- VIP-зона у задней стены: подиум, диваны, ограждение, неон --- */
-  b.add(G.rbox(13, 0.45, 5, 0.06), '#1a0f22', 'gloss', M([0, 0.22, -13.4]));
-  b.add(G.box(13, 0.05, 0.05), YEL, 'neon', M([0, 0.46, -10.9]));
-  for (const x of [-4.5, 0, 4.5]) {
-    b.add(G.rbox(3.2, 0.5, 1.1, 0.15), '#3a0a2a', 'plastic', M([x, 0.7, -15.1])); b.add(G.rbox(3.2, 1.0, 0.35, 0.12), '#3a0a2a', 'plastic', M([x, 1.2, -15.55]));
-    b.add(G.cyl(0.55, 0.55, 0.05, 24), '#d9a441', 'metal', M([x, 0.95, -13.6])); b.add(G.cyl(0.08, 0.1, 0.5, 8), '#d9a441', 'metal', M([x, 0.7, -13.6]));
-  }
-  for (let x = -6; x <= 6; x += 1.5) { b.add(G.cyl(0.04, 0.05, 0.95, 8), '#d9a441', 'metal', M([x, 0.45 + 0.47, -10.9])); b.add(G.sph(0.07, 10, 8), '#d9a441', 'metal', M([x, 1.43, -10.9])); }
-  for (let x = -6; x < 6; x += 1.5) b.add(G.tube([[x, 1.3, -10.9], [x + 0.75, 1.05, -10.85], [x + 1.5, 1.3, -10.9]], 0.035, 12, 6), '#8a0a1a', 'plastic');
-  kit.text3d(b, font, 'VIP', { size: 1.4, color: YEL, kind: 'neon', p: [0, 4.6, -15.7], bevel: 0.02, depth: 0.08 });
   kit.text3d(b, font, 'STAYA', { size: 1.3, color: '#ff4fe0', p: [0, 11.5, -15.2] });
-  glows.push([0, 4.6, -15.3, YEL, 6, 0.4]);
 
   /* --- диско-шар под потолком --- */
   const MR = 1.6, MC = [0, 12.8, -1];
@@ -179,10 +165,6 @@ export async function build({ THREE, kit, font, renderer }) {
   glows.push([MC[0], MC[1], MC[2], '#fff1d6', 2.2, 0.22]);
   for (let i = 0; i < 14; i++) { const a = i * 2.4, y = Math.cos(i * 1.7) * 0.9; glows.push([MC[0] + Math.cos(a) * MR * 0.95, MC[1] + y, MC[2] + Math.sin(a) * MR * 0.95, '#ffffff', 0.5, 2]); }
 
-  // полки-светильники за баром (неон, без запекания)
-  for (const y of [1.62, 2.22]) { b.add(G.box(4.6, 0.04, 0.34), '#ffd6f0', 'neon', M([7, y, 15.62])); glows.push([7, y + 0.2, 15.5, PINK, 3.4, 0.35]); }
-  /* --- бар, с которого начинается сцена (Sketchfab «Modern Industrial Bar», CC BY) --- */
-  const BX = 7, BZ = 11.6, BTOP = 0.96, GL = [6.55, BTOP, 10.75];
   /* --- 2017: спиннеры, кальяны, розовое вино, лайк --- */
   kit.spinner(b, [-15.6, 5.2, -4], [0, Math.PI / 2, 0.3], 1.9, '#2f7bff');
   kit.spinner(b, [-15.6, 4.6, 8], [0, Math.PI / 2, 1.1], 1.4, '#ffd23f');
@@ -213,15 +195,6 @@ export async function build({ THREE, kit, font, renderer }) {
   brickWall(32, H, [0, H / 2, -15.78], 0);
   brickWall(7.2, H, [15.78, H / 2, -12.4], -Math.PI / 2); brickWall(22.2, H, [15.78, H / 2, 4.9], -Math.PI / 2); brickWall(CW, H - CH, [15.78, CH + (H - CH) / 2, CZ], -Math.PI / 2);
   brickWall(14.2, H, [-8.9, H / 2, 15.78], Math.PI); brickWall(14.2, H, [8.9, H / 2, 15.78], Math.PI); brickWall(3.6, H - 4.4, [0, 4.4 + (H - 4.4) / 2, 15.78], Math.PI);
-  /* --- стена за баром: тёплая подсветка за полками и неон BAR --- */
-  const barGlow = kit.canvasTex(1024, 512, (x, w2, h2) => {
-    const g = x.createLinearGradient(0, 0, 0, h2); g.addColorStop(0, '#3a0a2a'); g.addColorStop(0.45, '#ff6a8a'); g.addColorStop(0.8, '#ffb36b'); g.addColorStop(1, '#5a1a1a'); x.fillStyle = g; x.fillRect(0, 0, w2, h2);
-    x.globalAlpha = 0.35; for (let i = 0; i < 9; i++) { const gx = x.createLinearGradient(i * w2 / 8 - 40, 0, i * w2 / 8 + 40, 0); gx.addColorStop(0, 'rgba(255,255,255,0)'); gx.addColorStop(0.5, '#fff3e0'); gx.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gx; x.fillRect(i * w2 / 8 - 40, 0, 80, h2); }
-  });
-  const bw2 = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 2.6), new THREE.MeshBasicMaterial({ map: barGlow, color: '#b8a0b0' }));
-  bw2.position.set(7, 1.95, 15.74); bw2.rotation.y = Math.PI; scene.add(bw2);
-  kit.text3d(b, font, 'BAR', { size: 0.75, color: '#ffe14a', kind: 'neon', p: [7, 3.6, 15.7], r: [0, Math.PI, 0], bevel: 0.01, depth: 0.05 });
-  glows.push([7, 3.95, 15.4, '#ffe14a', 4, 0.35]);
   // бир-понг: неон над столом
   kit.text3d(b, font, 'BEER PONG', { size: 0.5, color: '#21e0ff', kind: 'neon', p: [-15.7, 4.4, 6.4], r: [0, Math.PI / 2, 0], bevel: 0.01, depth: 0.04 });
   glows.push([-15.4, 4.6, 6.4, '#21e0ff', 5, 0.3]);
@@ -230,9 +203,9 @@ export async function build({ THREE, kit, font, renderer }) {
   /* --- свет --- */
   scene.add(new THREE.HemisphereLight('#6a3bd0', '#0c0614', 0.55));
   const L = (c, i, p, d = 45) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
-  L(PINK, 200, [0, 11.5, 37.5], 18); L(PINK, 120, [0, 8, 27], 18); L(VIO, 380, [0, 10, -8]); L(YEL, 260, [0, 3.2, -12.4], 11); L('#ff6fd0', 160, [-5, 3, -13], 8); L('#21e0ff', 160, [5, 3, -13], 8); L('#ffffff', 90, [2.5, 12.2, 2.5], 8); L('#ffe6f4', 160, [-9.2, 3.2, 6.4], 7); L(CY, 120, [-6, 2.5, 8], 6); L('#fff1d6', 120, [0, 11, 2], 16); L(CY, 220, [-10, 5, 0]); L(PINK, 220, [10, 5, 0]); L('#fff1d6', 40, [0, 5, 0], 10); L(PINK, 70, [18, 2.8, -7.5], 9); L('#ff2a55', 90, [24, -2, -7.5], 10); L(PINK, 90, [33, LY + 2.8, -7.5], 11);
-  // свет для моделей: бар с вывеской и парадная дверь в конце коридора
-  L('#ffd0a0', 260, [7, 3.0, 9.6], 10); L(PINK, 220, [7, 2.8, 14.8], 9); L('#ffb15a', 140, [X3 - 1.6, LY + 2.7, CZ], 6);
+  L(PINK, 200, [0, 11.5, 37.5], 18); L(PINK, 120, [0, 8, 27], 18); L(VIO, 380, [0, 10, -8]); L('#ffffff', 90, [2.5, 12.2, 2.5], 8); L('#ffe6f4', 160, [-9.2, 3.2, 6.4], 7); L(CY, 120, [-6, 2.5, 8], 6); L('#fff1d6', 120, [0, 11, 2], 16); L(CY, 220, [-10, 5, 0]); L(PINK, 220, [10, 5, 0]); L('#fff1d6', 40, [0, 5, 0], 10); L(PINK, 70, [18, 2.8, -7.5], 9); L('#ff2a55', 90, [24, -2, -7.5], 10); L(PINK, 90, [33, LY + 2.8, -7.5], 11);
+  // свет у парадной двери в конце коридора
+  L('#ffb15a', 140, [X3 - 1.6, LY + 2.7, CZ], 6);
   scene.add(kit.glowPoints(glows));
   // реквизит 2017 (Poly Haven, CC0): бумбокс на сцене, кассетники и бутылки на столиках лаунжа
   await Promise.all([
@@ -240,22 +213,9 @@ export async function build({ THREE, kit, font, renderer }) {
     kit.prop(scene, 'portable_cassette_player', { p: [-14.4, 0.5, 2.4], ry: 0.8, s: 2.4 }),
     kit.prop(scene, 'wine_bottles_01', { p: [-14.4, 0.5, 9.4], ry: 1.2, s: 1.6 }),
     kit.decks(scene, [SC[0], 2.0, SC[2] + 0.35], 0, 1.4), kit.decks(scene, [SC[0], 2.0, SC[2] - 0.35], Math.PI, 1.4),
-    kit.prop(scene, 'wine_bottles_01', { p: [-4.5, 0.97, -13.6], ry: 0.5, s: 1.4 }), kit.prop(scene, 'wine_bottles_01', { p: [4.5, 0.97, -13.6], ry: 2.0, s: 1.4 }),
-    kit.prop(scene, 'sf_indbar', { p: [BX, 0.0, BZ], w: 4.8 }).then((m) => {
-      // над стойкой у модели висит полка с перилами — в кадре она выглядела как строительные леса
-      m.updateMatrixWorld(true);
-      m.traverse((c) => { if (c.isMesh && new THREE.Box3().setFromObject(c).min.y > 1.9) c.visible = false; });
-    }),
-    kit.prop(scene, 'sf_summer', { p: GL, h: 0.24, ry: 0.6 }),
-    // подсвеченные полки с бутылками за баром
-    ...[-1.6, -0.5, 0.6, 1.7].flatMap((dx, i) => [kit.prop(scene, 'wine_bottles_01', { p: [BX + dx, 1.66, 15.62], ry: i, s: 1.3 }), kit.prop(scene, 'wine_bottles_01', { p: [BX + dx + 0.3, 2.26, 15.62], ry: i + 2, s: 1.3 })]),
-    kit.prop(scene, 'wine_bottles_01', { p: [BX + 1.3, BTOP, BZ + 0.2], ry: 0.4, s: 1.4 }),
-    kit.prop(scene, 'sf_martini', { p: [BX - 1.4, BTOP, BZ - 0.6], h: 0.18 }),
-    ...[-1.6, -0.5, 0.6, 1.7].map((dx, i) => kit.prop(scene, 'bar_chair_round_01', { p: [BX + dx, 0, BZ - 1.75], ry: i % 2 ? 0.3 : -0.3, s: 1.05 })),
     // бир-понг на краю танцпола (Sketchfab «Beer Pong Table», CC BY)
     kit.prop(scene, 'sf_beerpong', { p: [-9.2, 0.05, 6.4], ry: 0.25, w: 2.5 }),
   ]);
-  glows.push([BX, 3.6, 15.4, '#ffe14a', 3, 0.45], [BX, 2.6, BZ, '#ff2fd0', 3.2, 0.5]);
   const built = b.build(); scene.add(built);
   // дым: лучи прожекторов становятся видимыми объёмами
   kit.haze(scene, { box: [-15, 15, 1.2, 10, -15, 14], colors: ['#ff2fd0', '#8a3dff', '#2fe6ff'], n: 36, size: 12, opacity: 0.19 });
@@ -263,36 +223,40 @@ export async function build({ THREE, kit, font, renderer }) {
   kit.haze(scene, { box: [17, 39, -5, 2.8, -8.6, -6.4], colors: ['#ff3fb4'], n: 8, size: 4, opacity: 0.14, seed: 9 });
   await kit.applyBake(scene, built, 'club', { k: 26 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
 
+  /* --- толпа вокруг круговой сцены: мы — артист, все слушают наш сет; свободен только проход к гримёрке --- */
+  const exit = [16, -7.5];
+  const segD = (x, z) => { const ux = exit[0] - SC[0], uz = exit[1] - SC[2], t = Math.max(0, Math.min(1, ((x - SC[0]) * ux + (z - SC[2]) * uz) / (ux * ux + uz * uz))); return Math.hypot(x - SC[0] - ux * t, z - SC[2] - uz * t); };
+  const spots = scatter(SC[0], SC[2], SR + 0.9, 16, 0.8, (x, z) => Math.abs(x) < 15.2 && Math.abs(z) < 15.2 && segD(x, z) > 1.6 && Math.hypot(x + 9.2, z - 6.4) > 2.4 && !(x < -12.6 && z > 0.5 && z < 12) && !(Math.abs(x) < 2.8 && z > 12.2), 5, 6000);
+  const fans = crowd({ pos: spots, rim: [PINK, CY, VIO], fog: scene.fog, seed: 9 }); scene.add(fans);
+
   /* --- камера --- */
-  const EYE = 1.62;
+  const EYE = 1.62, SY = 2.6;
+  // начало: смотрим вверх на диско-шар и продолжаем вращение из POOL (та же скорость), опускаемся к пульту в центре круговой сцены,
+  // голова опускается — круговой обзор толпы; вращение плавно гаснет, когда впереди проход к гримёрке
+  const W0 = ((2 * Math.PI) / 0.2) / 1.8 * 1.6, D0 = 0.5, TOT = W0 * D0 / 2, A1 = Math.atan2(-(exit[1] - SC[2]), exit[0] - SC[0]) + 4 * Math.PI, A0 = A1 - TOT;
   const keys = [
-    // белая вспышка дискошара: камера у самого шара
-    { p: [MC[0], MC[1] + 0.1, MC[2] + 1.9], l: MC, t: 0 },
-    // боковой отлёт, дискошар по центру кадра
-    { p: [4.2, 12.0, 4.6], l: MC, t: 0.08 },
-    { p: [9.6, 9.2, 7.6], l: [0, 10.4, -1], t: 0.17 },
-    // облёт: бар
-    { p: [10.2, 4.6, 5.0], l: [7, 1.2, 11.6], t: 0.26 },
-    // круговая сцена 360°
-    { p: [4.6, 3.6, 3.4], l: [0, 2.0, -1], t: 0.33 },
-    // бир-понг
-    { p: [-4.2, 3.2, 3.4], l: [-9.2, 0.9, 6.4], t: 0.41 },
-    // VIP-зона
-    { p: [-6.4, 3.2, -6.2], l: [0, 1.2, -13.6], t: 0.5 },
-    { p: [1.5, 2.6, -8.6], l: [0, 1.6, -14.4], t: 0.56 },
-    // к выходу под WC
-    { p: [9, EYE, -7.6], l: [16, 2.4, -7.5], t: 0.63 },
+    { p: [SC[0], SY, SC[2]], l: [exit[0], 2.2, exit[1]], t: 0.5 },
+    { p: [4.6, 2.3, -2.9], l: [exit[0], 2.2, exit[1]], t: 0.56 },
+    { p: [9, EYE, -5.2], l: [16, 2.4, -7.5], t: 0.63 },
+    // в проход к гримёрке
     { p: [15.4, EYE, -7.5], l: [21, 0.6, -7.5], t: 0.7 },
     // лестница вниз
     { p: [19.3, EYE, -7.5], l: [26, -3.2, -7.5], t: 0.76 },
     { p: [X2 - 0.4, LY + EYE + 0.15, -7.5], l: [X3, LY + 1.5, -7.5], t: 0.83 },
-    // коридор с видео: налево, направо, налево
-    { p: [29.2, LY + EYE, -7.5], l: [30.4, LY + 1.6, CZ - 1.3], t: 0.875 },
-    { p: [32.2, LY + EYE, -7.5], l: [33.4, LY + 1.6, CZ + 1.3], t: 0.915 },
-    { p: [35.2, LY + EYE, -7.5], l: [36.4, LY + 1.6, CZ - 1.3], t: 0.955 },
+    // коридор: все видео на левой стене — голова поворачивается только в одну сторону
+    { p: [29.2, LY + EYE, -7.5], l: [30.8, LY + 1.6, CZ - 0.95], t: 0.875 },
+    { p: [32.2, LY + EYE, -7.5], l: [33.8, LY + 1.6, CZ - 0.95], t: 0.915 },
+    { p: [35.2, LY + EYE, -7.5], l: [36.8, LY + 1.6, CZ - 0.95], t: 0.955 },
     { p: [X3 - 1.1, LY + EYE, -7.5], l: [X3, LY + 1.45, -7.5], t: 1 },
   ];
-  const path = kit.camPath(keys);
+  const path = kit.camPath(keys), out = { p: new THREE.Vector3(), l: new THREE.Vector3() };
+  const cam = (t) => {
+    if (t >= D0) return path(t);
+    const u = t / D0, a = A0 + TOT * (2 * u - u * u), pitch = 1.47 - 1.57 * sm(0, 0.2, t);
+    out.p.set(SC[0], 9.2 + (SY - 9.2) * sm(0.02, 0.22, t), SC[2]);
+    out.l.set(Math.cos(a) * Math.cos(pitch), Math.sin(pitch), -Math.sin(a) * Math.cos(pitch)).multiplyScalar(10).add(out.p);
+    return out;
+  };
   const sm = (a, c, t) => { const k = Math.min(1, Math.max(0, (t - a) / (c - a))); return k * k * (3 - 2 * k); };
   // шарик бир-понга летит в стаканы и отскакивает
   const pong = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }));
@@ -300,11 +264,12 @@ export async function build({ THREE, kit, font, renderer }) {
   const PT = [-9.2, 0.05, 6.4], ca = Math.cos(0.25), sa = Math.sin(0.25), TOPY = 0.82;
   const update = (t) => {
     const now = performance.now() / 1000;
+    fans.userData.tick(now);
     door.open(0.35 * sm(0.93, 1, t)); ball.rotation.y = t * 9 + now * 0.5; ball.material.uniforms.time.value = now;
     const q = (now % 1.7) / 1.7, lx = -1.05 + q * 1.95;
     const ly = q < 0.62 ? TOPY + 0.35 + Math.sin((q / 0.62) * Math.PI) * 0.75 - (q / 0.62) * 0.3 : TOPY + 0.05 + Math.abs(Math.sin(((q - 0.62) / 0.38) * Math.PI * 2)) * 0.18 * (1 - (q - 0.62) / 0.38);
     pong.position.set(PT[0] + lx * ca, ly, PT[2] - lx * sa);
   };
-  const calm = (t) => Math.min(1, Math.max(0, (0.12 - t) / 0.06));   // отлёт от дискошара — кадр по центру
-  return { scene, cam: path, update, calm };
+  const calm = (t) => Math.min(1, Math.max(0, (0.56 - t) / 0.06));   // вращение со сцены — без влияния головы и курсора
+  return { scene, cam, update, calm };
 }

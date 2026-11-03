@@ -46,6 +46,12 @@ export const CREDITS = [
   { what: 'Lamborghini Gallardo 2010', who: 'Artem P · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/lamborghini-gallardo-2010-ff0eb2242d0e42eb8b7034b4db639e56' },
   { what: 'Porsche 911 (930) Turbo 1975', who: 'Lexyc16 · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/porsche-911-930-turbo-1975-de1ffd344c41481892511f7fd332c136' },
   { what: 'Mercedes-Benz 300 SL Gullwing', who: 'Lexyc16 · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/mercedes-benz-300-sl-gullwing-505241c829c540a4921533000736904e' },
+  { what: 'Mercedes Benz G-class W263', who: 'Lexyc16 · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/mercedes-benz-g-class-w263-1a2a52b16cad4e618af347461817895c' },
+  { what: 'Rolls Royce Cullinan', who: 'NewViStudios · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/rolls-royce-cullinan-61f16a1d5be2403abcdd8fa552f730f7' },
+  { what: 'Ferrari 288 GTO', who: 'Randomness · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/ferrari-288-gto-e83da098149746b5a3ba6f1661645b09' },
+  { what: 'Koenigsegg One:1', who: 'iSteven · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/koenigsegg-one1-b4e5a4c5fa5d4d45acd6715d3325254f' },
+  { what: 'Porsche 911 GT3 RS (991.1) ’16', who: 'Mona x Supercars · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/porsche-911-gt3-rs-9911-16-c08b312e73754d0db8ab1e266eca8a28' },
+  { what: 'Creepy Teen Girl', who: 'Purple.Point · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/creepy-teen-girl-638cbdfa3430453898f30b6b90cbe130' },
   { what: 'Fancy Picture Frame 01', who: 'Rob Tuytel · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/fancy_picture_frame_01' },
   // картины во дворце — открытая коллекция Cleveland Museum of Art (CC0)
   { what: 'Scenes of Witchcraft: Night', who: 'Salvator Rosa · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1977.37.4' },
