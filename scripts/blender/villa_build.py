@@ -150,10 +150,19 @@ for x0, x1 in [(-VX + 0.5, -4.2), (4.2, VX - 0.5)]:
     box(((x0 + x1) / 2, Y2 + 1.8, 8.0), (x1 - x0, 3.6, 0.03), GLASSM, 'glass')
     box(((x0 + x1) / 2, Y2 + 1.8, 8.05), (x1 - x0, 3.4, 0.06), mat('bedroom_glow', srgb('#3a2a1e'), 0.6), 'far')
 for x in (-10, -7, 7, 10): box((x, Y2 + 3.5, 8.3), (1.6, 0.04, 0.06), N_WARM, 'neon')
-# диджейская стойка лицом к морю (пульт ставится на сайте)
-box((0, Y2 + 0.55, 6.0), (3.2, 1.1, 0.9), mat('booth', srgb('#f4efe6'), 0.35), 'near', bevel=0.03)
-box((0, Y2 + 0.85, 5.54), (3.0, 0.05, 0.02), N_VIP, 'neon')
-for sx in (-1, 1): box((sx * 3.0, Y2 + 0.9, 6.4), (0.7, 1.8, 0.7), CHAR, 'near', bevel=0.03)
+# диджейская сцена-балкон под навесом крыши: подиум, большая стойка, колонки (пульт ставится на сайте)
+PZ = 4.6; PDH = 0.35
+box((0, Y2 + PDH / 2, PZ + 0.4), (12, PDH, 5.6), OAK, 'near', bevel=0.02)
+box((0, Y2 + PDH + 0.02, PZ - 2.38), (12, 0.04, 0.04), N_VIP, 'neon')
+box((0, Y2 + PDH + 0.6, PZ), (4.6, 1.2, 1.1), mat('booth', srgb('#f4efe6'), 0.35), 'near', bevel=0.03)
+box((0, Y2 + PDH + 0.95, PZ - 0.57), (4.4, 0.05, 0.02), N_VIP, 'neon')
+for sx in (-1, 1):
+    box((sx * 4.2, Y2 + PDH + 0.9, PZ + 0.6), (1.0, 1.8, 0.9), CHAR, 'near', bevel=0.03)
+    box((sx * 4.2, Y2 + PDH + 2.35, PZ + 0.6), (0.8, 1.1, 0.8), CHAR, 'near', bevel=0.03)
+# навес: крыша второго этажа выдвинута вперёд над сценой, тонкие бронзовые колонны
+box((0, Y2 + 3.75, 4.9), (15, 0.3, 6.4), PLASTER, 'far'); box((0, Y2 + 3.58, 4.9), (14.8, 0.06, 6.2), OAK, 'far')
+for sx in (-1, 1): cyl((sx * 7.1, Y2, 2.0), (sx * 7.1, Y2 + 3.6, 2.0), 0.09, BRONZE, 'near', seg=12)
+for x in (-6, -3, 0, 3, 6): box((x, Y2 + 3.55, 3.2), (1.2, 0.03, 0.08), N_WARM, 'neon')
 # бассейн на крыше слева: приподнятая чаша с каменным бортом, вода — на сайте
 RX0, RX1, RZ0, RZ1 = -12.6, -5.0, -2.6, 4.6
 box(((RX0 + RX1) / 2, Y2 + 0.06, (RZ0 + RZ1) / 2), (RX1 - RX0, 0.08, RZ1 - RZ0), POOLT, 'near')
@@ -299,8 +308,9 @@ for i in range(5): light('POINT', (-2.3, 0.3, 17.4 + i * 4.6), srgb('#ffc37a'), 
 light('AREA', (0, 6, 22), srgb('#ffc890'), 1600, size=10, target=(0, 2, VZ1))
 for x in range(-8, 9, 4): light('POINT', (x, -1.0, PZ0 - 0.3), srgb('#9fe8ff'), 220, size=0.3)
 light('POINT', (JX, 0.2, JZ), srgb('#2fe6ff'), 160, size=0.3)
-light('AREA', (0, Y2 + 4.5, 2), srgb('#ffd6a0'), 900, size=8, target=(0, Y2, 4))
-light('POINT', (0, Y2 + 1.2, 5.2), srgb('#ff3fb4'), 40, size=0.3)
+light('AREA', (0, Y2 + 4.5, -2.5), srgb('#ffd6a0'), 900, size=8, target=(0, Y2, 3))
+light('POINT', (0, Y2 + 1.4, PZ - 1.4), srgb('#ff3fb4'), 60, size=0.3)
+light('AREA', (0, Y2 + 3.4, 4.2), srgb('#ffd6a0'), 500, size=6, target=(0, Y2, 4.4))
 for x in (-11, -8.8, -6.6): light('POINT', (x, Y2 + 0.4, RZ0 + 0.6), srgb('#9fe8ff'), 60, size=0.2)
 
 sc.render.engine = 'CYCLES'; sc.cycles.device = 'CPU'
