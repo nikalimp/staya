@@ -15,9 +15,9 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const SCENES = [
-  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.4, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.95, 'splash']] },
-  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.95, out: 'black', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.9, 'clink'], [0.96, 'gulp']] },
-  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.45, out: 'black', sfx: [[0.03, 'clink'], [0.97, 'door']] },
+  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.7, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.93, 'whoosh'], [0.97, 'splash']] },
+  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.8, out: 'white', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.94, 'chime']] },
+  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.6, out: 'black', sfx: [[0.02, 'chime'], [0.97, 'door']] },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.03, 'door'], [0.9, 'whoosh']] },
   { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975, sfx: [[0.7, 'whoosh'], [0.81, 'chime']] },
 ];
@@ -49,6 +49,7 @@ LINKS.filter((l) => l.href).forEach((l) => {
 
 /* ---------- рендерер ---------- */
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, powerPreference: 'high-performance' });
+kit.useRenderer(renderer);
 renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
@@ -156,7 +157,7 @@ function gToScroll(g) { const i = Math.min(N - 1, Math.floor(g)); return (cum[i]
 
 let cur = 0, target = 0, lastG = -1, curIdx = -1, started = false, jumping = false;
 // Стык 'black' уходит в чёрный, 'water' — в синеву воды (нырок AQUA → выныривание в POOL), 'cut' — склейка без затемнения
-const FADE_COLOR = { black: '#000', water: '#0a5f8f' };
+const FADE_COLOR = { black: '#000', water: '#0a5f8f', white: '#fff' };
 function blackAt(i, t) {
   let k = 0, c = '#000';
   const inT = i === 0 ? 'black' : SCENES[i - 1].out, outT = SCENES[i].out;

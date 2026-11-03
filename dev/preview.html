@@ -3,7 +3,7 @@
 <script type="module">
 // Просмотр ассетов: ?a=name1,name2 — ставит модели в ряд, пишет габариты в window.__dims
 import * as THREE from 'three'; import * as kit from '../js/kit.js';
-const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(1200, 700); document.body.appendChild(r.domElement);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(1200, 700); kit.useRenderer(r); document.body.appendChild(r.domElement);
 r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping;
 const s = new THREE.Scene(); s.background = new THREE.Color('#9a9aa0');
 s.add(new THREE.HemisphereLight('#fff', '#556', 2)); const d = new THREE.DirectionalLight('#fff', 2.5); d.position.set(3, 5, 4); s.add(d);

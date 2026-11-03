@@ -261,30 +261,8 @@ TENT = [
 ]
 for pts in TENT: tube(pts, 1.0, INF_OCTO, 'gloss', taper=(1.05, 0.22), res=10)
 
-# ---------- электро-сцена: в конце коридора из экранов, лицом к бассейну (-Z) ----------
-# строится в исходной ориентации (лицом к -X), затем поворачивается на -90° вокруг своего центра
-EX, EZ = 14.0, 44.0
-_before_e = set(bpy.data.objects)
-box((EX, 0.6, EZ), (8, 1.2, 14), DARK, 'far', bevel=0.04)
-box((EX - 4, 0.03, EZ), (30, 0.06, 26), mat('asphalt', srgb('#15131c'), 0.7), 'far')
-for z in (EZ - 7, EZ + 7):
-    for x in (EX - 3.4, EX + 3.4): truss((x, 1.2, z), (x, 10, z))
-for x in (EX - 3.4, EX + 3.4): truss((x, 10, EZ - 7), (x, 10, EZ + 7))
-truss((EX - 3.4, 10, EZ - 7), (EX + 3.4, 10, EZ - 7)); truss((EX - 3.4, 10, EZ + 7), (EX + 3.4, 10, EZ + 7))
-box((EX + 3.85, 5.6, EZ), (0.2, 8, 14), DARK, 'far')
-box((EX - 1.2, 1.2 + 0.55, EZ), (0.9, 1.1, 3.2), DARK, 'far', bevel=0.03)
-box((EX - 1.66, 1.2 + 0.85, EZ), (0.03, 0.06, 3.0), N_PAR['cyan'], 'neon')
-logo((EX - 1.67, 1.2 + 0.55, EZ), 2.2, math.radians(-90))
-for sz in (-1, 1):
-    speaker(EX - 2.4, 1.2, EZ + sz * 5.2, 2.2, math.radians(-90)); speaker(EX - 2.4, 3.4, EZ + sz * 5.2, 1.6, math.radians(-90))
-for i in range(6):
-    z = EZ - 5 + i * 2
-    cyl((EX - 3.4, 9.75, z), (EX - 3.8, 9.35, z), 0.2, DARK, 'far', seg=12, r2=0.24)
-    sph((EX - 3.86, 9.3, z), 0.16, N_PAR['cyan' if i % 2 else 'pink'], 'neon')
-RC = (EX + 0.5, 15.5, EZ)   # Луна над сценой — на сайте
-inflated('ELECTRO', mat('inf_blue', srgb('#2f5bff'), 0.16, coat=1), (EX - 6.4, 0.05, EZ), 1.35, ry=math.radians(-90))
-_rot_e = Matrix.Translation(P(EX, 0, EZ)) @ Matrix.Rotation(math.radians(-90), 4, 'Z') @ Matrix.Translation(-P(EX, 0, EZ))
-for o in set(bpy.data.objects) - _before_e: o.matrix_world = _rot_e @ o.matrix_world
+# электро-сцены больше нет: за коридором экранов — танцпол с аркой и Луной (собирается на сайте)
+EX, EZ = 36.0, -1.0
 
 HZ = 19.0   # дома нет: за баром сад и забор
 
@@ -313,9 +291,8 @@ for i in range(16):
     cyl((x, 0, z), (x, h * 0.4, z), 0.3, TRUNK, 'far', seg=8)
     sph((x, h * 0.75, z), 2.4 + random.random(), TREE, 'far', s=(1, 1.3, 1), seg=12)
 for x in range(-40, 80, 2): box((x, 1.2, -32), (1.85, 2.4, 0.12), FENCE, 'far')
-for x in range(-40, 80, 2): box((x, 1.2, 62), (1.85, 2.4, 0.12), FENCE, 'far')
-for z in range(-30, 62, 2): box((40, 1.2, z), (0.12, 2.4, 1.85), FENCE, 'far') if z > 32 else None
-for z in range(-30, 62, 2): box((-40, 1.2, z), (0.12, 2.4, 1.85), FENCE, 'far')
+for x in range(-40, 80, 2): box((x, 1.2, 34), (1.85, 2.4, 0.12), FENCE, 'far')
+for z in range(-30, 34, 2): box((-40, 1.2, z), (0.12, 2.4, 1.85), FENCE, 'far')
 for x, z in [(-19, -6), (19, -7), (-16, HZ), (-6, HZ), (6, HZ), (16, HZ)]: cyl((x, 0, z), (x, 7.5, z), 0.08, METAL, 'far', seg=8)
 strings = [((-16, 7.5, HZ), (-19, 6.5, -6)), ((-6, 7.5, HZ), (-8, 9.0, SZ + 2.4)), ((6, 7.5, HZ), (8, 9.0, SZ + 2.4)), ((16, 7.5, HZ), (19, 6.5, -7)),
            ((-19, 6.5, -6), (-8, 9.0, SZ + 2.4)), ((19, 6.5, -7), (8, 9.0, SZ + 2.4))]
@@ -351,8 +328,6 @@ for i, c in enumerate(pars):
     light('SPOT', (x, 8.45, SZ + 2.85), srgb(cols[c]), 1800, size=0.2, target=(x * 1.4, 0.3, -1 + (i % 3) * 2), spot=math.radians(30))
 light('AREA', (0, 6, SZ + 6), srgb('#ff4fb8'), 2200, size=8, target=(0, 4, SZ))
 light('AREA', (0, 22, SZ + 10), srgb('#b04dff'), 9000, size=10, target=OC)
-light('AREA', (EX, 8, EZ - 10), srgb('#2f6bff'), 9000, size=10, target=(EX, 4, EZ))
-light('AREA', (EX, 18, EZ - 8), srgb('#2fe6ff'), 2000, size=6, target=(EX, 6, EZ))
 light('AREA', (12.6, 5, 8), srgb('#ffb36b'), 900, size=4, target=(12.6, 1, 13))   # свет над баром
 for q in BULBS[::6]: light('POINT', (q[0], q[1] - 0.3, q[2]), srgb('#ffd28a'), 60, size=0.2)
 
