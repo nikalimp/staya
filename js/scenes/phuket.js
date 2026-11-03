@@ -6,7 +6,7 @@ const BASE = 'world/villa/';
 const Y2 = 5.2;   // пол второго этажа: терраса с бассейном и диджейской стойкой
 
 import { CREDITS, DEV } from '../credits.js';
-export async function build({ THREE, kit, renderer, mobile }) {
+export async function build({ THREE, kit, font, renderer, mobile }) {
   const { Builder } = kit;
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2('#e9a27a', 0.0016);
@@ -75,10 +75,28 @@ export async function build({ THREE, kit, renderer, mobile }) {
   const roof = kit.water(7.4, 7.0, '#2aa6b0', { tile: 3, ei: 0.4, emissive: '#1a8a9a', opacity: 0.86 });
   roof.position.set(-8.8, Y2 + 0.72, 1.0); scene.add(roof);
   /* --- второй этаж: пульт Pioneer и экран с видео; пальмы у виллы и на террасе (Sketchfab, CC BY) --- */
-  const props = [kit.decks(scene, [0, Y2 + 1.1, 6.0], Math.PI, 1.6)];
-  kit.vScreen(scene, 'video/phuket2.mp4', [0, Y2 + 0.25, 7.74], Math.PI, 3.1, { edge: '#ffb070', stand: false });
-  /* --- видео с вечеринок в гостиной: картина в раме над камином и холст на мольберте у кухни --- */
-  props.push(kit.painting(scene, 'video/phuket2.mp4', { video: true, p: [-13.2, 3.25, 7], ry: Math.PI / 2, h: 2.5 }));
+  // диджейская сцена-балкон под навесом: пульт Pioneer на большой стойке, неоновая надпись на простенке
+  const props = [kit.decks(scene, [0, Y2 + 0.35 + 1.2, 4.6], Math.PI, 1.9)];
+  const nb = new Builder(); kit.text3d(nb, font, 'STAYA', { size: 0.9, color: '#ff3fb4', kind: 'neon', p: [0, Y2 + 2.4, 7.76], r: [0, Math.PI, 0], bevel: 0.01, depth: 0.05 }); scene.add(nb.build());
+  glows.push([0, Y2 + 2.6, 7.4, '#ff3fb4', 4, 0.5]);
+  /* --- видео с вечеринок в гостиной: картина в раме на стене перед диваном и холст на мольберте у кухни --- */
+  props.push(kit.painting(scene, 'video/phuket2.mp4', { video: true, p: [-5, 2.5, 13.68], ry: Math.PI, h: 2.3 }));
+  /* --- машины у въезда и на боковой террасе (Sketchfab, CC BY): видны в начале и при развороте ко второму этажу --- */
+  props.push(
+    kit.prop(scene, 'sf_car_porsche', { p: [-6.4, 0.0, 37.5], ry: 0.6, w: 4.3 }),
+    kit.prop(scene, 'sf_car_merc', { p: [9.4, 0.0, 41.5], ry: -0.5, w: 4.5 }),
+    kit.prop(scene, 'sf_car_lambo', { p: [-22.5, 0.0, 3.5], ry: -2.4, w: 4.4 }),
+  );
+  /* --- далёкие острова: простые узнаваемые силуэты в дымке, по сторонам от солнца --- */
+  { const iM = new THREE.MeshStandardMaterial({ color: '#8a8f86', roughness: 1, flatShading: true });
+    const RI = kit.rng(9);
+    for (const [ang, dist, w, h] of [[-0.62, 760, 150, 46], [-0.44, 980, 210, 70], [0.38, 820, 170, 52], [0.58, 1050, 240, 64], [0.5, 640, 70, 24]]) {
+      const g = new THREE.IcosahedronGeometry(1, 3), pos = g.attributes.position;
+      for (let i = 0; i < pos.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(pos, i); const k = 1 + (RI() - 0.5) * 0.35; pos.setXYZ(i, v.x * k, Math.max(v.y, -0.2) * k, v.z * k); }
+      g.computeVertexNormals();
+      const m = new THREE.Mesh(g, iM), dir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), ang);
+      m.scale.set(w, h, w * 0.6); m.position.set(dir.x * dist, SEA - 2, dir.z * dist); m.rotation.y = RI() * 3; scene.add(m);
+    } }
   const EP = [4.4, 0.02, 3.6], ery = -0.98;
   props.push(kit.prop(scene, 'sf_easel', { p: EP, ry: ery, h: 2.2 }).then((m) => m.traverse((c) => { if (c.isMesh && /LOD1/.test(c.name + (c.parent?.name ?? ''))) c.visible = false; })));
   { const fw = 0.86, fh = fw * 16 / 9, off = new THREE.Vector3(0, 1.62, 0.12).applyAxisAngle(new THREE.Vector3(0, 1, 0), ery);
@@ -161,19 +179,18 @@ export async function build({ THREE, kit, renderer, mobile }) {
     { p: [0, 1.95, 32], l: [0, 2.2, 10] },
     { p: [0, 1.8, 20], l: [0, 1.8, 4], t: 0.168 },
     { p: [0, 1.8, 14], l: [0, 1.7, 0], t: 0.21 },
-    // гостиная: взгляд на камин и диваны, затем на кухню
-    { p: [-1, 1.8, 9.6], l: [-13, 3.0, 7], t: 0.277 },
-    { p: [1.2, 1.75, 5.8], l: [4.4, 1.5, 3.6], t: 0.336 },
-    { p: [0, 1.8, 1.6], l: [0, 1.4, -14], t: 0.386 },
-    // на террасу через раздвинутое стекло и над бассейном к краю утёса
-    { p: [0.4, 2.0, -3], l: [0, 1.4, -30], t: 0.437 },
-    { p: [0, 2.8, -13], l: [0, 2, -60], t: 0.49 },
-    // разворот над морем: второй этаж виллы
-    { p: [-3.5, 4.6, -19.5], l: [-40, 4.5, -16], t: 0.525 },
-    { p: [-6, 6.4, -23], l: [-6, 6.2, 2], t: 0.56 },
+    // гостиная: взгляд налево на камин, затем на видео-картину на стене перед диваном, потом направо — мольберт
+    { p: [-0.6, 1.8, 11.8], l: [-13, 2.2, 9], t: 0.25 },
+    { p: [-2.4, 1.8, 9.2], l: [-5, 2.4, 13.6], t: 0.295 },
+    { p: [-0.4, 1.8, 6.8], l: [4.4, 1.5, 3.6], t: 0.345 },
+    { p: [0, 1.8, 1.6], l: [0, 1.6, -12], t: 0.39 },
+    // на террасу и сразу разворот налево — без взгляда на пейзаж
+    { p: [0.2, 2.4, -3.6], l: [-14, 3.2, -12], t: 0.44 },
+    { p: [-3.2, 3.8, -11], l: [-20, 5, 2], t: 0.49 },
+    { p: [-6.4, 5.8, -17.5], l: [-4, 6.2, 4], t: 0.545 },
     // боковой пролёт вдоль террасы: бассейн на крыше → диджейская стойка с экраном → балкон
     { p: [-13, 7.3, -12.5], l: [-9, 5.6, 2], t: 0.61 },
-    { p: [-2, 7.5, -11.5], l: [0, 6.6, 7], t: 0.67 },
+    { p: [-2, 7.4, -11.5], l: [0, 6.4, 4.6], t: 0.67 },
     { p: [9.5, 7.2, -12.5], l: [11.5, 5.8, -5], t: 0.72 },
     // разворот к морю — в восход
     { p: [5.5, 4.4, -18.5], l: far(600), t: 0.77 },
