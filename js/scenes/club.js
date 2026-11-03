@@ -109,7 +109,15 @@ export async function build({ THREE, kit, font, renderer }) {
     kit.laser(b, [X1, CH - 0.08, CZ + sz * (CW / 2 - 0.04)], [X2, LY + CH - 0.08, CZ + sz * (CW / 2 - 0.04)], sz < 0 ? PINK : '#ff2a55', 0.03);
   }
   for (let i = 1; i < 5; i++) glows.push([X1 + i * 1.8, -i * 1.08 + CH - 0.3, CZ, '#ff3fb4', 1.6, 0.6]);
-  b.add(G.box(0.2, CH, CW), '#2a0f2e', 'matte', M([X3 + 0.1, LY + CH / 2, CZ]));
+  // за дверью — тёплый свет дворца: в щели приоткрытых створок видно красное зарево (склейка с дверьми дворца)
+  const hallT = kit.canvasTex(256, 320, (x, w, h) => {
+    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#2a0806'); g.addColorStop(0.45, '#7a1a10'); g.addColorStop(1, '#3a0806'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+    const lg = x.createRadialGradient(w / 2, h * 0.12, 0, w / 2, h * 0.12, w * 0.4); lg.addColorStop(0, '#fff2c0'); lg.addColorStop(0.3, '#ffb15a'); lg.addColorStop(1, 'rgba(255,120,40,0)'); x.fillStyle = lg; x.fillRect(0, 0, w, h);
+    x.fillStyle = '#c4141e'; x.beginPath(); x.moveTo(w * 0.36, h); x.lineTo(w * 0.47, h * 0.6); x.lineTo(w * 0.53, h * 0.6); x.lineTo(w * 0.64, h); x.fill();
+    x.fillStyle = '#e8dccb'; x.beginPath(); x.ellipse(w / 2, h * 0.6, w * 0.14, h * 0.025, 0, 0, 7); x.fill();
+  });
+  const behind = new THREE.Mesh(new THREE.PlaneGeometry(CW, CH), new THREE.MeshBasicMaterial({ map: hallT, fog: false }));
+  behind.position.set(X3 + 0.2, LY + CH / 2, CZ); behind.rotation.y = -Math.PI / 2; scene.add(behind);
   // парадная двустворчатая дверь — та же, что во дворце (kit.grandDoor), в масштабе коридора
   const door = kit.grandDoor(scene, b, [X3 - 0.25, LY, CZ], -Math.PI / 2, 0.38);
   b.add(G.box(0.06, 0.04, 2.4), '#ff8a2a', 'neon', M([X3 - 0.35, LY + 0.02, CZ]));
@@ -165,9 +173,10 @@ export async function build({ THREE, kit, font, renderer }) {
   const MR = 1.6, MC = [0, 12.8, -1];
   kit.rod(b, [MC[0], H, MC[2]], [MC[0], MC[1] + MR, MC[2]], 0.025, '#c8c8d0', 'metal', 6);
   // дискошар — отдельная зеркальная модель (не запекается): гранёный, крутится, отражает огни клуба
-  const ball = new THREE.Mesh(new THREE.IcosahedronGeometry(MR, 4), new THREE.MeshStandardMaterial({ color: '#f4f4fa', metalness: 1, roughness: 0.08, flatShading: true, envMapIntensity: 2.2 }));
+  // тот же зеркальный шар, в который превратилась Луна в конце POOL: склейка по форме
+  const ball = kit.moonMesh(MR); ball.material.uniforms.tiles.value = 1;
   ball.position.set(...MC); ball.userData.dynamic = true; scene.add(ball);
-  glows.push([MC[0], MC[1], MC[2], '#fff1d6', 4.5, 0.3]);
+  glows.push([MC[0], MC[1], MC[2], '#fff1d6', 2.2, 0.22]);
   for (let i = 0; i < 14; i++) { const a = i * 2.4, y = Math.cos(i * 1.7) * 0.9; glows.push([MC[0] + Math.cos(a) * MR * 0.95, MC[1] + y, MC[2] + Math.sin(a) * MR * 0.95, '#ffffff', 0.5, 2]); }
 
   // полки-светильники за баром (неон, без запекания)
@@ -185,6 +194,39 @@ export async function build({ THREE, kit, font, renderer }) {
   glows.push([15.2, 6.4, -3, '#ff2a55', 4, 0.8]);
   kit.text3d(b, font, '2K17', { size: 1.5, color: '#b45cff', p: [-15.6, 7.2, -10.5], r: [0, Math.PI / 2, 0] });
 
+  /* --- кирпичные стены зала (живой свет клуба ложится на фактуру) --- */
+  const brick = kit.canvasTex(1024, 512, (x, w2, h2) => {
+    x.fillStyle = '#0d060f'; x.fillRect(0, 0, w2, h2); const BR = kit.rng(44), rows = 30, cols = 16, bh = h2 / rows, bw = w2 / cols;
+    for (let r = 0; r < rows; r++) for (let c = -1; c < cols; c++) {
+      const v = BR(), off = r % 2 ? bw / 2 : 0;
+      x.fillStyle = v < 0.5 ? '#3a1832' : v < 0.8 ? '#45203a' : v < 0.95 ? '#2c1228' : '#5a2a44';
+      x.fillRect(c * bw + off + 2, r * bh + 2, bw - 4, bh - 4);
+    }
+  });
+  brick.wrapS = brick.wrapT = THREE.RepeatWrapping;
+  const brickWall = (w2, h2, p, ry) => {
+    const t2 = brick.clone(); t2.needsUpdate = true; t2.repeat.set(w2 / 4, h2 / 2);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(w2, h2), new THREE.MeshStandardMaterial({ map: t2, roughness: 0.85, metalness: 0 }));
+    m.position.set(...p); m.rotation.y = ry; scene.add(m);
+  };
+  brickWall(32, H, [-15.78, H / 2, 0], Math.PI / 2);
+  brickWall(32, H, [0, H / 2, -15.78], 0);
+  brickWall(7.2, H, [15.78, H / 2, -12.4], -Math.PI / 2); brickWall(22.2, H, [15.78, H / 2, 4.9], -Math.PI / 2); brickWall(CW, H - CH, [15.78, CH + (H - CH) / 2, CZ], -Math.PI / 2);
+  brickWall(14.2, H, [-8.9, H / 2, 15.78], Math.PI); brickWall(14.2, H, [8.9, H / 2, 15.78], Math.PI); brickWall(3.6, H - 4.4, [0, 4.4 + (H - 4.4) / 2, 15.78], Math.PI);
+  /* --- стена за баром: тёплая подсветка за полками и неон BAR --- */
+  const barGlow = kit.canvasTex(1024, 512, (x, w2, h2) => {
+    const g = x.createLinearGradient(0, 0, 0, h2); g.addColorStop(0, '#3a0a2a'); g.addColorStop(0.45, '#ff6a8a'); g.addColorStop(0.8, '#ffb36b'); g.addColorStop(1, '#5a1a1a'); x.fillStyle = g; x.fillRect(0, 0, w2, h2);
+    x.globalAlpha = 0.35; for (let i = 0; i < 9; i++) { const gx = x.createLinearGradient(i * w2 / 8 - 40, 0, i * w2 / 8 + 40, 0); gx.addColorStop(0, 'rgba(255,255,255,0)'); gx.addColorStop(0.5, '#fff3e0'); gx.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = gx; x.fillRect(i * w2 / 8 - 40, 0, 80, h2); }
+  });
+  const bw2 = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 2.6), new THREE.MeshBasicMaterial({ map: barGlow, color: '#b8a0b0' }));
+  bw2.position.set(7, 1.95, 15.74); bw2.rotation.y = Math.PI; scene.add(bw2);
+  kit.text3d(b, font, 'BAR', { size: 0.75, color: '#ffe14a', kind: 'neon', p: [7, 3.6, 15.7], r: [0, Math.PI, 0], bevel: 0.01, depth: 0.05 });
+  glows.push([7, 3.95, 15.4, '#ffe14a', 4, 0.35]);
+  // бир-понг: неон над столом
+  kit.text3d(b, font, 'BEER PONG', { size: 0.5, color: '#21e0ff', kind: 'neon', p: [-15.7, 4.4, 6.4], r: [0, Math.PI / 2, 0], bevel: 0.01, depth: 0.04 });
+  glows.push([-15.4, 4.6, 6.4, '#21e0ff', 5, 0.3]);
+  kit.beam(b, [-9.2, H - 2.35, 6.4], [-9.2, 0.8, 6.4], 1.6, '#ffffff');
+
   /* --- свет --- */
   scene.add(new THREE.HemisphereLight('#6a3bd0', '#0c0614', 0.55));
   const L = (c, i, p, d = 45) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
@@ -199,7 +241,11 @@ export async function build({ THREE, kit, font, renderer }) {
     kit.prop(scene, 'wine_bottles_01', { p: [-14.4, 0.5, 9.4], ry: 1.2, s: 1.6 }),
     kit.decks(scene, [SC[0], 2.0, SC[2] + 0.35], 0, 1.4), kit.decks(scene, [SC[0], 2.0, SC[2] - 0.35], Math.PI, 1.4),
     kit.prop(scene, 'wine_bottles_01', { p: [-4.5, 0.97, -13.6], ry: 0.5, s: 1.4 }), kit.prop(scene, 'wine_bottles_01', { p: [4.5, 0.97, -13.6], ry: 2.0, s: 1.4 }),
-    kit.prop(scene, 'sf_indbar', { p: [BX, 0.0, BZ], w: 4.8 }),
+    kit.prop(scene, 'sf_indbar', { p: [BX, 0.0, BZ], w: 4.8 }).then((m) => {
+      // над стойкой у модели висит полка с перилами — в кадре она выглядела как строительные леса
+      m.updateMatrixWorld(true);
+      m.traverse((c) => { if (c.isMesh && new THREE.Box3().setFromObject(c).min.y > 1.9) c.visible = false; });
+    }),
     kit.prop(scene, 'sf_summer', { p: GL, h: 0.24, ry: 0.6 }),
     // подсвеченные полки с бутылками за баром
     ...[-1.6, -0.5, 0.6, 1.7].flatMap((dx, i) => [kit.prop(scene, 'wine_bottles_01', { p: [BX + dx, 1.66, 15.62], ry: i, s: 1.3 }), kit.prop(scene, 'wine_bottles_01', { p: [BX + dx + 0.3, 2.26, 15.62], ry: i + 2, s: 1.3 })]),
@@ -211,7 +257,9 @@ export async function build({ THREE, kit, font, renderer }) {
   ]);
   glows.push([BX, 3.6, 15.4, '#ffe14a', 3, 0.45], [BX, 2.6, BZ, '#ff2fd0', 3.2, 0.5]);
   const built = b.build(); scene.add(built);
-  kit.haze(scene, { box: [-15, 15, 3, 9.5, -15, 14], colors: ['#ff2fd0', '#8a3dff', '#2fe6ff'], n: 20, size: 12, opacity: 0.16 });
+  // дым: лучи прожекторов становятся видимыми объёмами
+  kit.haze(scene, { box: [-15, 15, 1.2, 10, -15, 14], colors: ['#ff2fd0', '#8a3dff', '#2fe6ff'], n: 36, size: 12, opacity: 0.19 });
+  kit.haze(scene, { box: [-14, 14, 0.2, 1.4, -14, 13], colors: ['#d8c8ff', '#ff9ad8'], n: 16, size: 7, opacity: 0.12, seed: 21 });
   kit.haze(scene, { box: [17, 39, -5, 2.8, -8.6, -6.4], colors: ['#ff3fb4'], n: 8, size: 4, opacity: 0.14, seed: 9 });
   await kit.applyBake(scene, built, 'club', { k: 26 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
 
@@ -219,7 +267,7 @@ export async function build({ THREE, kit, font, renderer }) {
   const EYE = 1.62;
   const keys = [
     // белая вспышка дискошара: камера у самого шара
-    { p: [MC[0], MC[1] + 0.1, MC[2] + 3.0], l: MC, t: 0 },
+    { p: [MC[0], MC[1] + 0.1, MC[2] + 1.9], l: MC, t: 0 },
     // боковой отлёт, дискошар по центру кадра
     { p: [4.2, 12.0, 4.6], l: MC, t: 0.08 },
     { p: [9.6, 9.2, 7.6], l: [0, 10.4, -1], t: 0.17 },
@@ -246,7 +294,17 @@ export async function build({ THREE, kit, font, renderer }) {
   ];
   const path = kit.camPath(keys);
   const sm = (a, c, t) => { const k = Math.min(1, Math.max(0, (t - a) / (c - a))); return k * k * (3 - 2 * k); };
-  const update = (t) => { door.open(0.35 * sm(0.93, 1, t)); ball.rotation.y = t * 9; };
+  // шарик бир-понга летит в стаканы и отскакивает
+  const pong = new THREE.Mesh(new THREE.SphereGeometry(0.04, 12, 8), new THREE.MeshBasicMaterial({ color: '#ffffff' }));
+  pong.userData.dynamic = true; scene.add(pong);
+  const PT = [-9.2, 0.05, 6.4], ca = Math.cos(0.25), sa = Math.sin(0.25), TOPY = 0.82;
+  const update = (t) => {
+    const now = performance.now() / 1000;
+    door.open(0.35 * sm(0.93, 1, t)); ball.rotation.y = t * 9 + now * 0.5; ball.material.uniforms.time.value = now;
+    const q = (now % 1.7) / 1.7, lx = -1.05 + q * 1.95;
+    const ly = q < 0.62 ? TOPY + 0.35 + Math.sin((q / 0.62) * Math.PI) * 0.75 - (q / 0.62) * 0.3 : TOPY + 0.05 + Math.abs(Math.sin(((q - 0.62) / 0.38) * Math.PI * 2)) * 0.18 * (1 - (q - 0.62) / 0.38);
+    pong.position.set(PT[0] + lx * ca, ly, PT[2] - lx * sa);
+  };
   const calm = (t) => Math.min(1, Math.max(0, (0.12 - t) / 0.06));   // отлёт от дискошара — кадр по центру
   return { scene, cam: path, update, calm };
 }

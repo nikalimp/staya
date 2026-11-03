@@ -17,8 +17,8 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 const SCENES = [
   { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.7, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.93, 'whoosh'], [0.97, 'splash']] },
   { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.8, out: 'white', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.94, 'chime']] },
-  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.6, out: 'black', sfx: [[0.02, 'chime'], [0.97, 'door']] },
-  { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.03, 'door'], [0.9, 'whoosh']] },
+  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.6, out: 'cut', sfx: [[0.02, 'chime'], [0.97, 'door']] },
+  { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.9, 'whoosh']] },
   { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975, sfx: [[0.7, 'whoosh'], [0.81, 'chime']] },
 ];
 // Кнопки финала. Пустой href — кнопка не показывается.
@@ -36,6 +36,7 @@ const isTouch = matchMedia('(pointer: coarse)').matches;
 const mobile = isTouch || innerWidth <= 860;
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const DEBUG = new URLSearchParams(location.search).has('debug');
+if (/[?&]nobake/.test(location.search)) globalThis.__noBake = true;   // отладка: исходная геометрия без запечённого света
 if (mobile) document.documentElement.classList.add('touch');
 
 const $ = (s) => document.querySelector(s);
@@ -64,16 +65,18 @@ if (!mobile) {
   composer.addPass(bloomPass = new UnrealBloomPass(new THREE.Vector2(1024, 1024), 0.42, 0.5, 0.9));
   // виньетка и лёгкий расфокус по краям кадра (центр резкий)
   composer.addPass(vigPass = new ShaderPass({
-    uniforms: { tDiffuse: { value: null }, uAspect: { value: 1 } },
+    uniforms: { tDiffuse: { value: null }, uAspect: { value: 1 }, uRGB: { value: 0 }, uZoom: { value: 0 } },
     vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-    fragmentShader: `uniform sampler2D tDiffuse; uniform float uAspect; varying vec2 vUv;
+    // края: лёгкий расфокус; uZoom — радиальное смазывание от скорости прокрутки; uRGB — расслоение цветов (скорость, VHS в 2K17)
+    fragmentShader: `uniform sampler2D tDiffuse; uniform float uAspect, uRGB, uZoom; varying vec2 vUv;
       void main(){
         vec2 d = vUv - 0.5; d.x *= uAspect; float r = length(d);
-        float k = smoothstep(0.45, 0.95, r);
-        vec2 dir = (vUv - 0.5) * 0.006 * k;
+        float k = smoothstep(0.5, 0.98, r);
+        vec2 dir = (vUv - 0.5) * (0.0032 * k + uZoom * smoothstep(0.1, 0.8, r));
         vec4 c = vec4(0.0);
         for (int i = 0; i < 8; i++) c += texture2D(tDiffuse, vUv - dir * float(i));
         c /= 8.0;
+        if (uRGB > 0.0) { vec2 o = (vUv - 0.5) * uRGB; c.r = texture2D(tDiffuse, vUv + o).r; c.b = texture2D(tDiffuse, vUv - o).b; }
         c.rgb *= mix(1.0, 0.42, smoothstep(0.38, 0.95, r));
         gl_FragColor = c;
       }`,
@@ -127,11 +130,11 @@ async function buildScene(i) {
   return p;
 }
 // Рендерим первый кадр следующей сцены в текстуру — это «фотография» в соцсети
-function renderPreview(owner, next) {
-  if (owner.previewDone) return;
-  const { mesh, t = 0 } = owner.preview, w = mobile ? 768 : 1024, h = w;
-  const rt = new THREE.WebGLRenderTarget(w, h, { colorSpace: THREE.SRGBColorSpace, samples: mobile ? 0 : 4 });
-  const cam = new THREE.PerspectiveCamera(fovFor(w / h), w / h, 0.05, 2000);
+function renderPreview(owner, next, again = false) {
+  if (owner.previewDone && !again) return;
+  const { mesh, t = 0 } = owner.preview, w = mobile ? 768 : 1280, h = w;
+  const rt = owner.scene.userData.rt ?? new THREE.WebGLRenderTarget(w, h, { colorSpace: THREE.SRGBColorSpace, samples: mobile ? 0 : 4 });
+  const cam = new THREE.PerspectiveCamera(owner.preview.fov ?? fovFor(w / h), w / h, 0.05, 2000);
   const c = next.cam(t); cam.position.copy(c.p); cam.lookAt(c.l);
   const keep = [...kit.glowMats].map((m) => m.uniforms.uScale.value);
   kit.glowMats.forEach((m) => (m.uniforms.uScale.value = h / (2 * Math.tan(THREE.MathUtils.degToRad(cam.fov) / 2))));
@@ -155,14 +158,19 @@ function scrollToG(y) {
 }
 function gToScroll(g) { const i = Math.min(N - 1, Math.floor(g)); return (cum[i] + (g - i) * SCENES[i].w) * VH_PER_UNIT * VH; }
 
+let previewTick = false, speedK = 0;
+const vhsEl = document.getElementById('vhs'), vhsTc = vhsEl?.querySelector('.tc');
 let cur = 0, target = 0, lastG = -1, curIdx = -1, started = false, jumping = false;
 // Стык 'black' уходит в чёрный, 'water' — в синеву воды (нырок AQUA → выныривание в POOL), 'cut' — склейка без затемнения
 const FADE_COLOR = { black: '#000', water: '#0a5f8f', white: '#fff' };
+// нырок AQUA → POOL снят в самих сценах (пузыри, толща воды), заливка только склеивает кадры
+const FADE_LEN = { water: 0.014 };
 function blackAt(i, t) {
   let k = 0, c = '#000';
   const inT = i === 0 ? 'black' : SCENES[i - 1].out, outT = SCENES[i].out;
-  if (FADE_COLOR[inT] && t < FADE) { k = 1 - t / FADE; c = FADE_COLOR[inT]; }
-  if (FADE_COLOR[outT] && t > 1 - FADE) { k = (t - (1 - FADE)) / FADE; c = FADE_COLOR[outT]; }
+  const fi = FADE_LEN[inT] ?? FADE, fo = FADE_LEN[outT] ?? FADE;
+  if (FADE_COLOR[inT] && t < fi) { k = 1 - t / fi; c = FADE_COLOR[inT]; }
+  if (FADE_COLOR[outT] && t > 1 - fo) { k = (t - (1 - fo)) / fo; c = FADE_COLOR[outT]; }
   if (fadeEl.dataset.c !== c) { fadeEl.style.background = c; fadeEl.dataset.c = c; }
   return Math.max(0, Math.min(1, k));
 }
@@ -182,7 +190,7 @@ function apply(g) {
   // у переходов (телефон, стакан) кадр центрируется: влияние головы и курсора плавно гаснет
   const cw = 1 - (s.calm?.(t) ?? 0), hx = head.x * cw, hy = head.y * cw, hyaw = head.yaw * cw, hp = head.pitch * cw;
   const sq = s.squint?.(t) ?? 0;   // «прищур»: сцена просит приблизить дальний объект
-  const fv = baseFov * (1 - 0.42 * sq) * (1 - Math.max(-0.6, Math.min(1, head.z * cw)) * 0.2);   // зритель ближе к экрану — кадр приближается
+  const fv = baseFov * (1 - 0.42 * sq) * (1 - Math.max(-0.6, Math.min(1, head.z * cw)) * 0.2) * (1 + speedK * 0.07);   // зритель ближе к экрану — кадр приближается; быстрая прокрутка — кадр чуть растягивается
   if (sq !== lastSq) { lastSq = sq; lidsEl.style.setProperty('--sq', sq.toFixed(3)); }
   if (Math.abs(camera.fov - fv) > 1e-3) { camera.fov = fv; camera.updateProjectionMatrix(); }
   if (hx || hy || hyaw || hp) {
@@ -191,8 +199,17 @@ function apply(g) {
     camera.rotateY(-hx * 0.16 - hyaw * 0.3); camera.rotateX(hy * 0.12 + hp * 0.2);
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
-  if (composer) { renderPass.scene = s.scene; bloomPass.strength = s.bloom ?? 0.42; composer.render(); } else renderer.render(s.scene, camera);
-  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); kit.playVideos(s.scene); }
+  // живое превью следующей сцены в телефоне (дворец → вилла)
+  // (через кадр: кадр виллы почти неподвижен, а рендер второй сцены дорогой)
+  if (s.preview?.live?.(t) && built.has(i + 1) && (previewTick = !previewTick)) { renderPreview(s, built.get(i + 1), true); dirty = true; }
+  if (composer) {
+    renderPass.scene = s.scene; bloomPass.strength = (s.bloom ?? 0.42) * (1 + 0.3 * kit.pulse.beat);
+    const vhs = SCENES[i].id === 'club' ? 1 : 0;
+    vigPass.uniforms.uZoom.value = speedK * 0.011; vigPass.uniforms.uRGB.value = speedK * 0.007 + vhs * 0.0035;
+    composer.render();
+  } else renderer.render(s.scene, camera);
+  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); kit.playVideos(s.scene); vhsEl.classList.toggle('on', SCENES[i].id === 'club'); }
+  if (vhsTc && SCENES[i].id === 'club') { const sec = 23 * 3600 + 41 * 60 + Math.floor(t * 160); vhsTc.textContent = [sec / 3600, (sec / 60) % 60, sec % 60].map((v) => String(Math.floor(v)).padStart(2, '0')).join(':'); }
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
   return true;
 }
@@ -232,6 +249,14 @@ function loop() {
       if (Math.abs(d) > 0.0005) { head[q] += d * 0.075; moved = 1; } else head[q] = to;
     }
     if (moved) dirty = true;
+  }
+  {
+    // скорость прокрутки (доля сцены за кадр) → растяжение кадра и смазывание по краям
+    const v = lastG >= 0 && !jumping ? Math.min(1, Math.abs(cur - lastG) / 0.012) : 0;
+    const sk = speedK + (v - speedK) * (v > speedK ? 0.25 : 0.08);
+    if (Math.abs(sk - speedK) > 1e-4) { speedK = sk < 1e-3 ? 0 : sk; dirty = true; }
+    // ритм музыки → неон, лучи, огни, свечение
+    if (started) { const b = audio.beat(); if (Math.abs(b - kit.pulse.beat) > 0.004) { kit.pulse.apply(b); dirty = true; } }
   }
   if (started && cur > lastG && lastG >= 0 && audio.on && audio.fx) {
     // звуковые эффекты: срабатывают, когда скролл проходит точку вперёд
@@ -302,6 +327,8 @@ const audio = {
   init() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC || this.ctx) return;
     this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination);
+    this.an = this.ctx.createAnalyser(); this.an.fftSize = 1024; this.an.smoothingTimeConstant = 0.5; this.master.connect(this.an);
+    this.fq = new Uint8Array(this.an.frequencyBinCount);
     this.fx = makeSfx(this.ctx, this.master);
     // одна дорожка на файл: если у соседних сцен один трек (когда трек повторяется), музыка не прерывается
     const bySrc = {};
@@ -333,6 +360,20 @@ const audio = {
       }
     });
     const nx = this.tracks[i + 1]; if (nx && nx !== curTr && nx.ok && nx.el.preload === 'none') { nx.el.preload = 'auto'; nx.el.load(); }
+  },
+  // доля баса 0…1: быстрая огибающая минус медленная — вспышка на каждом ударе бочки.
+  // звук выключен — ровный пульс 122 BPM, чтобы сцены не замирали
+  fast: 0, slow: 0, pv: 0,
+  beat() {
+    let k;
+    if (this.on && this.an && this.ctx.state === 'running') {
+      this.an.getByteFrequencyData(this.fq);
+      let s = 0; for (let i = 1; i <= 6; i++) s += this.fq[i]; const lvl = s / (6 * 255);
+      this.fast += (lvl - this.fast) * 0.6; this.slow += (lvl - this.slow) * 0.03;
+      k = Math.max(0, Math.min(1, (this.fast - this.slow * 0.94) * 5));
+    } else { const ph = (performance.now() / 1000) * (122 / 60); k = Math.exp(-(ph % 1) * 6) * 0.45; }
+    this.pv = Math.max(k, this.pv * 0.86);
+    return reduced ? 0 : this.pv;
   },
   setOn(v) {
     this.on = v; if (!this.ctx) return;
@@ -401,4 +442,5 @@ window.__staya = {
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, built: [...built.keys()] }),
   ready: () => real >= 100,
   scene: (i) => built.get(i)?.scene,
+  dbg: () => ({ g: cur, cam: camera.position.toArray().map((v) => +v.toFixed(4)), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(3) }),
 };

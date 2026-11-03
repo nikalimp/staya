@@ -23,6 +23,7 @@ ROCK = mat('rock', srgb('#7d6a55'), 0.9, node=lambda m, p: noise(m, p, srgb('#5d
 HILL = mat('hill', srgb('#3c4a2c'), 0.95, node=lambda m, p: noise(m, p, srgb('#2c3a22'), srgb('#56603a'), 0.3))
 OLIVE = mat('olive_leaf', srgb('#6f7a4c'), 0.8)
 BUSH = mat('bush', srgb('#4b5e34'), 0.85)
+BUSH2 = mat('bush2', srgb('#5d6f3c'), 0.85)
 PALMLEAF = mat('palm_leaf', srgb('#3f6a2e'), 0.6)
 TRUNK = mat('trunk', srgb('#6b5440'), 0.85, node=lambda m, p: noise(m, p, srgb('#4f3d2e'), srgb('#8a7158'), 9))
 STEEL = mat('steel', (0.7, 0.7, 0.72), 0.25, metal=1)
@@ -48,7 +49,13 @@ def rock(c, r, s=(1, 1, 1), m=ROCK, g='far', seed=0, k=0.35, sub=4):
     return done(o, m, g, smooth=True)
 
 def bush(x, y, z, r, m=BUSH, g='near'):
-    return rock((x, y + r * 0.6, z), r, s=(1, 0.75, 1), m=m, g=g, seed=int(abs(x * 7 + z * 13)) % 97, k=0.4, sub=2)
+    # куст — три мягких шара разного размера (раньше один шар с сильным шумом выглядел как груда камней)
+    sd = int(abs(x * 7 + z * 13)) % 97; rnd = random.Random(sd)
+    o = rock((x, y + r * 0.6, z), r, s=(1, 0.78, 1), m=m, g=g, seed=sd, k=0.1, sub=3)
+    for i in range(2):
+        a = rnd.random() * math.tau; rr = r * (0.55 + rnd.random() * 0.15)
+        rock((x + math.cos(a) * r * 0.7, y + rr * 0.55, z + math.sin(a) * r * 0.7), rr, s=(1, 0.8, 1), m=BUSH2 if m is BUSH else m, g=g, seed=sd + i + 1, k=0.1, sub=2)
+    return o
 
 def palm(x, z, h, lean, seed, y0=0.0):
     rnd = random.Random(seed)
@@ -64,7 +71,7 @@ def olive(x, z, h, seed):
     tube([(x, 0, z), (x + 0.3, h * 0.4, z + 0.2), (x - 0.2, h * 0.7, z - 0.1)], 1.0, TRUNK, 'near', taper=(0.22, 0.1), res=4)
     for i in range(6):
         a = rnd.random() * math.tau; rr = rnd.random() * 1.6
-        rock((x + math.cos(a) * rr, h * 0.75 + rnd.random() * 1.2, z + math.sin(a) * rr), 1.1 + rnd.random() * 0.5, s=(1.2, 0.7, 1.2), m=OLIVE, g='far', seed=seed * 10 + i, k=0.5, sub=2)
+        rock((x + math.cos(a) * rr, h * 0.75 + rnd.random() * 1.2, z + math.sin(a) * rr), 1.1 + rnd.random() * 0.5, s=(1.2, 0.7, 1.2), m=OLIVE, g='far', seed=seed * 10 + i, k=0.2, sub=3)
 
 # готовые модели Poly Haven (CC0): импорт glTF, упрощение, масштаб, установка низом (или верхом) в точку
 PH = os.path.join(D, '..', 'ph')

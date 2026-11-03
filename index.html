@@ -34,6 +34,16 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 #lids::before,#lids::after{content:"";position:absolute;left:-5%;right:-5%;height:calc(var(--sq) * 30vh + 2vh);background:radial-gradient(120% 100% at 50% 0%,#000 55%,rgba(0,0,0,.85) 75%,rgba(0,0,0,0) 100%);opacity:min(1,calc(var(--sq) * 3));filter:blur(6px)}
 #lids::before{top:-2vh}
 #lids::after{bottom:-2vh;transform:scaleY(-1)}
+/* VHS-плёнка 2017 года: строки развёртки, шум, REC и таймкод (только в 2K17) */
+#vhs{position:fixed;inset:0;z-index:4;pointer-events:none;opacity:0;transition:opacity .8s;font:700 clamp(14px,2.2vw,22px)/1 ui-monospace,Menlo,Consolas,monospace;color:#f4f4f4;text-shadow:2px 0 rgba(255,0,80,.6),-2px 0 rgba(0,220,255,.6);letter-spacing:.06em}
+#vhs.on{opacity:1}
+#vhs::before{content:"";position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(0,0,0,.16) 0 1px,rgba(0,0,0,0) 1px 3px);mix-blend-mode:multiply}
+#vhs::after{content:"";position:absolute;left:0;right:0;height:14vh;top:-14vh;background:linear-gradient(rgba(255,255,255,0),rgba(255,255,255,.05) 50%,rgba(255,255,255,0));animation:vhsroll 6s linear infinite}
+@keyframes vhsroll{to{transform:translateY(128vh)}}
+#vhs .rec{position:absolute;top:4.5vh;left:4vw}#vhs .rec i{color:#ff2a3a;font-style:normal;animation:blink 1s steps(1) infinite}
+#vhs .dt{position:absolute;bottom:5vh;left:4vw}#vhs .tc{position:absolute;bottom:5vh;right:4vw}#vhs .pl{position:absolute;top:4.5vh;right:4vw}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){#vhs::after,#vhs .rec i{animation:none}}
 #vig{position:fixed;inset:0;z-index:4;pointer-events:none;background:radial-gradient(ellipse at center,rgba(0,0,0,0) 55%,rgba(0,0,0,.5) 100%);display:none}
 .touch #vig{display:block}
 
@@ -132,6 +142,7 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 <canvas id="gl" aria-hidden="true"></canvas>
 <div id="vig"></div>
 <div id="lids" aria-hidden="true"></div>
+<div id="vhs" aria-hidden="true"><span class="rec"><i>●</i> REC</span><span class="pl">PLAY ▶</span><span class="dt">NOV 03 2017</span><span class="tc">23:41:00</span></div>
 <div id="fade"></div>
 
 <!-- Текст сайта для поиска и нейросетей. На экране — только путешествие. -->
