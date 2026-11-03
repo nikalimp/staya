@@ -833,6 +833,49 @@ export const pulse = { beat: 0, u: { value: 0 }, mats: new Set(),
     for (const m of this.mats) m.color.setScalar(1 + k * 0.6);
   } };
 
+/* ---------- вывеска с логотипом из SVG: буквы светятся градиентом, фон прозрачный ---------- */
+export async function logoSign(url, width, colors = ['#ff4fb8', '#ffffff', '#7ff2ff']) {
+  const img = new Image(); img.src = url; await img.decode();
+  const W = 2048, H = Math.round(W * img.naturalHeight / img.naturalWidth), c = document.createElement('canvas'); c.width = W; c.height = H;
+  const x = c.getContext('2d'); x.drawImage(img, 0, 0, W, H);
+  x.globalCompositeOperation = 'source-in'; const g = x.createLinearGradient(0, 0, W, H);
+  colors.forEach((col, i) => g.addColorStop(i / (colors.length - 1), col)); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  const m = new THREE.Mesh(new THREE.PlaneGeometry(width, width * H / W), new THREE.MeshBasicMaterial({ map: t, transparent: true, toneMapped: false, depthWrite: false }));
+  pulse.mats.add(m.material); return m;
+}
+
+/* ---------- контуры области по функции расстояния (marching squares) ---------- */
+// sdf(x, z) < 0 внутри области. Возвращает замкнутые петли [[x, z], …] и глубину вложенности:
+// depth 0 — внешняя граница области, 1 — остров внутри неё.
+export function sdfLoops(sdf, x0, x1, z0, z1, step = 0.25) {
+  const nx = Math.ceil((x1 - x0) / step), nz = Math.ceil((z1 - z0) / step), v = new Float32Array((nx + 1) * (nz + 1));
+  for (let j = 0; j <= nz; j++) for (let i = 0; i <= nx; i++) v[j * (nx + 1) + i] = sdf(x0 + i * step, z0 + j * step);
+  const V = (i, j) => v[j * (nx + 1) + i], pts = new Map(), nb = new Map();
+  const ep = (key, ax, az, va, bx, bz, vb) => { if (!pts.has(key)) { const t = va / (va - vb); pts.set(key, [ax + (bx - ax) * t, az + (bz - az) * t]); } return key; };
+  const link = (a, b) => { (nb.get(a) || nb.set(a, []).get(a)).push(b); (nb.get(b) || nb.set(b, []).get(b)).push(a); };
+  for (let j = 0; j < nz; j++) for (let i = 0; i < nx; i++) {
+    const a = V(i, j), b = V(i + 1, j), c = V(i + 1, j + 1), d = V(i, j + 1), X = x0 + i * step, Z = z0 + j * step;
+    const e = [
+      a < 0 !== b < 0 ? ep(`h${i},${j}`, X, Z, a, X + step, Z, b) : null,
+      b < 0 !== c < 0 ? ep(`v${i + 1},${j}`, X + step, Z, b, X + step, Z + step, c) : null,
+      d < 0 !== c < 0 ? ep(`h${i},${j + 1}`, X, Z + step, d, X + step, Z + step, c) : null,
+      a < 0 !== d < 0 ? ep(`v${i},${j}`, X, Z, a, X, Z + step, d) : null,
+    ].filter(Boolean);
+    if (e.length === 2) link(e[0], e[1]);
+    else if (e.length === 4) { const m = (a + b + c + d) / 4; if ((m < 0) === (a < 0)) { link(e[0], e[1]); link(e[2], e[3]); } else { link(e[0], e[3]); link(e[1], e[2]); } }
+  }
+  const seen = new Set(), loops = [];
+  for (const k of nb.keys()) {
+    if (seen.has(k)) continue;
+    const loop = []; let prev = null, cur = k;
+    while (cur && !seen.has(cur)) { seen.add(cur); loop.push(pts.get(cur)); const nx2 = nb.get(cur).find((q) => q !== prev && !seen.has(q)); prev = cur; cur = nx2; }
+    if (loop.length > 8) loops.push(loop.filter((_, i) => i % 2 === 0));   // через точку: контур мягче и легче
+  }
+  const inside = (p, poly) => { let c = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const [xi, zi] = poly[i], [xj, zj] = poly[j]; if ((zi > p[1]) !== (zj > p[1]) && p[0] < ((xj - xi) * (p[1] - zi)) / (zj - zi) + xi) c = !c; } return c; };
+  return loops.map((l) => ({ pts: l, depth: loops.filter((o) => o !== l && inside(l[0], o)).length }));
+}
+
 /* ---------- каустика: сетка бегущих бликов (поверхность воды снизу, дно бассейна) ---------- */
 let _cau = null;
 export function causticTex() {

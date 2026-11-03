@@ -18,7 +18,7 @@ const SCENES = [
   { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.7, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.93, 'whoosh'], [0.97, 'splash']] },
   { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.8, out: 'white', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.94, 'chime']] },
   { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.6, out: 'cut', sfx: [[0.02, 'chime'], [0.97, 'door']] },
-  { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.9, 'whoosh']] },
+  { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.665, 'click'], [0.7, 'thud'], [0.76, 'click'], [0.795, 'thud'], [0.845, 'click'], [0.88, 'thud'], [0.93, 'whoosh']] },
   { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975, sfx: [[0.7, 'whoosh'], [0.81, 'chime']] },
 ];
 // Кнопки финала. Пустой href — кнопка не показывается.
@@ -159,7 +159,6 @@ function scrollToG(y) {
 function gToScroll(g) { const i = Math.min(N - 1, Math.floor(g)); return (cum[i] + (g - i) * SCENES[i].w) * VH_PER_UNIT * VH; }
 
 let previewTick = false, speedK = 0;
-const vhsEl = document.getElementById('vhs'), vhsTc = vhsEl?.querySelector('.tc');
 let cur = 0, target = 0, lastG = -1, curIdx = -1, started = false, jumping = false;
 // Стык 'black' уходит в чёрный, 'water' — в синеву воды (нырок AQUA → выныривание в POOL), 'cut' — склейка без затемнения
 const FADE_COLOR = { black: '#000', water: '#0a5f8f', white: '#fff' };
@@ -178,7 +177,11 @@ function apply(g) {
   const i = Math.min(N - 1, Math.floor(g)), t = g - i;
   const s = built.get(i);
   if (!s) { fadeEl.style.opacity = 1; buildScene(i).then(() => (dirty = true)); return false; }
-  fadeEl.style.opacity = blackAt(i, t).toFixed(3);
+  // сцена может сама погасить свет (мистика во дворце) и выключить музыку
+  const fk = blackAt(i, t), dk = s.dark?.(t) ?? 0;
+  if (dk > fk && fadeEl.dataset.c !== '#000') { fadeEl.style.background = '#000'; fadeEl.dataset.c = '#000'; }
+  fadeEl.style.opacity = Math.max(fk, dk).toFixed(3);
+  audio.music(!(s.mute?.(t)));
   s.update?.(t);
   const nr = s.near?.(t) ?? 0.05;
   if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); }
@@ -204,12 +207,10 @@ function apply(g) {
   if (s.preview?.live?.(t) && built.has(i + 1) && (previewTick = !previewTick)) { renderPreview(s, built.get(i + 1), true); dirty = true; }
   if (composer) {
     renderPass.scene = s.scene; bloomPass.strength = (s.bloom ?? 0.42) * (1 + 0.3 * kit.pulse.beat);
-    const vhs = SCENES[i].id === 'club' ? 1 : 0;
-    vigPass.uniforms.uZoom.value = speedK * 0.011; vigPass.uniforms.uRGB.value = speedK * 0.007 + vhs * 0.0035;
+    vigPass.uniforms.uZoom.value = speedK * 0.011; vigPass.uniforms.uRGB.value = speedK * 0.007;
     composer.render();
   } else renderer.render(s.scene, camera);
-  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); kit.playVideos(s.scene); vhsEl.classList.toggle('on', SCENES[i].id === 'club'); }
-  if (vhsTc && SCENES[i].id === 'club') { const sec = 23 * 3600 + 41 * 60 + Math.floor(t * 160); vhsTc.textContent = [sec / 3600, (sec / 60) % 60, sec % 60].map((v) => String(Math.floor(v)).padStart(2, '0')).join(':'); }
+  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); kit.playVideos(s.scene); }
   finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
   return true;
 }
@@ -327,6 +328,7 @@ const audio = {
   init() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC || this.ctx) return;
     this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination);
+    this.bus = this.ctx.createGain(); this.bus.connect(this.master);   // музыка отдельно от звуковых эффектов: её можно приглушить
     this.an = this.ctx.createAnalyser(); this.an.fftSize = 1024; this.an.smoothingTimeConstant = 0.5; this.master.connect(this.an);
     this.fq = new Uint8Array(this.an.frequencyBinCount);
     this.fx = makeSfx(this.ctx, this.master);
@@ -342,7 +344,7 @@ const audio = {
   wire(tr) {
     if (tr.gain || !this.ctx) return;
     const src = this.ctx.createMediaElementSource(tr.el); tr.gain = this.ctx.createGain(); tr.gain.gain.value = 0;
-    src.connect(tr.gain).connect(this.master);
+    src.connect(tr.gain).connect(this.bus);
   },
   go(i) {
     this.idx = i; if (!this.ctx || !this.on) return;
@@ -363,6 +365,8 @@ const audio = {
   },
   // доля баса 0…1: быстрая огибающая минус медленная — вспышка на каждом ударе бочки.
   // звук выключен — ровный пульс 122 BPM, чтобы сцены не замирали
+  musicOn: true,
+  music(v) { if (v === this.musicOn) return; this.musicOn = v; if (this.bus) this.bus.gain.setTargetAtTime(v ? 1 : 0, this.ctx.currentTime, v ? 0.4 : 0.03); },
   fast: 0, slow: 0, pv: 0,
   beat() {
     let k;
@@ -442,5 +446,6 @@ window.__staya = {
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, built: [...built.keys()] }),
   ready: () => real >= 100,
   scene: (i) => built.get(i)?.scene,
+  pick: (x, y) => { const r = new THREE.Raycaster(); r.setFromCamera(new THREE.Vector2(x, y), camera); const s = built.get(curIdx)?.scene; return s ? r.intersectObject(s, true).slice(0, 4).map((h) => [h.object.type, h.object.name, h.object.parent?.name, h.object.material?.type, h.object.material?.name, +h.distance.toFixed(2), h.object.geometry?.type, JSON.stringify(h.object.geometry?.parameters ?? {}).slice(0, 80)]) : []; },
   dbg: () => ({ g: cur, cam: camera.position.toArray().map((v) => +v.toFixed(4)), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(3) }),
 };

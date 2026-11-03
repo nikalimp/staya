@@ -54,6 +54,21 @@ export function makeSfx(ctx, out) {
       f.type = 'bandpass'; f.Q.value = 1.4; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1800, t + 0.7); f.frequency.exponentialRampToValueAtTime(500, t + 1.5);
       env(g, t, 0.5, 0.35, 1.0); n.connect(f).connect(g).connect(bus); n.start(t); n.stop(t + 1.6);
     },
+    // щелчок рубильника: свет гаснет
+    click() {
+      const t = now(), n = noise(0.08), f = ctx.createBiquadFilter(), g = ctx.createGain();
+      f.type = 'highpass'; f.frequency.value = 1800; env(g, t, 0.002, 0.6, 0.06); n.connect(f).connect(g).connect(bus); n.start(t); n.stop(t + 0.08);
+      const o = ctx.createOscillator(), g2 = ctx.createGain(); o.frequency.setValueAtTime(140, t); o.frequency.exponentialRampToValueAtTime(60, t + 0.12);
+      env(g2, t, 0.003, 0.35, 0.12); o.connect(g2).connect(bus); o.start(t); o.stop(t + 0.15);
+    },
+    // глухой удар и гул: свет включается — она ближе
+    thud() {
+      const t = now(), o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine';
+      o.frequency.setValueAtTime(90, t); o.frequency.exponentialRampToValueAtTime(32, t + 0.9);
+      env(g, t, 0.01, 1.0, 1.4); o.connect(g).connect(bus); o.start(t); o.stop(t + 1.5);
+      const n = noise(2.2), f = ctx.createBiquadFilter(), g2 = ctx.createGain(); f.type = 'lowpass'; f.frequency.value = 220;
+      env(g2, t, 0.05, 0.28, 2.0); n.connect(f).connect(g2).connect(bus); n.start(t); n.stop(t + 2.2);
+    },
     // мягкий аккорд-колокольчик на начало титров
     chime() {
       const t = now();

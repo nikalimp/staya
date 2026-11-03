@@ -11,19 +11,45 @@ export async function build({ THREE, kit, font, renderer }) {
   b.rim = ['#2fe6ff', '#ff3fb4', '#7ff2ff'];   // контровой свет силуэтов
   const PINK = '#ff2fa8', CYAN = '#2fe6ff', VIOLET = '#8a4dff', YEL = '#ffd84a';
 
-  /* --- зал: палуба вокруг бассейна (бассейн x[-15,15], z[-9,9]) --- */
-  const deck = '#7d74a6', top = 0.4;
-  b.add(G.box(100, 1, 40), deck, 'plastic', M([0, top - 0.5, -29]));
-  b.add(G.box(100, 1, 40), deck, 'plastic', M([0, top - 0.5, 29]));
-  b.add(G.box(35, 1, 18), deck, 'plastic', M([-32.5, top - 0.5, 0]));
-  b.add(G.box(35, 1, 18), deck, 'plastic', M([32.5, top - 0.5, 0]));
-  // бортик
-  for (const [w, d, x, z] of [[30.8, 0.4, 0, -9.2], [30.8, 0.4, 0, 9.2], [0.4, 18.8, -15.2, 0], [0.4, 18.8, 15.2, 0]]) b.add(G.box(w, 0.14, d), '#f5f3ff', 'gloss', M([x, top + 0.07, z]));
-  // чаша бассейна
-  b.add(G.box(30, 0.2, 18), '#0a7fa8', 'plastic', M([0, -2.1, 0]));
-  for (const [w, d, x, z] of [[30, 0.2, 0, -9.05], [30, 0.2, 0, 9.05], [0.2, 18, -15.05, 0], [0.2, 18, 15.05, 0]]) b.add(G.box(w, 2.4, d), '#1aa6cf', 'plastic', M([x, -0.9, z]));
-  // подводные фонари
-  for (let x = -12; x <= 12; x += 4) { glows.push([x, -0.6, -8.8, CYAN, 1.6, 1.4], [x, -0.6, 8.8, '#ffffff', 1.4, 1.0]); }
+  /* --- бассейн-лагуна со скруглёнными берегами и «ленивая река»: выходит из лагуны, огибает экраны и возвращается --- */
+  const deck = '#7d74a6', top = 0.4, FLOOR = -2.1;
+  const rbox = (x, z, hx, hz, r) => { const qx = Math.abs(x) - hx + r, qz = Math.abs(z) - hz + r; return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - r; };
+  const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
+  const RIVER = new THREE.CatmullRomCurve3([[-11.5, 6.5], [-16.8, 11], [-16.8, 17.5], [-12.5, 21.5], [12.5, 21.5], [16.8, 17.5], [16.8, 11], [11.5, 6.5]].map(([x, z]) => V(x, 0, z)), false, 'centripetal');
+  const RP = RIVER.getSpacedPoints(160), RW = 1.8;
+  const riverD = (x, z) => { let d = 1e9; for (let i = 1; i < RP.length; i++) { const a = RP[i - 1], c = RP[i], ux = c.x - a.x, uz = c.z - a.z, t = Math.max(0, Math.min(1, ((x - a.x) * ux + (z - a.z) * uz) / (ux * ux + uz * uz))); d = Math.min(d, Math.hypot(x - a.x - ux * t, z - a.z - uz * t)); } return d - RW; };
+  const lagoon = (x, z) => smin(rbox(x, z, 16, 9.5, 7), Math.hypot(x + 10, z + 7) - 5.5, 3);
+  const water = (x, z) => smin(lagoon(x, z), riverD(x, z), 2.4);
+  const loops = kit.sdfLoops(water, -24, 24, -16, 28, 0.25);
+  const outer = loops.filter((l) => l.depth % 2 === 0), isles = loops.filter((l) => l.depth % 2 === 1);
+  const toShape = (pts, S = THREE.Shape) => { const sh = new S(); pts.forEach(([x, z], i) => (i ? sh.lineTo(x, -z) : sh.moveTo(x, -z))); return sh; };
+  const flat = (geo, y) => { geo.rotateX(-Math.PI / 2); geo.translate(0, y, 0); return geo; };
+  // палуба: плита с вырезом лагуны и реки + острова между ними
+  const deckShape = toShape([[-50, -49], [50, -49], [50, 49], [-50, 49]]);
+  outer.forEach((l) => deckShape.holes.push(toShape(l.pts, THREE.Path)));
+  for (const sh of [deckShape, ...isles.map((l) => toShape(l.pts))]) b.add(flat(new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, curveSegments: 4 }), top - 1), deck, 'plastic', new THREE.Matrix4());
+  // дно и вода: внешние контуры, острова — дырки
+  const waterShapes = outer.map((l) => { const sh = toShape(l.pts); isles.forEach((il) => sh.holes.push(toShape(il.pts, THREE.Path))); return sh; });
+  b.add(flat(new THREE.ShapeGeometry(waterShapes), FLOOR), '#0a7fa8', 'plastic', new THREE.Matrix4());
+  // стенки чаши и белый бортик вдоль каждого берега; подводные фонари
+  for (const l of loops) {
+    const P = l.pts, n = P.length, wall = [], rim = [];
+    for (let i = 0; i < n; i++) {
+      const [ax, az] = P[i], [bx, bz] = P[(i + 1) % n];
+      let nx = -(bz - az), nz = bx - ax; const ln = Math.hypot(nx, nz) || 1; nx /= ln; nz /= ln;
+      if (water((ax + bx) / 2 + nx * 0.3, (az + bz) / 2 + nz * 0.3) > 0) { nx = -nx; nz = -nz; }   // нормаль — в воду
+      const q = [[ax, top, az], [bx, top, bz], [bx, FLOOR, bz], [ax, FLOOR, az]];
+      // порядок вершин: лицевая сторона смотрит в воду
+      const fw = ((bx - ax) * nz - (bz - az) * nx) > 0;
+      wall.push(...(fw ? [q[0], q[2], q[1], q[0], q[3], q[2]] : [q[0], q[1], q[2], q[0], q[2], q[3]]).flat());
+      const r1 = [ax - nx * 0.45, top + 0.03, az - nz * 0.45], r2 = [bx - nx * 0.45, top + 0.03, bz - nz * 0.45], w1 = [ax + nx * 0.05, top + 0.03, az + nz * 0.05], w2 = [bx + nx * 0.05, top + 0.03, bz + nz * 0.05];
+      rim.push(...(fw ? [r1, w1, w2, r1, w2, r2] : [r1, w2, w1, r1, r2, w2]).flat());
+      if (i % 16 === 0) glows.push([ax + nx * 0.25, -0.6, az + nz * 0.25, i % 32 ? '#ffffff' : CYAN, 1.5, 1.2]);
+    }
+    for (const [arr, c, k] of [[wall, '#1aa6cf', 'plastic'], [rim, '#f5f3ff', 'gloss']]) {
+      const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3)); g.computeVertexNormals(); b.add(g, c, k, new THREE.Matrix4());
+    }
+  }
 
   /* --- купол: рёбра и кольца --- */
   const DR = 46, DC = [0, 0, -4];
@@ -93,7 +119,10 @@ export async function build({ THREE, kit, font, renderer }) {
   // экран поднят и отодвинут: когда камера заходит за спины диджеев, он не закрывает полкадра
   kit.videoScreen(scene, 'video/aqua-h.mp4', 15, 7.5, [0, ST + 5.3, SZ - 3.7], [0, 0, 0], tex);
   // надувные буквы
-  kit.text3d(b, font, 'STAYA', { size: 2.4, color: '#ff4fb8', p: [0, TY + 0.6, SZ - 0.4] });
+  // логотип «СТАЯ» из файла бренда (world/logo.svg) — светящаяся вывеска на ферме
+  const logo = await kit.logoSign('world/logo.svg', 13.5, ['#ff4fb8', '#ffffff', '#7ff2ff']);
+  logo.position.set(0, TY + 2.0, SZ + 0.2); scene.add(logo);
+  glows.push([0, TY + 2.0, SZ - 0.2, PINK, 16, 0.18]);
 
   // колонки
   for (const sx of [-1, 1]) { kit.speaker(b, [sx * 10.6, top, SZ + 1], 0, 1.7, 1.5); kit.speaker(b, [sx * 10.6, top + 1.7, SZ + 1], 0, 1.7, 1.5); }
@@ -133,7 +162,7 @@ export async function build({ THREE, kit, font, renderer }) {
   [['video/aqua-v.mp4', 9], ['video/aqua-v2.mp4', 0], ['video/aqua-v3.mp4', -9]].forEach(([src, x], i) => kit.vScreen(scene, src, [x * 1.05, top + 0.8, 12.6], Math.PI, 13.5, { edge: [CYAN, PINK, CYAN][i] }));
   /* --- надувные круги: хаотично по бассейну, пара лежит на суше (Sketchfab, CC BY); у места прыжка (x≈-10.6, z≈-2) свободно --- */
   const FL = [['sf_duck', -11.2, 5.8, 2.2, 1.7], ['sf_flamingo', -4.2, -5.4, -0.7, 1.6], ['sf_duck', 3.4, 6.6, -1.2, 1.5], ['sf_flamingo', 12.2, -6.1, 1.9, 1.7],
-    ['sf_duck', -2.4, 1.2, 0.8, 1.4], ['sf_flamingo', 6.1, 3.1, 2.8, 1.5], ['sf_duck', 11.6, 1.8, 4.1, 1.6], ['sf_flamingo', -12.8, -7.2, 5.2, 1.6]];
+    ['sf_duck', -2.4, 1.2, 0.8, 1.4], ['sf_flamingo', 6.1, 3.1, 2.8, 1.5], ['sf_duck', 11.6, 1.8, 4.1, 1.6], ['sf_flamingo', -11.5, -6.2, 5.2, 1.6]];
   const floatsP = [kit.prop(scene, 'sf_floats', { p: [-4.5, -0.2, 3.5], ry: 1.1, w: 7.5 }), ...FL.map(([n, x, z, ry, w]) => kit.prop(scene, n, { p: [x, -0.12, z], ry, w }))];
   props.push(...floatsP);
   // на суше: фламинго у шезлонгов справа от сцены, утка на западной палубе
@@ -145,7 +174,7 @@ export async function build({ THREE, kit, font, renderer }) {
   [['sf_ball1', -24.8, top, -7], ['sf_ball2', -25.6, top, 3.4], ['sf_ball1', -8.5, -0.15, -2.4], ['sf_ball2', 7.5, -0.15, -6.5], ['sf_ball2', 20.6, top, -11], ['sf_ball1', 0.5, -0.15, 7.6],
     ['sf_ball1', 22.5, top, 9.5], ['sf_ball2', 41, top, 3.5], ['sf_ball1', 39.5, top, 9.2]]
     .forEach(([n, x, y, z], i) => props.push(kit.prop(scene, n, { p: [x, y, z], ry: i, w: 0.7 })));
-  for (const [x, z, ry, h] of [[-30, -14, 0.3, 9], [-31, 8, 2.1, 8], [-18, 11.5, 4.0, 8.5], [24.5, -10.5, 1.2, 9], [19.5, 12, 3.3, 8], [44, -13, 0.7, 9.5], [45, 12.5, 2.6, 8.5]])
+  for (const [x, z, ry, h] of [[-30, -14, 0.3, 9], [-37, 4, 2.1, 8], [-13.8, 17.5, 4.0, 8.5], [24.5, -10.5, 1.2, 9], [19.5, 12, 3.3, 8], [44, -13, 0.7, 9.5], [45, 12.5, 2.6, 8.5]])
     props.push(kit.prop(scene, 'sf_palm', { p: [x, top, z], ry, h }));
 
   /* --- аквазона на востоке, напротив вышки: башня с тремя трубами, открытые горки, лягушатник, грибы-фонтаны --- */
@@ -228,7 +257,13 @@ export async function build({ THREE, kit, font, renderer }) {
   kit.haze(scene, { box: [-26, 26, 4, 14, -22, 10], colors: ['#8a4dff', '#2fe6ff', '#ff2fa8'], n: 16, size: 16, opacity: 0.05 });
   await kit.applyBake(scene, built, 'aqua', { k: 32 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
   const w = kit.water(30, 18, '#0b8fc0', { tile: 5, ei: 0.5, opacity: 0.88, emissive: '#0a6fa8' });
+  w.geometry.dispose(); w.geometry = new THREE.ShapeGeometry(waterShapes); w.material.normalMap.repeat.set(0.2, 0.2);
   w.position.y = 0.1; scene.add(w);
+  // по реке плывут надувные круги
+  const tubesR = [PINK, YEL, CYAN, '#ff7a3a', VIOLET].map((c, i) => {
+    const m = new THREE.Mesh(new THREE.TorusGeometry(0.62, 0.26, 12, 28), new THREE.MeshStandardMaterial({ color: c, roughness: 0.3, metalness: 0 }));
+    m.rotation.x = Math.PI / 2; m.userData = { dynamic: true, ph: i / 5 }; scene.add(m); return m;
+  });
 
   /* --- камера: горка → бассейн → сцена → нырок --- */
   const keys = [];
@@ -248,21 +283,22 @@ export async function build({ THREE, kit, font, renderer }) {
     { p: [7.6, 3.7, -15.6], l: [0, 3.2, -16] },
     { p: [4.6, 3.5, -17.8], l: [0, 3.3, -15] },
     { p: [1.6, 3.45, -17.7], l: [0.85, 3.3, -12], t: 0.6 },
-    // над пультом — три экрана через бассейн, справа налево: боковое движение к востоку
-    { p: [-1.8, 3.6, -13.2], l: [-9.5, 7.5, 12.6], t: 0.645 },
-    { p: [1.8, 3.6, -12.6], l: [0, 7.5, 12.6], t: 0.7 },
-    { p: [7.8, 3.6, -12.0], l: [9.5, 7.5, 12.6], t: 0.755 },
-    // пролёт над бассейном, между надувными кругами — к вышке на западной стороне
-    { p: [3.5, 5.2, -6.5], l: [-19, 9.5, -4], t: 0.8 },
-    { p: [-11.5, 9.6, -7.6], l: [-21, 12.5, -3], t: 0.845 },
+    // над пультом — три экрана через бассейн, слева направо: боковое движение на запад, к вышке
+    { p: [2.4, 3.6, -13.2], l: [9.5, 7.5, 12.6], t: 0.645 },
+    { p: [-1.2, 3.6, -12.6], l: [0, 7.5, 12.6], t: 0.7 },
+    { p: [-6.8, 3.6, -12.0], l: [-9.5, 7.5, 12.6], t: 0.755 },
+    // пролёт к вышке на западной стороне
+    { p: [-10.5, 6.4, -8.8], l: [-21, 11.5, -3], t: 0.8 },
+    { p: [-15.5, 10.4, -7.6], l: [-21, 12.5, -2], t: 0.845 },
     { p: [-20.6, 12.9, -5.2], l: [-8, 10.5, 3], t: 0.875 },
     // на вышке — взгляд на аквапарк и аквазону с горками напротив
-    { p: [-20.2, 13.1, TZ], l: [AX, 7.5, AZ - 1], t: 0.905 },
-    { p: [-19.4, 13.1, TZ], l: [AX, 6.5, AZ - 1], t: 0.93 },
-    // прыжок и нырок
-    { p: [-15.6, 12.0, TZ], l: [-10.4, 2, TZ], t: 0.952 },
-    { p: [-12.4, 5.0, TZ], l: [-10.5, -3, TZ], t: 0.975 },
-    { p: [-10.3, -1.5, TZ], l: [-8.6, -6, TZ + 0.6], t: 1 },
+    { p: [-20.2, 13.1, TZ], l: [AX, 7.5, AZ - 1], t: 0.9 },
+    // шаги по доске до самого края, взгляд вниз — и прыжок с конца доски
+    { p: [-18.6, 13.05, TZ], l: [AX, 6.5, AZ - 1], t: 0.925 },
+    { p: [-15.3, 13.0, TZ], l: [-6, 4, TZ], t: 0.955 },
+    { p: [-14.3, 13.5, TZ], l: [-10.4, 1, TZ], t: 0.972 },
+    { p: [-12.0, 6.0, TZ], l: [-10.6, -3, TZ], t: 0.99 },
+    { p: [-10.6, -1.5, TZ], l: [-8.8, -6, TZ + 0.6], t: 1 },
   );
   const path = kit.camPath(keys);
   const bub = kit.bubbles(160, 4); scene.add(bub);
@@ -276,11 +312,6 @@ export async function build({ THREE, kit, font, renderer }) {
     r.position.set(f.userData.base.x, 0.13, f.userData.base.z); r.userData = { dynamic: true, ph: i * 0.37 }; scene.add(r); return r;
   });
   const jumpRings = [0, 1, 2].map((i) => { const r = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ringMat.clone()); r.rotation.x = -Math.PI / 2; r.position.set(-10.6, 0.14, TZ); r.visible = false; r.userData.dynamic = true; scene.add(r); return r; });
-  const spray = kit.drops(90, '#cfefff', 0.06), splash = kit.drops(160, '#e8fbff', 0.14), fount = kit.drops(150, '#dff7ff', 0.09);
-  scene.add(spray, splash, fount);
-  const SR = kit.rng(91), sprayS = Array.from({ length: 90 }, () => [SR(), SR() * 6.28, SR()]);
-  const splashS = Array.from({ length: 160 }, () => [SR() * 6.28, 2 + SR() * 5, 3 + SR() * 7, SR() * 0.25]);
-  const fountS = Array.from({ length: 150 }, (_, i) => [i % MUSH.length, SR() * 6.28, SR()]);
   const wn = w.material.normalMap;
   // под водой — плотная синяя дымка (нырок)
   const fogC = scene.fog.color.clone(), fogD = scene.fog.density, blue = new THREE.Color('#0a5f8f');
@@ -289,7 +320,7 @@ export async function build({ THREE, kit, font, renderer }) {
     const u = Math.min(0.97, (t / 0.2) * 0.97);
     tl1.position.copy(slide.getPointAt(Math.min(1, u + 0.012))); tl2.position.copy(slide.getPointAt(Math.min(1, u + 0.03)));
     tl1.intensity = tl2.intensity = t < 0.22 ? 14 : 0;
-    const k = Math.min(1, Math.max(0, (t - 0.972) / 0.024));
+    const k = Math.min(1, Math.max(0, (t - 0.992) / 0.008));
     scene.fog.color.copy(fogC).lerp(blue, k); scene.fog.density = fogD + k * 0.16;
     // под водой — пузыри вокруг камеры
     bub.userData.tick(path(t).p, k, now, 0.05);
@@ -297,33 +328,12 @@ export async function build({ THREE, kit, font, renderer }) {
     wn.offset.set(now * 0.018, now * 0.011);
     floats.forEach((f, i) => { const bs = f.userData.base; f.position.y = bs.y + Math.sin(now * 1.4 + i * 1.7) * 0.07; f.rotation.z = Math.sin(now * 1.1 + i) * 0.05; f.rotation.x = Math.cos(now * 0.9 + i * 2) * 0.04; });
     rings.forEach((r) => { const q = (now * 0.45 + r.userData.ph) % 1; r.scale.setScalar(1.8 + q * 3.2); r.material.opacity = 0.35 * (1 - q); });
-    // брызги в трубе: капли летят навстречу камере
-    const sp = spray.userData.pos;
-    if (t < 0.21) {
-      for (let i = 0; i < 90; i++) {
-        const [a0, ang, rr] = sprayS[i], q = (a0 + now * 1.6) % 1, uu = Math.min(1, u + 0.004 + q * 0.03);
-        const p = slide.getPointAt(uu); sp[i * 3] = p.x + Math.cos(ang) * 1.1 * rr; sp[i * 3 + 1] = p.y - 0.6 + Math.abs(Math.sin(ang)) * 0.9 * rr; sp[i * 3 + 2] = p.z + Math.sin(ang) * 1.1 * rr;
-      }
-    } else sp.fill(-999);
-    spray.userData.commit();
-    // всплеск: камера входит в воду — капли разлетаются вверх, по воде идут круги
-    const ks = (t - 0.968) / 0.03, pp = splash.userData.pos;
-    for (let i = 0; i < 160; i++) {
-      const [ang, vh, vu, d] = splashS[i], tt = (ks - d) * 1.4;
-      if (tt <= 0 || tt > 1.2) { pp[i * 3 + 1] = -999; continue; }
-      pp[i * 3] = -10.6 + Math.cos(ang) * vh * tt; pp[i * 3 + 1] = 0.2 + vu * tt - 9 * tt * tt; pp[i * 3 + 2] = TZ + Math.sin(ang) * vh * tt;
-    }
-    splash.userData.commit();
+    const ks = (t - 0.992) / 0.012;
     jumpRings.forEach((r, i) => { const q = ks * 1.3 - i * 0.18; r.visible = q > 0 && q < 1; r.scale.setScalar(1 + q * 9); r.material.opacity = 0.6 * (1 - q); });
-    // грибы-фонтаны: вода стекает со шляпок
-    const fp = fount.userData.pos;
-    for (let i = 0; i < 150; i++) {
-      const [m, ang, ph] = fountS[i], [x, z, h, r] = MUSH[m], q = (ph + now * 0.7) % 1;
-      fp[i * 3] = x + Math.cos(ang) * r * (0.96 + q * 0.12); fp[i * 3 + 1] = top + h - 0.15 - q * q * (h - 0.1); fp[i * 3 + 2] = z + Math.sin(ang) * r * (0.96 + q * 0.12);
-    }
-    fount.userData.commit();
+    // круги плывут по реке по кругу
+    tubesR.forEach((m) => { const q = (m.userData.ph + now * 0.012) % 1, p = RIVER.getPointAt(q); m.position.set(p.x, 0.16 + Math.sin(now * 1.5 + q * 30) * 0.05, p.z); });
     // лучи гаснут, пока камера смотрит на экраны напротив
-    if (beamM) beamM.opacity = 0.16 * (1 - 0.7 * Math.max(0, Math.min(1, (t - 0.6) / 0.03, (0.845 - t) / 0.03)));
+    if (beamM) beamM.opacity = 0.16 * (1 - 0.7 * Math.max(0, Math.min(1, (t - 0.6) / 0.03, (0.79 - t) / 0.03)));
   };
   const beamM = built.getObjectByName('beam')?.material;
   return { scene, cam: path, update };

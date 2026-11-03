@@ -87,6 +87,34 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     kit.prop(scene, 'sf_car_merc', { p: [9.4, 0.0, 41.5], ry: -0.5, w: 4.5 }),
     kit.prop(scene, 'sf_car_lambo', { p: [-22.5, 0.0, 3.5], ry: -2.4, w: 4.4 }),
   );
+  /* --- парковки по сторонам от въезда: машины стоят ёлочкой, их видно на подходе к дому (Sketchfab, CC BY) --- */
+  const lotT = kit.canvasTex(256, 768, (x, w, h) => {
+    x.fillStyle = '#3c3a3e'; x.fillRect(0, 0, w, h); x.strokeStyle = 'rgba(255,255,255,.75)'; x.lineWidth = 5;
+    for (let i = 0; i <= 5; i++) { const y = 40 + i * (h - 80) / 5; x.beginPath(); x.moveTo(w * 0.15, y); x.lineTo(w * 0.95, y - 50); x.stroke(); }
+  });
+  for (const sx of [-1, 1]) {
+    const lot = new THREE.Mesh(new THREE.PlaneGeometry(7, 21), new THREE.MeshStandardMaterial({ map: lotT, roughness: 0.85 }));
+    lot.rotation.set(-Math.PI / 2, 0, sx > 0 ? Math.PI : 0); lot.position.set(sx * 21.5, 0.025, 40); scene.add(lot);
+  }
+  [['sf_car_gclass', -21.6, 33.8, 4.6], ['sf_car_f288', -21.6, 40, 4.4], ['sf_car_koenig', -21.6, 46.2, 4.4],
+    ['sf_car_cullinan', 21.6, 33.8, 5.2], ['sf_car_gt3', 21.6, 40, 4.4]].forEach(([n, x, z, w]) =>
+    props.push(kit.prop(scene, n, { p: [x, 0.0, z], ry: x < 0 ? Math.PI / 2 - 0.45 : -Math.PI / 2 + 0.45, w })));
+  /* --- команда STAYA на балконе второго этажа: пять фото за стеклянными перилами, над каждым — ник --- */
+  const TEAM = [['gulidic', 'GULIDIC'], ['sixphrases', 'SIXPHRASES'], ['dierouzze', 'DIEROUZZE'], ['klen', 'KLËN'], ['pronto', 'PRONTO']];
+  await Promise.all(TEAM.map(async ([f, nick], i) => {
+    const img = new Image(); img.src = `world/team/${f}.webp`; await img.decode();
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; const x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    // низ кадра растворяется — фигура стоит за перилами, а не обрезана
+    x.globalCompositeOperation = 'destination-in'; const g = x.createLinearGradient(0, 0, 0, c.height); g.addColorStop(0, '#000'); g.addColorStop(0.68, '#000'); g.addColorStop(0.97, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+    const H = 1.8, W = H * c.width / c.height, X = [8.2, 5.5, 2.8, -2.8, -5.5][i];   // слева направо, как смотрит камера: GULIDIC … PRONTO; середина свободна для неона STAYA
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: t, transparent: true, color: '#fff0e4', depthWrite: false }));
+    m.position.set(X, Y2 + 0.3 + H / 2, -2.7); m.rotation.y = Math.PI; m.renderOrder = 2; scene.add(m);
+    const nt = kit.canvasTex(1024, 192, (x2, w, h) => kit.gradText(x2, nick, w / 2, h / 2, 104, '#ffffff', '#ff8ad8', { glow: '#ff3fb4' }));
+    const nm = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 0.4), new THREE.MeshBasicMaterial({ map: nt, transparent: true, toneMapped: false, depthWrite: false }));
+    nm.position.set(X, Y2 + 0.3 + H + 0.3, -2.7); nm.rotation.y = Math.PI; scene.add(nm);
+  }));
   /* --- далёкие острова: известняковые скалы-«свечи», как в заливе Пханг-Нга — отвесные стены, подмыв у воды, зелёная шапка --- */
   { const iM = new THREE.MeshLambertMaterial({ vertexColors: true });
     const RI = kit.rng(9), cliffC = new THREE.Color('#b9a48e'), darkC = new THREE.Color('#8a7a6c'), greenC = new THREE.Color('#5e7650'), hazeC = new THREE.Color('#eab396');
@@ -210,8 +238,9 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   const far = (k) => SD.clone().multiplyScalar(k).toArray();
   const fin = (k) => CP.clone().addScaledVector(VD, k).setY(CP.y + k * 0.035).toArray();
   const keys = [
-    // подъезд: вдоль канала к входу
-    { p: [0, 2.2, 44], l: [0, 3, 10], t: 0.0 },
+    // подъезд: между парковками с машинами, вдоль канала к входу
+    { p: [0, 2.6, 58], l: [0, 2.6, 20], t: 0.0 },
+    { p: [0, 2.2, 44], l: [0, 3, 10] },
     { p: [0, 1.95, 32], l: [0, 2.2, 10] },
     { p: [0, 1.8, 20], l: [0, 1.8, 4], t: 0.168 },
     { p: [0, 1.8, 14], l: [0, 1.7, 0], t: 0.21 },
@@ -226,7 +255,7 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     { p: [-6.4, 5.8, -17.5], l: [-4, 6.2, 4], t: 0.545 },
     // боковой пролёт вдоль террасы: бассейн на крыше → диджейская стойка с экраном → балкон
     { p: [-13, 7.3, -12.5], l: [-9, 5.6, 2], t: 0.61 },
-    { p: [-2, 7.4, -11.5], l: [0, 6.4, 4.6], t: 0.67 },
+    { p: [-2, 7.4, -11.5], l: [1, Y2 + 1.3, -2.7], t: 0.67 },
     { p: [9.5, 7.2, -12.5], l: [11.5, 5.8, -5], t: 0.72 },
     // разворот к морю — в восход
     { p: [5.5, 4.4, -18.5], l: far(600), t: 0.77 },
