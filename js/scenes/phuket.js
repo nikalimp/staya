@@ -87,16 +87,51 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     kit.prop(scene, 'sf_car_merc', { p: [9.4, 0.0, 41.5], ry: -0.5, w: 4.5 }),
     kit.prop(scene, 'sf_car_lambo', { p: [-22.5, 0.0, 3.5], ry: -2.4, w: 4.4 }),
   );
-  /* --- далёкие острова: простые узнаваемые силуэты в дымке, по сторонам от солнца --- */
-  { const iM = new THREE.MeshStandardMaterial({ color: '#8a8f86', roughness: 1, flatShading: true });
-    const RI = kit.rng(9);
-    for (const [ang, dist, w, h] of [[-0.62, 760, 150, 46], [-0.44, 980, 210, 70], [0.38, 820, 170, 52], [0.58, 1050, 240, 64], [0.5, 640, 70, 24]]) {
-      const g = new THREE.IcosahedronGeometry(1, 3), pos = g.attributes.position;
-      for (let i = 0; i < pos.count; i++) { const v = new THREE.Vector3().fromBufferAttribute(pos, i); const k = 1 + (RI() - 0.5) * 0.35; pos.setXYZ(i, v.x * k, Math.max(v.y, -0.2) * k, v.z * k); }
-      g.computeVertexNormals();
-      const m = new THREE.Mesh(g, iM), dir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), ang);
-      m.scale.set(w, h, w * 0.6); m.position.set(dir.x * dist, SEA - 2, dir.z * dist); m.rotation.y = RI() * 3; scene.add(m);
+  /* --- далёкие острова: известняковые скалы-«свечи», как в заливе Пханг-Нга — отвесные стены, подмыв у воды, зелёная шапка --- */
+  { const iM = new THREE.MeshLambertMaterial({ vertexColors: true });
+    const RI = kit.rng(9), cliffC = new THREE.Color('#b9a48e'), darkC = new THREE.Color('#8a7a6c'), greenC = new THREE.Color('#5e7650'), hazeC = new THREE.Color('#eab396');
+    const tower = (h, r) => {
+      // профиль: подмыв у воды → отвесная стена → скруглённая вершина
+      const prof = [[0, -2], [r * 0.82, -2], [r * 0.8, h * 0.05], [r * 0.97, h * 0.14], [r * 0.93, h * 0.45], [r * 0.86, h * 0.72], [r * 0.7, h * 0.88], [r * 0.42, h * 0.97], [0, h]].map(([x, y]) => new THREE.Vector2(x, y));
+      const g = new THREE.LatheGeometry(prof, 22), pos = g.attributes.position, col = [];
+      const ph = RI() * 6.28, ph2 = RI() * 6.28;
+      for (let i = 0; i < pos.count; i++) {
+        const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), a = Math.atan2(z, x);
+        const k = 1 + 0.12 * Math.sin(a * 3 + ph) + 0.07 * Math.sin(a * 7 + ph2 + y * 0.05) + 0.04 * Math.sin(y * 0.3 + a * 5);
+        pos.setXYZ(i, x * k, y, z * k);
+        const top = Math.min(1, Math.max(0, (y / h - 0.8) / 0.08)), streak = 0.5 + 0.5 * Math.sin(a * 11 + ph);
+        const c = cliffC.clone().lerp(darkC, streak * 0.45).lerp(greenC, top).lerp(hazeC, 0.35); col.push(c.r, c.g, c.b);
+      }
+      g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals(); return g;
+    };
+    // группы скал: угол от направления на море, дистанция, набор башен [dx, dz, высота, радиус]
+    const isles = [
+      [-0.6, 700, [[0, 0, 95, 30], [38, 12, 62, 22], [-30, 8, 48, 18]]],
+      [-0.42, 930, [[0, 0, 130, 40], [52, -10, 86, 28]]],
+      [0.36, 760, [[0, 0, 78, 26], [-34, 6, 104, 30], [30, 14, 44, 16]]],
+      [0.55, 1000, [[0, 0, 120, 36], [46, 8, 70, 24], [-40, -6, 56, 20]]],
+      [0.47, 560, [[0, 0, 40, 14], [18, 6, 26, 10]]],
+      [-0.78, 620, [[0, 0, 52, 18]]],
+    ];
+    for (const [ang, dist, set] of isles) {
+      const dir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), ang);
+      for (const [dx, dz, h, r] of set) {
+        const m = new THREE.Mesh(tower(h, r), iM); m.scale.set(1, 1, 0.8 + RI() * 0.3);
+        m.position.set(dir.x * dist + dx, SEA, dir.z * dist + dz); m.rotation.y = RI() * 6; scene.add(m);
+      }
     } }
+  /* --- шторы из лёгкой ткани у стеклянного фасада: колышутся от бриза --- */
+  const curtains = [];
+  { const cM = new THREE.MeshStandardMaterial({ color: '#fbf6ee', roughness: 0.9, transparent: true, opacity: 0.62, side: THREE.DoubleSide, depthWrite: false });
+    for (const [x, w] of [[-5.5, 2.4], [5.5, 2.4], [-12.6, 2.6], [12.6, 2.6]]) {
+      const g = new THREE.PlaneGeometry(w, 4.3, 28, 6), m = new THREE.Mesh(g, cM);
+      m.position.set(x, 2.2, 0.35); m.userData.dynamic = true; scene.add(m);
+      curtains.push({ m, base: Float32Array.from(g.attributes.position.array), ph: x });
+    } }
+  /* --- блики на дне инфинити-бассейна --- */
+  const cauT = kit.causticTex(); cauT.repeat.set(6, 3.7);
+  const cauM = new THREE.Mesh(new THREE.PlaneGeometry(18, 11), new THREE.MeshBasicMaterial({ map: cauT, color: '#bff6ff', transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false }));
+  cauM.rotation.x = -Math.PI / 2; cauM.position.set(0, -1.48, -12); cauM.userData.dynamic = true; scene.add(cauM);
   const EP = [4.4, 0.02, 3.6], ery = -0.98;
   props.push(kit.prop(scene, 'sf_easel', { p: EP, ry: ery, h: 2.2 }).then((m) => m.traverse((c) => { if (c.isMesh && /LOD1/.test(c.name + (c.parent?.name ?? ''))) c.visible = false; })));
   { const fw = 0.86, fh = fw * 16 / 9, off = new THREE.Vector3(0, 1.62, 0.12).applyAxisAngle(new THREE.Vector3(0, 1, 0), ery);
@@ -131,13 +166,14 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   const RT = new THREE.Vector3(-VD.z, 0, VD.x);                                                    // вправо от взгляда
   const at = (dist, side, y) => CP.clone().addScaledVector(VD, dist).addScaledVector(RT, side).setY(y);
   // титры — большой «щит» вдали по центру, поднимается из-за горизонта
-  const CW = 1024, CH = 2400 + CREDITS.length * 112 + 420, links = []; let yEnd = CH;
+  const CW = 1024, CH = 2400 + CREDITS.length * 128 + 420, links = []; let yEnd = CH;
   const credT = kit.canvasTex(CW, CH, (x, w, h) => {
     x.textAlign = 'center'; x.textBaseline = 'middle'; x.shadowColor = 'rgba(120,40,0,.55)'; x.shadowBlur = 30;
     let y = 150;
     const line = (txt, size, c1 = '#ffffff', c2 = '#ffe2c4', gap = 1.25) => { kit.gradText(x, txt, w / 2, y + size / 2, size, c1, c2, { glow: 'rgba(255,170,110,.7)' }); y += size * gap; };
     const cap = (txt) => { x.shadowBlur = 18; x.font = `800 44px Manrope, sans-serif`; x.fillStyle = 'rgba(255,255,255,.9)'; x.fillText(txt.toUpperCase().split('').join(String.fromCharCode(8202)), w / 2, y + 10); y += 140; };
-    const small = (txt, size = 36, alpha = 0.92, weight = 700) => { x.shadowBlur = 14; x.font = `${weight} ${size}px Manrope, sans-serif`; x.fillStyle = `rgba(255,255,255,${alpha})`; x.fillText(txt, w / 2, y + size / 2); y += size * 1.35; };
+    // мелкий текст: крупнее и с тёмной подложкой-тенью — раньше на светлом небе он терялся
+    const small = (txt, size = 36, alpha = 0.92, weight = 700) => { x.save(); x.shadowColor = 'rgba(70,20,10,.85)'; x.shadowBlur = 16; x.font = `${weight} ${size}px Manrope, sans-serif`; x.fillStyle = `rgba(255,255,255,${alpha})`; x.fillText(txt, w / 2, y + size / 2, w - 40); x.fillText(txt, w / 2, y + size / 2, w - 40); x.restore(); y += size * 1.35; };
     line('STAYA', 230, '#ffffff', '#ffd1ee', 1.35);
     line('Проводим тусовки', 70); line('с 2020 года', 70, '#ffffff', '#ffe2c4', 2.2);
     line('100 500', 190, '#ffffff', '#ffe2c4', 1.0); cap('гостей');
@@ -148,14 +184,14 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     // источники и лицензии: каждая строка — ссылка (клик по титрам открывает источник)
     small('ИСТОЧНИКИ И ЛИЦЕНЗИИ', 34, 0.75, 800); y += 18;
     for (const c of CREDITS) {
-      const y0 = y; small(c.what, 36, 0.95); small(`${c.who} · ${c.lic}`, 30, 0.7, 600); y += 16;
+      const y0 = y; small(c.what, 42, 1); small(`${c.who} · ${c.lic}`, 34, 0.86, 600); y += 16;
       links.push({ y0, y1: y, href: c.url });
     }
     y += 90; const y0 = y;
     small(DEV.label, 40, 0.8, 600); line(DEV.name, 96, '#ffffff', '#ffd1ee', 1.2);
     links.push({ y0, y1: y, href: DEV.url }); yEnd = y + 20;
   });  credT.anisotropy = 8;
-  const CDIST = 700, CWW = mobile ? 380 : 300, CHH = CWW * CH / CW;
+  const CDIST = 700, CWW = mobile ? 400 : 380, CHH = CWW * CH / CW;
   const cred = new THREE.Mesh(new THREE.PlaneGeometry(CWW, CHH), new THREE.MeshBasicMaterial({ map: credT, transparent: true, depthWrite: false, fog: false, toneMapped: false }));
   const cbase = CP.clone().addScaledVector(VD, CDIST);
   cred.position.copy(cbase); cred.lookAt(CP.x, cbase.y, CP.z); cred.userData.dynamic = true; cred.renderOrder = 1; scene.add(cred);
@@ -197,7 +233,18 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     { p: CP.toArray(), l: fin(1000), t: 0.83 },
     { p: CP.toArray(), l: fin(1000), t: 1 },
   ];
+  const waters = [sea, pool, jac, canal, roof].map((w, i) => [w.material.normalMap, [0.006, 0.02, 0.03, 0.01, 0.02][i]]);
   const update = (t) => {
+    const now = performance.now() / 1000;
+    // волны: бегущая рябь на море и в бассейнах, блики на дне
+    for (const [nm, v] of waters) nm.offset.set(now * v, now * v * 0.6);
+    cauT.offset.set(now * 0.02, -now * 0.013);
+    // шторы колышутся: волна вдоль ширины, сильнее внизу
+    for (const c of curtains) {
+      const p = c.m.geometry.attributes.position, b = c.base;
+      for (let i = 0; i < p.count; i++) { const x = b[i * 3], y = b[i * 3 + 1], low = (2.15 - y) / 4.3; p.setZ(i, (Math.sin(x * 3.1 + now * 1.3 + c.ph) * 0.09 + Math.sin(x * 1.3 - now * 0.8) * 0.06) * (0.4 + low)); }
+      p.needsUpdate = true;
+    }
     const ck = Math.min(1, Math.max(0, (t - 0.82) / 0.16));
     cred.position.y = credY(ck); cred.visible = t > 0.8;
     if (!pv) return;

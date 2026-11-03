@@ -94,7 +94,7 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   kit.truss(b, [FX0, TH, DZ], [FX1, TH, DZ], 0.4);
   for (const dz of [-0.9, 0.9]) kit.rod(b, [DX, TH, DZ + dz], [DX, MOON[1] + MR - 0.2, DZ + dz * 0.3], 0.02, '#c8c8d0', 'metal', 6);
   // Луна светится изнутри — без терминатора
-  const moonArt = kit.moonMesh(MR); moonArt.position.set(...MOON); scene.add(moonArt);
+  const moonArt = kit.moonMesh(MR); moonArt.position.set(...MOON); moonArt.userData.dynamic = true; scene.add(moonArt);
   scene.add(kit.halo(MOON, 22, '#cfd8ff', 0.35));
   for (let i = 0; i < 12; i++) {
     const x = FX0 + (i % 6) * 3, z = i < 6 ? FZ0 : FZ1, c = i % 2 ? '#2fe6ff' : '#8a3dff';
@@ -143,7 +143,8 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   const OCT = [0, 10.6, -13.4];   // центр осьминога над главной сценой
   const keys = [
     // выныриваем в центре бассейна: сначала взгляд в ночное небо, затем вниз — осьминог по центру кадра
-    { p: [0, -0.9, 2.4], l: [0, 30, -1.2], t: 0 },
+    { p: [0.4, -1.35, 2.0], l: [0.2, 30, -0.6], t: 0 },
+    { p: [0.15, -0.55, 2.4], l: [0, 30, -1.0], t: 0.03 },
     { p: [0, 0.68, 2.8], l: [0, 30, -1.6], t: 0.05 },
     { p: [0, 0.74, 3.5], l: [0, 22, -9], t: 0.12 },
     { p: [0, 0.76, 4.2], l: OCT, t: 0.2 },
@@ -153,8 +154,8 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     { p: [9.7, 0.75, -1.6], l: [13, 1.6, -1.6], t: 0.36 },
     { p: [11.9, EYE, -1.5], l: [18, EYE, -2], t: 0.41 },
     // прямо — коридор из двух экранов, развёрнутых по диагонали: взгляд налево, направо
-    { p: [13.6, EYE, -1.5], l: [18.2, 2.9, -5.6], t: 0.45 },
-    { p: [16.4, EYE, -1.4], l: [18.2, 2.9, 2.6], t: 0.5 },
+    { p: [13.0, EYE, -1.5], l: [18.2, 2.7, -5.6], t: 0.45 },
+    { p: [14.4, EYE, -1.1], l: [18.2, 2.7, 2.6], t: 0.5 },
     // впереди арка танцпола
     { p: [22.4, EYE, -1.2], l: [DX, 5, DZ], t: 0.56 },
     // сквозь арку: большие экраны по сторонам
@@ -167,6 +168,21 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   ];
   const path = kit.camPath(keys);
   const cam = (t) => path(t);
+  /* --- под водой: пузыри и лучи света от поверхности --- */
+  const bub = kit.bubbles(170, 9); scene.add(bub);
+  const rayM = new THREE.MeshBasicMaterial({ color: '#c8f4ff', transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+  const rays = new THREE.Group(); scene.add(rays);
+  // поверхность снизу: бегущая сетка бликов (каустика), два слоя навстречу друг другу
+  const surf = [0, 1].map((i) => {
+    const t2 = kit.causticTex(); t2.repeat.set(i ? 15 : 19, i ? 15 : 19);
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshBasicMaterial({ map: t2, color: i ? '#7fdcff' : '#d8f7ff', transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
+    m.rotation.x = Math.PI / 2; m.position.set(0, 0.1 - i * 0.02, 0); m.userData.dynamic = true; scene.add(m); return m;
+  });
+  const RR = kit.rng(31);
+  for (let i = 0; i < 9; i++) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.25 + RR() * 0.3, 0.9 + RR() * 0.8, 2.2, 14, 1, true), rayM);
+    m.position.set(-3 + RR() * 6, -0.95, -0.5 + RR() * 4.5); m.rotation.set((RR() - 0.5) * 0.35, 0, (RR() - 0.5) * 0.35); m.userData.dynamic = true; rays.add(m);
+  }
   // надписи надуваются по очереди: STAYA и POOL при выныривании, ELECTRO при повороте
   const blow = (g, a, d, t) => {
     if (!g) return;
@@ -174,10 +190,40 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     const e = k === 1 ? 1 : 1 + 2.7 * Math.pow(k - 1, 3) + 1.7 * Math.pow(k - 1, 2); // easeOutBack
     const s = 0.05 + 0.95 * e; g.scale.set(s, s, s);
   };
+  // щупальца осьминога машут: поворот вокруг основания
+  const wave = [['TENTL', [-2, 11.5, SZ - 3], -1], ['TENTR', [2.5, 12, SZ - 2.8], 1]].map(([n, base, sx]) => {
+    const o = letters[n]; if (!o) return null;
+    const g = new THREE.Group(); g.position.set(...base); scene.add(g); g.attach(o); return [g, sx];
+  }).filter(Boolean);
+  // салют за Луной: вспышки по очереди, искры разлетаются и падают
+  const FW = ['#ff3fb4', '#2fe6ff', '#ffd84a', '#b78bff', '#ffffff'].map((c, i) => {
+    const pts = kit.drops(90, c, 0.32, { fog: false }), R = kit.rng(70 + i);
+    const dir = Array.from({ length: 90 }, () => { const u = R() * 2 - 1, a = R() * 6.28, r = Math.sqrt(1 - u * u); return [r * Math.cos(a), u, r * Math.sin(a), 0.7 + R() * 0.3]; });
+    scene.add(pts); return { pts, dir, c: [DX + 16 + R() * 14, 15 + R() * 9, DZ - 14 + i * 7], ph: i * 0.53 };
+  });
   const update = (t) => {
+    const now = performance.now() / 1000;
+    for (const [g, sx] of wave) g.rotation.set(Math.sin(now * 1.6 + sx) * 0.07, 0, sx * Math.sin(now * 1.9 + sx) * 0.12);
+    // Луна медленно вращается и у самого края превращается в зеркальный диско-шар
+    moonArt.rotation.y = now * 0.05 + t * 1.2;
+    const mu = moonArt.material.uniforms; mu.tiles.value = Math.min(1, Math.max(0, (t - 0.86) / 0.11)); mu.time.value = now;
+    const fwOn = t > 0.62;
+    for (const f of FW) {
+      const p = f.pts.userData.pos, q = ((now * 0.42 + f.ph) % 1.6) / 1.6;
+      for (let i = 0; i < 90; i++) {
+        if (!fwOn || q > 0.62) { p[i * 3 + 1] = -999; continue; }
+        const [dx, dy, dz, v] = f.dir[i], r = (1 - Math.pow(1 - q / 0.62, 2.4)) * 7 * v;
+        p[i * 3] = f.c[0] + dx * r; p[i * 3 + 1] = f.c[1] + dy * r - q * q * 9; p[i * 3 + 2] = f.c[2] + dz * r;
+      }
+      f.pts.material.opacity = q < 0.62 ? 1 - q / 0.62 : 0; f.pts.userData.commit();
+    }
     // синяя толща воды рассеивается, когда голова выходит на поверхность
     const u = Math.min(1, Math.max(0, (t - 0.025) / 0.03));
     scene.fog.color.copy(DEEP).lerp(NIGHT, u); scene.fog.density = 0.12 + (0.004 - 0.12) * u;
+    const under = 1 - Math.min(1, Math.max(0, (t - 0.03) / 0.02));
+    bub.userData.tick(path(t).p, under, now, 0.08);
+    rays.visible = under > 0; rayM.opacity = 0.2 * under * (0.8 + 0.2 * Math.sin(now * 2));
+    surf.forEach((m, i) => { m.visible = under > 0; m.material.opacity = 0.42 * under; m.material.map.offset.set(now * (i ? -0.021 : 0.017), now * (i ? 0.013 : -0.019)); });
     blow(pv.STAYA, 0.1, 0.1, t); blow(pv.POOL, 0.14, 0.1, t);
   };
   // «прищур» на электро-сцену: камера приближает её, сверху и снизу темнеет, как веки

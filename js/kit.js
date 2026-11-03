@@ -92,6 +92,7 @@ export class Builder {
       geo.computeBoundingSphere();
       const mesh = new THREE.Mesh(geo, MAT[kind]());
       mesh.name = kind;
+      if (kind === 'neon' || kind === 'beam') pulse.mats.add(mesh.material);   // неон и лучи дышат в ритм музыки
       mesh.matrixAutoUpdate = false;
       if (kind === 'glass' || kind === 'beam') mesh.renderOrder = 2;
       group.add(mesh);
@@ -367,9 +368,9 @@ export function glowPoints(list) {
   geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
   geo.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uScale: { value: 600 } },
-    vertexShader: `attribute vec3 aColor; attribute float aSize; uniform float uScale; varying vec3 vC;
-      void main(){ vC=aColor; vec4 mv=modelViewMatrix*vec4(position,1.); gl_PointSize=min(aSize*uScale/max(-mv.z,0.1), 512.); gl_Position=projectionMatrix*mv; }`,
+    uniforms: { uScale: { value: 600 }, uBeat: pulse.u },
+    vertexShader: `attribute vec3 aColor; attribute float aSize; uniform float uScale, uBeat; varying vec3 vC;
+      void main(){ vC=aColor*(1.+uBeat*0.55); vec4 mv=modelViewMatrix*vec4(position,1.); gl_PointSize=min(aSize*(1.+uBeat*0.18)*uScale/max(-mv.z,0.1), 512.); gl_Position=projectionMatrix*mv; }`,
     fragmentShader: `varying vec3 vC; void main(){ float d=length(gl_PointCoord-.5)*2.; float a=max(0.,1.-d); a=a*a*(0.35+0.65*a*a); gl_FragColor=vec4(vC*a,1.);
       #include <colorspace_fragment>
     }`,
@@ -552,29 +553,53 @@ export function disposeScene(scene) {
 export const MOON_DIR = [0, -0.19, -0.982];
 export const MOON_K = 0.383;
 export function moonTexture() {
-  return canvasTex(1024, 512, (x, w, h) => {
-    x.fillStyle = '#fff1d6'; x.fillRect(0, 0, w, h);
-    const r = rng(5);
-    for (let i = 0; i < 120; i++) {
-      const cx = r() * w, cy = h * 0.12 + r() * h * 0.76, rr = 6 + r() * 42;
-      const g = x.createRadialGradient(cx, cy, 0, cx, cy, rr);
-      g.addColorStop(0, 'rgba(160,150,140,.55)'); g.addColorStop(0.7, 'rgba(170,160,150,.25)'); g.addColorStop(1, 'rgba(170,160,150,0)');
-      x.fillStyle = g; x.beginPath(); x.ellipse(cx, cy, rr, rr * 0.8, 0, 0, 7); x.fill();
+  // бесшовная по долготе: кратер у края рисуется ещё раз со сдвигом на ширину (раньше на Луне был вертикальный шов)
+  return canvasTex(2048, 1024, (x, w, h) => {
+    x.fillStyle = '#f6ead2'; x.fillRect(0, 0, w, h);
+    const r = rng(5), wrap = (cx, fn) => { fn(cx); if (cx < w * 0.15) fn(cx + w); if (cx > w * 0.85) fn(cx - w); };
+    // «моря» — крупные тёмные пятна
+    for (let i = 0; i < 14; i++) {
+      const cx = r() * w, cy = h * 0.25 + r() * h * 0.5, rr = 90 + r() * 170;
+      wrap(cx, (X) => { const g = x.createRadialGradient(X, cy, 0, X, cy, rr); g.addColorStop(0, 'rgba(150,140,128,.42)'); g.addColorStop(1, 'rgba(150,140,128,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(X, cy, rr, rr * 0.7, 0, 0, 7); x.fill(); });
+    }
+    // кратеры: тёмная чаша, светлый вал со стороны света
+    for (let i = 0; i < 260; i++) {
+      const cx = r() * w, cy = h * 0.1 + r() * h * 0.8, rr = 4 + Math.pow(r(), 2.2) * 60;
+      wrap(cx, (X) => {
+        const g = x.createRadialGradient(X + rr * 0.15, cy + rr * 0.1, 0, X, cy, rr); g.addColorStop(0, 'rgba(120,110,100,.5)'); g.addColorStop(0.75, 'rgba(140,130,120,.28)'); g.addColorStop(1, 'rgba(140,130,120,0)');
+        x.fillStyle = g; x.beginPath(); x.ellipse(X, cy, rr, rr * 0.85, 0, 0, 7); x.fill();
+        x.strokeStyle = 'rgba(255,250,236,.5)'; x.lineWidth = Math.max(1, rr * 0.12); x.beginPath(); x.ellipse(X, cy, rr * 0.92, rr * 0.78, 0, 3.6, 5.9); x.stroke();
+      });
     }
   });
 }
-// Луна с освещённой и тёмной стороной. lightDir — откуда свет (в мире).
+// Луна. lightDir — откуда свет (в мире), null — светится вся. uniforms.tiles 0…1 — превращение в зеркальный диско-шар.
 export function moonMesh(radius, lightDir = null, o = {}) {
-  const map = moonTexture();
+  const map = moonTexture(); map.anisotropy = 8;
   const mat = new THREE.ShaderMaterial({
-    uniforms: { map: { value: map }, L: { value: new THREE.Vector3(...(lightDir ?? [0, 0, 0])).normalize() }, lit: { value: lightDir ? 0 : 1 }, glow: { value: new THREE.Color(o.tint ?? '#fff3dc') } },
-    vertexShader: `varying vec2 vUv; varying vec3 vN; void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal); gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.); }`,
-    fragmentShader: `uniform sampler2D map; uniform vec3 L, glow; uniform float lit; varying vec2 vUv; varying vec3 vN;
-      void main(){ vec3 c=texture2D(map,vUv).rgb*glow; float k = lit>0.5 ? 1. : smoothstep(-0.15,0.35,dot(vN,L)); gl_FragColor=vec4(c*(0.035+0.965*k),1.);
+    uniforms: { map: { value: map }, L: { value: new THREE.Vector3(...(lightDir ?? [0, 0, 0])).normalize() }, lit: { value: lightDir ? 0 : 1 }, glow: { value: new THREE.Color(o.tint ?? '#fff3dc') }, tiles: { value: 0 }, time: { value: 0 } },
+    vertexShader: `varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv=uv; vN=normalize(mat3(modelMatrix)*normal); vec4 wp=modelMatrix*vec4(position,1.); vV=normalize(cameraPosition-wp.xyz); gl_Position=projectionMatrix*viewMatrix*wp; }`,
+    fragmentShader: `uniform sampler2D map; uniform vec3 L, glow; uniform float lit, tiles, time; varying vec2 vUv; varying vec3 vN; varying vec3 vV;
+      float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+      void main(){
+        vec3 c = texture2D(map, vUv).rgb * glow;
+        float k = lit > 0.5 ? 1. : smoothstep(-0.15, 0.35, dot(vN, L));
+        float mu = max(dot(vN, vV), 0.);
+        c *= 0.035 + 0.965 * k;
+        c *= mix(0.62, 1.04, pow(mu, 0.45));            // край диска темнее — Луна читается шаром
+        if (tiles > 0.) {
+          // зеркальная плитка: сетка по широте и долготе, каждая плитка вспыхивает в своё время
+          vec2 g = vec2(vUv.x * 64., vUv.y * 32.), id = floor(g), f = fract(g);
+          float grout = step(0.08, f.x) * step(0.08, f.y) * step(f.x, 0.92) * step(f.y, 0.92);
+          float r = h(id), flash = pow(max(0., sin(time * (2. + r * 3.) + r * 40.)), 18.);
+          vec3 mir = mix(vec3(0.55, 0.58, 0.68), vec3(1.), r * 0.5) * (0.55 + 0.45 * pow(mu, 0.3)) + flash * vec3(1.6, 1.5, 1.7);
+          c = mix(c, mir * grout + (1. - grout) * vec3(0.08), tiles);
+        }
+        gl_FragColor = vec4(c, 1.);
       #include <colorspace_fragment>
     }`,
   });
-  return new THREE.Mesh(new THREE.SphereGeometry(radius, 64, 40), mat);
+  return new THREE.Mesh(new THREE.SphereGeometry(radius, 96, 64), mat);
 }
 
 /* ---------- GLB из Blender (сжатие meshopt через gltfpack) ---------- */
@@ -799,6 +824,69 @@ export async function applyBake(scene, group, id, o = {}) {
     g.scene.traverse((c) => { if (c.isMesh) { const k = (c.material.name || 'plastic').split('.')[0]; c.material = mats[k] ||= mk(k); } });
     scene.add(g.scene);
   } catch (e) { console.warn('[staya] bake', id, e); }
+}
+
+/* ---------- ритм: доля баса в музыке 0…1 (main.js обновляет каждый кадр), им дышат неон, лучи и огни ---------- */
+export const pulse = { beat: 0, u: { value: 0 }, mats: new Set(),
+  apply(k) {
+    this.beat = k; this.u.value = k;
+    for (const m of this.mats) m.color.setScalar(1 + k * 0.6);
+  } };
+
+/* ---------- каустика: сетка бегущих бликов (поверхность воды снизу, дно бассейна) ---------- */
+let _cau = null;
+export function causticTex() {
+  if (!_cau) {
+    _cau = canvasTex(512, 512, (x, w2, h2) => {
+      x.fillStyle = '#000'; x.fillRect(0, 0, w2, h2); const C = rng(12), P = [];
+      for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) P.push([(i + 0.2 + C() * 0.6) / 7 * w2, (j + 0.2 + C() * 0.6) / 7 * h2]);
+      x.strokeStyle = '#fff'; x.lineWidth = 3; x.shadowColor = '#fff'; x.shadowBlur = 6; x.lineCap = 'round';
+      for (const [ax, ay] of P) for (const [bx, by] of P) for (const ox of [-w2, 0, w2]) for (const oy of [-h2, 0, h2]) {
+        const d = Math.hypot(bx + ox - ax, by + oy - ay); if (d < 1 || d > w2 / 6.2) continue;
+        x.beginPath(); x.moveTo(ax, ay); x.quadraticCurveTo((ax + bx + ox) / 2 + (C() - 0.5) * 20, (ay + by + oy) / 2 + (C() - 0.5) * 20, bx + ox, by + oy); x.stroke();
+      }
+    });
+    _cau.wrapS = _cau.wrapT = THREE.RepeatWrapping;
+  }
+  const t = _cau.clone(); t.needsUpdate = true; return t;
+}
+
+/* ---------- капли: облако светящихся точек, позиции двигает сама сцена ---------- */
+// drops(n, color, size) → Points; pos — Float32Array (x,y,z подряд); после правки — commit()
+let _dotTex = null;
+function dotTex() {
+  if (_dotTex) return _dotTex;
+  const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d');
+  const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,.55)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 64, 64); _dotTex = new THREE.CanvasTexture(c); return _dotTex;
+}
+export function drops(n, color = '#dff6ff', size = 0.08, o = {}) {
+  const geo = new THREE.BufferGeometry(), pos = new Float32Array(n * 3).fill(-999);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  const mat = new THREE.PointsMaterial({ color, size, map: dotTex(), transparent: true, opacity: o.opacity ?? 0.9, depthWrite: false, blending: o.normal ? THREE.NormalBlending : THREE.AdditiveBlending, fog: o.fog ?? true, toneMapped: false });
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.userData.dynamic = true; pts.renderOrder = o.order ?? 3;
+  pts.userData.pos = pos; pts.userData.commit = () => { geo.attributes.position.needsUpdate = true; };
+  return pts;
+}
+
+// пузыри под водой вокруг камеры: bubbles(n) → Points; .userData.tick(center, k, time) — k 0…1 (видимость), time — секунды
+export function bubbles(n = 140, seed = 3) {
+  const pts = drops(n, '#e6fbff', 0.07, { opacity: 0.8, fog: false, order: 4 }), R = rng(seed);
+  const S = Array.from({ length: n }, () => [R() * 6.28, 0.25 + R() * 1.6, R(), 0.5 + R() * 0.9, R() * 6.28]);
+  pts.userData.tick = (c, k, now, maxY = 0.05) => {
+    const p = pts.userData.pos;
+    for (let i = 0; i < n; i++) {
+      const [a, r, ph, v, w] = S[i], q = (ph + now * v * 0.35) % 1;
+      if (k <= 0 || ph > k) { p[i * 3 + 1] = -999; continue; }
+      p[i * 3] = c.x + Math.cos(a) * r + Math.sin(now * 3 + w) * 0.05;
+      p[i * 3 + 1] = c.y - 1.6 + q * 3.4;
+      p[i * 3 + 2] = c.z + Math.sin(a) * r + Math.cos(now * 2.6 + w) * 0.05;
+      if (p[i * 3 + 1] > maxY) p[i * 3 + 1] = -999;   // над водой пузырей нет
+    }
+    pts.material.opacity = 0.8 * Math.min(1, k * 2);
+    pts.userData.commit();
+  };
+  return pts;
 }
 
 /* ---------- дымка: мягкие полупрозрачные облака-спрайты в объёме сцены ---------- */
