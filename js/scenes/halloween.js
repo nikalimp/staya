@@ -312,5 +312,6 @@ export async function build({ THREE, kit, font, renderer }) {
   const preview = { mesh: photo, t: 0, fov: 2 * Math.atan(0.035 / dEnd) * 180 / Math.PI, live: (t) => t > 0.875 };
   // предмет для сбора: тыква-фонарь на правом краю пульта, не на пути камеры
   addLoot(scene, 'pumpkin', 'pumpkin', [1.75, LY + 1.4, BZ + 0.15], { r: 0.6, ry: Math.PI });
+  addLoot(scene, 'star', 'star', [0, 18.6, 3], { r: 1.1, glow: 1.6 });   // тайный 9-й предмет: под центральной люстрой, виден тому, кто смотрит вверх
   return { scene, cam: kit.camPath(keys), update, near, calm, preview };
 }

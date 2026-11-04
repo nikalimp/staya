@@ -15,6 +15,12 @@ function canvasTex(w, h, draw) { const c = document.createElement('canvas'); c.w
 
 // модели, размеры в метрах
 const MAKE = {
+  // тайный предмет: золотая звезда (9-й, вне счёта)
+  star() {
+    const sh = new THREE.Shape(); for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? 0.13 : 0.3; i ? sh.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : sh.moveTo(Math.cos(a) * rr, Math.sin(a) * rr); }
+    const m = new THREE.Mesh(new THREE.ExtrudeGeometry(sh, { depth: 0.06, bevelEnabled: true, bevelSize: 0.02, bevelThickness: 0.02, bevelSegments: 2 }), std('#ffd84a', { r: 0.2, m: 1, e: '#7a5000', ei: 0.8 }));
+    m.position.z = -0.03; const g = new THREE.Group(); g.add(m); return g;
+  },
   // золотая пластинка с розовой «яблоком»
   vinyl() {
     const g = new THREE.Group();
@@ -117,12 +123,18 @@ export function addLoot(scene, id, kind, p, o = {}) {
   return root;
 }
 
-// каждый кадр: парят, вращаются, мерцают; собранные улетают вверх и тают
-export function lootTick(scene, now) {
+// каждый кадр: парят, вращаются, мерцают; собранный предмет летит «в карман» — к камере, чуть ниже центра кадра, с разгоном и вращением
+const _tgt = new THREE.Vector3(), _fw = new THREE.Vector3(), _dn = new THREE.Vector3();
+export function lootTick(scene, now, cam) {
   for (const r of scene.userData.loot || []) {
     const L = r.userData.loot;
     if (L.gone) {
-      const k = Math.min(1, (now - L.gone) / 0.6); r.position.y = L.base + k * 1.2; r.scale.setScalar(1 - k * 0.9); L.glow.material.opacity = 1 - k;
+      const k = Math.min(1, (now - L.gone) / 0.75), e = k * k * (3 - 2 * k);
+      if (!L.from) { L.from = r.position.clone(); L.spin = r.rotation.y; }
+      if (cam) { cam.getWorldDirection(_fw); _dn.set(0, -1, 0).applyQuaternion(cam.quaternion); _tgt.copy(cam.position).addScaledVector(_fw, 0.9).addScaledVector(_dn, 0.42); }
+      else _tgt.copy(L.from).setY(L.base + 1.2);
+      r.position.lerpVectors(L.from, _tgt, e); r.position.y += Math.sin(k * Math.PI) * 0.6;   // дуга вверх, потом вниз в карман
+      r.rotation.y = L.spin + k * 9; r.scale.setScalar(1 - e * 0.85); L.glow.material.opacity = 1 - k;
       if (k >= 1) r.visible = false; continue;
     }
     if (!L.lie) { r.position.y = L.base + Math.sin(now * 2 + L.ph) * 0.06; L.item.rotation.y = now * 1.2 + L.ph; }
