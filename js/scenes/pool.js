@@ -167,6 +167,17 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     const t = i / 22, sag = Math.sin(t * Math.PI) * 2;
     glows.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t - sag - 0.12, a[2] + (c[2] - a[2]) * t, i % 3 ? '#ffd28a' : '#ff3fb4', 0.7, 1.5]);
   }
+  // шатёр гирлянд над танцполом: 8 столбов по кругу, нити сходятся к вершине фермы — при вращении на танцполе
+  // и взгляде вверх на Луну они расходятся лучами
+  for (let k = 0; k < 8; k++) {
+    const a = (k / 8) * Math.PI * 2 + Math.PI / 8, px = DX + Math.cos(a) * 15, pz = DZ + Math.sin(a) * 15;
+    kit.rod(b, [px, 0, pz], [px, 7.5, pz], 0.08, '#2a2232', 'metal', 6); glows.push([px, 7.6, pz, '#ffd28a', 1.4, 1.6]);
+    const a2 = ((k + 1) / 8) * Math.PI * 2 + Math.PI / 8, qx = DX + Math.cos(a2) * 15, qz = DZ + Math.sin(a2) * 15;
+    for (const [A, Cc, n, sag] of [[[px, 7.5, pz], [DX, TH + 0.3, DZ], 26, 1.6], [[px, 7.5, pz], [qx, 7.5, qz], 14, 1.2]]) for (let i = 1; i < n; i++) {
+      const t = i / n;
+      glows.push([A[0] + (Cc[0] - A[0]) * t, A[1] + (Cc[1] - A[1]) * t - Math.sin(t * Math.PI) * sag, A[2] + (Cc[2] - A[2]) * t, i % 3 ? '#ffd28a' : (k % 2 ? '#ff3fb4' : '#2fe6ff'), 0.6, 1.4]);
+    }
+  }
   scene.add(kit.glowPoints(glows));
 
   /* --- камера: от первого лица --- */
@@ -189,7 +200,8 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     { p: [14.4, EYE, -1.1], l: [18.2, 2.7, 2.6], t: 0.5 },
     // впереди арка танцпола
     { p: [22.4, EYE, -1.2], l: [DX, 5, DZ], t: 0.56 },
-    // сквозь арку на танцпол
+    // присели — низко над плитками под аркой, и выпрямляемся на танцполе
+    { p: [25.4, 0.95, DZ], l: [DX, 1.3, DZ], t: 0.595 },
     { p: [28.5, EYE, DZ], l: [DX + 8, 3, DZ], t: 0.62 },
   ];
   const path = kit.camPath(keys);
