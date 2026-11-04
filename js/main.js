@@ -16,7 +16,7 @@ import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const SCENES = [
   { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.7, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.93, 'whoosh'], [0.97, 'splash']] },
-  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.8, out: 'white', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.94, 'chime']] },
+  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.8, out: 'strobe', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.94, 'chime']] },
   { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.6, out: 'cut', sfx: [[0.02, 'chime'], [0.97, 'door']] },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.93, 'whoosh']] },
   { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975, sfx: [[0.7, 'whoosh'], [0.81, 'chime']] },
@@ -67,6 +67,9 @@ function detectTier(gl) {
   return weak || mem <= 4 ? 'mid' : 'high';
 }
 const probe = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
+// без WebGL или по ссылке ?lite — лёгкая версия: лента миров с кадрами и текстом (та же разметка, что для поисковиков)
+const LITE = !probe || new URLSearchParams(location.search).has('lite');
+if (LITE) { document.documentElement.classList.add('lite'); document.body.classList.remove('locked'); }
 let tier = probe ? detectTier(probe) : 'low';
 let quality = TIERS[tier];
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality.aa, powerPreference: 'high-performance' });
@@ -134,6 +137,7 @@ function fpsSample() {
   if (now - fps.start < 4000 || fps.n < 60) return;
   fps.done = true;
   if (fps.slow / fps.n > 0.35 && tier !== 'low') setTier(TIER_ORDER[TIER_ORDER.indexOf(tier) - 1]);
+  else if (fps.slow / fps.n > 0.6) { lootEl.innerHTML = 'Тормозит? Есть <a href="?lite" style="color:#ffd1ee">лёгкая версия</a>'; lootEl.style.pointerEvents = 'auto'; lootEl.classList.add('on'); setTimeout(() => { lootEl.classList.remove('on'); lootEl.style.pointerEvents = ''; }, 8000); }
   if (DEBUG) console.log(`[staya] fps check: ${fps.n} frames, ${(100 * fps.slow / fps.n).toFixed(0)}% slow → tier ${tier}`);
 }
 // понижение уровня на лету: меньше пикселей и без bloom (текстуры остаются загруженными)
@@ -205,7 +209,7 @@ function gToScroll(g) { const i = Math.min(N - 1, Math.floor(g)); return (cum[i]
 let previewTick = false, speedK = 0;
 let cur = 0, target = 0, lastG = -1, curIdx = -1, started = false, jumping = false;
 // Стык 'black' уходит в чёрный, 'water' — в синеву воды (нырок AQUA → выныривание в POOL), 'cut' — склейка без затемнения
-const FADE_COLOR = { black: '#000', water: '#0a5f8f', white: '#fff' };
+const FADE_COLOR = { black: '#000', water: '#0a5f8f', white: '#fff', strobe: '#fff' };
 // нырок AQUA → POOL снят в самих сценах (пузыри, толща воды), заливка только склеивает кадры
 const FADE_LEN = { water: 0.014 };
 function blackAt(i, t) {
@@ -215,6 +219,9 @@ function blackAt(i, t) {
   if (FADE_COLOR[inT] && t < fi) { k = 1 - t / fi; c = FADE_COLOR[inT]; }
   if (FADE_COLOR[outT] && t > 1 - fo) { k = (t - (1 - fo)) / fo; c = FADE_COLOR[outT]; }
   if (fadeEl.dataset.c !== c) { fadeEl.style.background = c; fadeEl.dataset.c = c; }
+  // стробоскоп на входе в 2K17: белая заливка мигает 12 раз в секунду
+  const st = (t < fi && inT === 'strobe') || (t > 1 - fo && outT === 'strobe');
+  if (st && k > 0 && !reduced) { k = k * (Math.sin(performance.now() / 1000 * Math.PI * 24) > 0 ? 1 : 0.08); dirty = true; }
   return Math.max(0, Math.min(1, k));
 }
 function apply(g) {
@@ -248,7 +255,7 @@ function apply(g) {
     camera.rotateY(-hx * 0.16 - hyaw * 0.3); camera.rotateX(hy * 0.12 + hp * 0.2);
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
-  lootTick(s.scene, performance.now() / 1000); kit.tickTime(performance.now() / 1000);
+  lootTick(s.scene, performance.now() / 1000, camera); kit.tickTime(performance.now() / 1000);
   touchTick(s, t);
   // живое превью следующей сцены в телефоне (дворец → вилла)
   // (через кадр: кадр виллы почти неподвижен, а рендер второй сцены дорогой)
@@ -351,7 +358,8 @@ const scoreEl = document.createElement('p'); scoreEl.className = 'score'; finalE
 const shareBtn = document.createElement('button'); shareBtn.type = 'button'; shareBtn.className = 'share'; shareBtn.textContent = 'Поделиться'; finalEl.querySelector('.row').prepend(shareBtn);
 function scoreText() {
   const n = lootCount();
-  scoreEl.innerHTML = n >= LOOT_TOTAL ? `<b>${n}/${LOOT_TOTAL}</b> — стикерпак твой! Покажи этот экран на тусовке СТАИ`
+  scoreEl.innerHTML = n > LOOT_TOTAL ? `<b>${LOOT_TOTAL}/${LOOT_TOTAL} ★</b> — стикерпак твой, и ты нашёл тайную звезду`
+    : n >= LOOT_TOTAL ? `<b>${n}/${LOOT_TOTAL}</b> — стикерпак твой! Покажи этот экран на тусовке СТАИ`
     : n ? `<b>${n}/${LOOT_TOTAL}</b> собрано — вернись и найди остальные` : `Собери <b>${LOOT_TOTAL}</b> предметов по пути — получишь стикерпак`;
 }
 scoreText();
@@ -365,7 +373,7 @@ function shareImage() {
   x.shadowColor = 'rgba(255,63,180,.6)'; x.shadowBlur = 40;
   x.font = '900 190px Unbounded, Arial Black, sans-serif'; x.fillStyle = grad(330, 520); x.fillText('STAYA', 540, 430); x.fillText('WORLD', 540, 610);
   x.shadowBlur = 0; x.font = '800 34px Unbounded, sans-serif'; x.fillStyle = '#ffd1ee'; x.fillText('B-DAY 8 YEARS', 540, 720);
-  x.font = '900 120px Unbounded, sans-serif'; x.fillStyle = n >= LOOT_TOTAL ? '#ffd84a' : '#ffffff'; x.fillText(`${n}/${LOOT_TOTAL}`, 540, 900);
+  x.font = '900 120px Unbounded, sans-serif'; x.fillStyle = n >= LOOT_TOTAL ? '#ffd84a' : '#ffffff'; x.fillText(n > LOOT_TOTAL ? `${LOOT_TOTAL}/${LOOT_TOTAL} ★` : `${n}/${LOOT_TOTAL}`, 540, 900);
   x.font = '700 40px Manrope, sans-serif'; x.fillStyle = 'rgba(255,255,255,.85)'; x.fillText(n >= LOOT_TOTAL ? 'все предметы собраны — стикерпак мой' : 'предметов собрано', 540, 990);
   x.font = '700 36px Manrope, sans-serif'; x.fillStyle = 'rgba(255,255,255,.55)'; x.fillText('staya.nikalimp.ru', 540, 1240);
   return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9));
@@ -393,7 +401,8 @@ function lootToast(n) {
   if (done) confetti();
   scoreText();
   lootEl.classList.toggle('done', done);
-  lootEl.innerHTML = done ? `<b>${n}/${LOOT_TOTAL}</b> — все предметы собраны!<br>Приходи на любую тусовку СТАИ и забирай стикерпак в подарок`
+  lootEl.innerHTML = n > LOOT_TOTAL ? `<b>★</b> Тайный предмет найден! Ты видишь больше других`
+    : done ? `<b>${n}/${LOOT_TOTAL}</b> — все предметы собраны!<br>Приходи на любую тусовку СТАИ и забирай стикерпак в подарок`
     : `<b>${n}/${LOOT_TOTAL}</b> собрано`;
   lootEl.classList.add('on'); clearTimeout(lootTimer); lootTimer = setTimeout(() => lootEl.classList.remove('on'), done ? 9000 : 2600);
 }
@@ -599,8 +608,23 @@ ring.addEventListener('click', () => {
   const offHint = () => { if (scrollY > lim()) { sh.classList.remove('on'); removeEventListener('scroll', offHint); } };
   addEventListener('scroll', offHint, { passive: true });
 });
-boot().catch((e) => { console.error(e); pctEl.textContent = '!'; });
-requestAnimationFrame(loop);
+if (LITE) { pre.remove(); lite(); }
+else { boot().catch((e) => { console.error(e); pctEl.textContent = '!'; }); requestAnimationFrame(loop); }
+// лёгкая версия: к каждому миру — кадр-постер из его видео и ссылка на полную версию
+function lite() {
+  const posters = { aqua: 'video/aqua-h.webp', pool: 'video/pool-h.webp', club: 'video/2k17-v2.webp', halloween: 'video/halloween-v.webp', phuket: 'video/phuket2.webp' };
+  document.querySelectorAll('main section').forEach((sec, k) => { const id = SCENES[k]?.id; if (!id) return; const im = new Image(); im.src = posters[id]; im.alt = ''; im.loading = 'lazy'; sec.prepend(im); });
+  const a = document.createElement('a'); a.href = location.pathname; a.className = 'full'; a.textContent = probe ? 'Открыть полную 3D-версию' : 'Для 3D-версии нужен браузер с WebGL'; document.querySelector('main').prepend(a);
+  finalEl.classList.add('on'); document.querySelector('main').appendChild(finalEl);
+}
+
+/* ---------- клавиатура: переход к миру по цифрам 1–5 и через скрытое меню (видно при фокусе) ---------- */
+const jumpNav = document.createElement('nav'); jumpNav.id = 'jump'; jumpNav.setAttribute('aria-label', 'Перейти к миру');
+const NAMES = { aqua: 'AQUA', pool: 'POOL', club: '2K17', halloween: 'HALLOWEEN', phuket: 'PHUKET' };
+SCENES.forEach((sc, k) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = `${k + 1}. ${NAMES[sc.id]}`; b.addEventListener('click', () => jumpTo(k)); jumpNav.appendChild(b); });
+document.body.appendChild(jumpNav);
+function jumpTo(k) { if (!started || LITE) return; const g = k + FADE * 1.4; jumping = true; scrollTo(0, gToScroll(g)); cur = target = g; buildScene(k).then(() => (dirty = true)); jumping = false; dirty = true; }
+addEventListener('keydown', (e) => { if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return; const k = '12345'.indexOf(e.key); if (k >= 0) jumpTo(k); });
 
 // Отладка: __staya.go(g) — камера в точку g (номер сцены + доля)
 window.__staya = {

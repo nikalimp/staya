@@ -119,6 +119,22 @@ canvas.confetti{position:fixed;inset:0;z-index:9;pointer-events:none}
 @keyframes wheel{0%{opacity:0;transform:translateY(-2px)}30%{opacity:1}100%{opacity:0;transform:translateY(12px)}}
 @media (prefers-reduced-motion:reduce){#scrollhint .mouse::after{animation:none}}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+/* лёгкая версия (?lite или без WebGL): лента миров */
+.lite body{overflow:auto;background:#07030a}
+.lite #gl,.lite #spacer,.lite #scrollhint,.lite #lids,.lite #vig,.lite #fade,.lite #jump,.lite #loot{display:none}
+.lite main.sr{position:static;width:auto;height:auto;clip:auto;white-space:normal;overflow:visible;max-width:720px;margin:0 auto;padding:40px 20px 60px;color:#fff;font:400 17px/1.55 Manrope,system-ui,sans-serif}
+.lite main h1{font:900 clamp(34px,8vw,64px)/1 Unbounded,sans-serif;margin:0 0 28px;background:linear-gradient(180deg,#fff,#ff5fc0 60%,#c2187f);-webkit-background-clip:text;background-clip:text;color:transparent}
+.lite main h2{font:800 22px/1.2 Unbounded,sans-serif;margin:0 0 10px}
+.lite main section{margin:0 0 40px}
+.lite main section img{display:block;width:100%;max-height:360px;object-fit:cover;border-radius:16px;margin:0 0 14px;background:#1a0a20}
+.lite main a.full{display:inline-block;margin:0 0 32px;padding:12px 20px;border-radius:23px;background:linear-gradient(180deg,#ff7cc9,#ff2fa6);color:#fff;font:800 14px Manrope,sans-serif;text-decoration:none}
+.lite main #final{position:static;opacity:1;transform:none;pointer-events:auto;margin-top:20px}
+.lite main #final .share{display:none}
+/* меню переходов для клавиатуры: появляется при фокусе */
+#jump{position:fixed;top:16px;left:16px;z-index:12;display:flex;gap:6px;opacity:0;pointer-events:none;transition:opacity .25s}
+#jump:focus-within{opacity:1;pointer-events:auto}
+#jump button{all:unset;padding:8px 12px;border-radius:16px;background:rgba(14,6,20,.78);border:1px solid rgba(255,255,255,.3);color:#fff;font:700 13px Manrope,sans-serif;cursor:pointer}
+#jump button:focus-visible{outline:2px solid #fff;outline-offset:2px}
 </style>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
