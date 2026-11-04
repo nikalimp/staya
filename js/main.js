@@ -48,17 +48,37 @@ LINKS.filter((l) => l.href).forEach((l) => {
   finalEl.querySelector('.row').appendChild(a);
 });
 
-/* ---------- рендерер ---------- */
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, powerPreference: 'high-performance' });
-kit.useRenderer(renderer);
-renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
+/* ---------- рендерер и уровень качества ---------- */
+// Три уровня: low — слабые телефоны, mid — телефоны и ноутбуки без отдельной видеокарты, high — десктоп.
+// Уровень задаёт плотность пикселей, размер запечённых текстур, bloom, сглаживание и видео на экранах.
+// Выбор: по видеокарте и памяти при старте; через 4 секунды после старта — проверка реальной частоты кадров.
+const TIERS = {
+  low: { pr: 1, tex: '-s', bloom: false, aa: false, video: false, aniso: 1 },
+  mid: { pr: 1.5, tex: '-m', bloom: false, aa: false, video: true, aniso: 2 },
+  high: { pr: 2, tex: '', bloom: true, aa: true, video: true, aniso: 4 },
+};
+const TIER_ORDER = ['low', 'mid', 'high'];
+function detectTier(gl) {
+  const q = new URLSearchParams(location.search).get('q'); if (q in TIERS) return q;
+  const dbg = gl.getExtension('WEBGL_debug_renderer_info'); const gpu = String(dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : '');
+  const mem = navigator.deviceMemory ?? 8, cores = navigator.hardwareConcurrency ?? 8, maxTex = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+  const weak = /Mali-4|Mali-T|Mali-G5[0-2]|Adreno \(TM\) [3-5]|PowerVR|Apple A(7|8|9|10)\b|Intel\(R\) HD|UHD Graphics 6[0-2]|SwiftShader/i.test(gpu);
+  if (mobile) return weak || mem <= 3 || cores <= 4 || maxTex < 4096 ? 'low' : 'mid';
+  return weak || mem <= 4 ? 'mid' : 'high';
+}
+const probe = document.createElement('canvas').getContext('webgl2') || document.createElement('canvas').getContext('webgl');
+let tier = probe ? detectTier(probe) : 'low';
+let quality = TIERS[tier];
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: quality.aa, powerPreference: 'high-performance' });
+kit.useRenderer(renderer); kit.setQuality(quality);
+renderer.setPixelRatio(Math.min(devicePixelRatio, quality.pr));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 renderer.setClearColor(0x000000, 1);
 const camera = new THREE.PerspectiveCamera(60, 1, 0.05, 2000);
 // десктоп: настоящее свечение неона и солнца (bloom); телефон — лёгкие ореолы-спрайты без постобработки
 let composer = null, renderPass = null, bloomPass = null, vigPass = null;
-if (!mobile) {
+if (quality.bloom) {
   composer = new EffectComposer(renderer);
   renderPass = new RenderPass(new THREE.Scene(), camera);
   composer.addPass(renderPass);
@@ -102,6 +122,28 @@ function layout() {
 addEventListener('resize', () => { if (isTouch && innerWidth === lastW) return; lastW = innerWidth; VH = innerHeight; layout(); });
 addEventListener('orientationchange', () => setTimeout(() => { lastW = innerWidth; VH = innerHeight; layout(); }, 250));
 
+/* ---------- проверка частоты кадров: если кадр идёт дольше 28 мс, уровень качества опускается на ступень ---------- */
+const fps = { t: 0, n: 0, slow: 0, done: false, start: 0 };
+function fpsSample() {
+  if (fps.done || !started) return;
+  const now = performance.now();
+  if (!fps.start) { fps.start = now; fps.t = now; return; }
+  const dt = now - fps.t; fps.t = now;
+  if (dt > 250) return;                         // пауза (вкладка, загрузка) — не считаем
+  fps.n++; if (dt > 28) fps.slow++;
+  if (now - fps.start < 4000 || fps.n < 60) return;
+  fps.done = true;
+  if (fps.slow / fps.n > 0.35 && tier !== 'low') setTier(TIER_ORDER[TIER_ORDER.indexOf(tier) - 1]);
+  if (DEBUG) console.log(`[staya] fps check: ${fps.n} frames, ${(100 * fps.slow / fps.n).toFixed(0)}% slow → tier ${tier}`);
+}
+// понижение уровня на лету: меньше пикселей и без bloom (текстуры остаются загруженными)
+function setTier(t) {
+  tier = t; quality = TIERS[t]; kit.setQuality(quality);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, quality.pr));
+  if (!quality.bloom && composer) { composer.dispose?.(); composer = null; bloomPass = null; vigPass = null; }
+  layout();
+}
+
 /* ---------- сцены ---------- */
 const built = new Map(), building = new Map();
 let font;
@@ -111,9 +153,11 @@ async function buildScene(i) {
   const p = (async () => {
     const mod = await SCENES[i].load();
     const t0 = performance.now();
-    const res = await mod.build({ THREE, kit, font, renderer, mobile });
+    const res = await mod.build({ THREE, kit, font, renderer, mobile, quality });
     res.scene.traverse((o) => { if ((o.isMesh || o.isPoints) && !o.userData.dynamic) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
     res.scene.updateMatrixWorld(true);
+    // одинаковые неподвижные предметы (пальмы, колонны, лежаки) рисуются одним вызовом
+    kit.instanceStatic(res.scene);
     kit.glowMats.forEach((m) => (m.uniforms.uScale.value = glowScale));
     // шейдеры компилируются параллельно (KHR_parallel_shader_compile); видео сцены грузятся позже, при входе в неё
     await (renderer.compileAsync ? renderer.compileAsync(res.scene, camera).catch(() => {}) : Promise.resolve(renderer.compile(res.scene, camera)));
@@ -203,10 +247,11 @@ function apply(g) {
     camera.rotateY(-hx * 0.16 - hyaw * 0.3); camera.rotateX(hy * 0.12 + hp * 0.2);
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
-  lootTick(s.scene, performance.now() / 1000);
+  lootTick(s.scene, performance.now() / 1000); kit.tickTime(performance.now() / 1000);
   // живое превью следующей сцены в телефоне (дворец → вилла)
   // (через кадр: кадр виллы почти неподвижен, а рендер второй сцены дорогой)
   if (s.preview?.live?.(t) && built.has(i + 1) && (previewTick = !previewTick)) { renderPreview(s, built.get(i + 1), true); dirty = true; }
+  fpsSample();
   if (composer) {
     renderPass.scene = s.scene; bloomPass.strength = (s.bloom ?? 0.42) * (1 + 0.3 * kit.pulse.beat);
     vigPass.uniforms.uZoom.value = speedK * 0.011; vigPass.uniforms.uRGB.value = speedK * 0.007;
@@ -463,6 +508,7 @@ window.__staya = {
     if (i < N - 1 && SCENES[i].out === 'cut') await buildScene(i + 1);
     jumping = true; scrollTo(0, gToScroll(g)); cur = target = g; apply(g); lastG = g; jumping = false;
   },
+  tier: () => tier, cam: () => camera,
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, built: [...built.keys()] }),
   ready: () => real >= 100,
   scene: (i) => built.get(i)?.scene,
