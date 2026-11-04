@@ -49,6 +49,11 @@ export function makeSfx(ctx, out) {
       env(g, t, 0.15, 0.22, 1.3); o.connect(f).connect(g).connect(bus); o.start(t); lfo.start(t); o.stop(t + 1.6); lfo.stop(t + 1.6);
     },
     // свист ветра / проход сквозь пространство
+    // гул на стыке миров: низкий тон 48 Гц с медленным нарастанием и спадом
+    rumble() {
+      const t = now(), o = ctx.createOscillator(), g = ctx.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(48, t); o.frequency.exponentialRampToValueAtTime(34, t + 1.4);
+      env(g, t, 0.25, 0.5, 1.2); o.connect(g).connect(bus); o.start(t); o.stop(t + 1.6);
+    },
     whoosh() {
       const t = now(), n = noise(1.6), f = ctx.createBiquadFilter(), g = ctx.createGain();
       f.type = 'bandpass'; f.Q.value = 1.4; f.frequency.setValueAtTime(300, t); f.frequency.exponentialRampToValueAtTime(1800, t + 0.7); f.frequency.exponentialRampToValueAtTime(500, t + 1.5);
