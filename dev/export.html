@@ -13,7 +13,7 @@ const id = new URLSearchParams(location.search).get('scene');
 const r = new THREE.WebGLRenderer(); kit.useRenderer(r); const font = await new FontLoader().loadAsync('fonts/unbounded_black.typeface.json'); await loadPeople();
 const mod = await import(`/js/scenes/${id}.js`);
 const res = await mod.build({ THREE, kit, font, renderer: r, mobile: false });
-const KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome', 'neon'];
+const KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome', 'neon', 'sand'];
 const out = new THREE.Scene(), lights = [];
 res.scene.updateMatrixWorld(true);
 res.scene.traverse((o) => {

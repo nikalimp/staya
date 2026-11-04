@@ -1,3 +1,4 @@
+import { addLoot } from '../loot.js';
 // 02 · STAYA POOL — двор коттеджа: бассейн, главная сцена с хитами и осьминогом, электро-сцена вдали, дом.
 // Геометрия и свет собраны в Blender и запечены в текстуры (Cycles): scripts/blender/pool_build.py, pool_bake.py.
 // Здесь: загрузка GLB, материалы по группам, живая вода, люди, свечение и путь камеры.
@@ -135,7 +136,6 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   }
   // прожекторы площадки
   for (const sz of [-1, 1]) { b.add(kit.G.cyl(0.1, 0.12, 7, 10), '#2a2a34', 'metal', kit.M([BCX, 3.5, DZ + sz * (BD / 2 + 0.8)])); glows.push([BCX, 7.1, DZ + sz * (BD / 2 + 0.6), '#fff1d6', 3, 1.2]); }
-  { const l = new THREE.PointLight('#fff1d6', 260, 22, 2); l.position.set(BCX, 7, DZ); scene.add(l); }
 
   /* --- жизнь вокруг танцпола: шезлонги, надувные круги и мячи (Sketchfab, CC BY) --- */
   for (let i = 0; i < 5; i++) props.push(kit.prop(scene, 'sf_lounger', { p: [DX - 6 + i * 2.6, 0.02, DZ + DS / 2 + 4.2], ry: Math.PI + (i % 2 ? 0.15 : -0.15), w: 1.9 }));
@@ -155,8 +155,8 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   /* --- свет для людей (запечённый двор от него не зависит) --- */
   scene.add(new THREE.HemisphereLight('#5b4bdf', '#12061f', 0.6));
   const L = (c, i, p, d = 40) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
-  L('#ff3fb4', 260, [-4, 8, SZ + 4]); L('#2fe6ff', 260, [4, 8, SZ + 4]); L('#ffd28a', 120, [0, 4, 2], 25);
-  L('#2f6bff', 320, [DX, 10, DZ - 6]); L('#ff3fb4', 260, [DX, 10, DZ + 6]); L('#cfd8ff', 140, [DX - 6, 9, DZ], 20);
+  // двор запечён; живые лампы нужны только моделям: одна у главной сцены, одна над танцполом (было 7)
+  L('#ff8ad8', 420, [0, 8, SZ + 4], 45); L('#8fa8ff', 460, [DX, 10, DZ], 40);
 
   /* --- свечение: подводные фонари, прожекторы, LED, окна, гирлянды --- */
   for (let x = -9; x <= 9; x += 3) glows.push([x, -0.55, -4.85, '#2fe6ff', 1.8, 1.4], [x, -0.55, 4.85, '#2fe6ff', 1.8, 1.4]);
@@ -261,5 +261,8 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   };
   // «прищур» на электро-сцену: камера приближает её, сверху и снизу темнеет, как веки
   const calm = (t) => Math.min(1, Math.max(0, (t - 0.6) / 0.05));   // вращение на танцполе — без влияния головы и курсора
+  // предметы для сбора: презерватив в фольге лежит у выхода из бассейна, золотой мяч парит над танцполом
+  addLoot(scene, 'condom', 'condom', [16.9, T + 0.004, -1.2], { lie: true, r: 0.45, glow: 0.5, ry: 0.4 });
+  addLoot(scene, 'ball', 'ball', [DX + 3.5, 1.5, DZ + 1.5], { r: 0.7 });
   return { scene, cam, update, calm };
 }

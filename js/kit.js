@@ -42,6 +42,7 @@ const MAT = {
   gloss: () => new THREE.MeshPhysicalMaterial({ vertexColors: true, roughness: 0.2, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05 }),
   plastic: () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.45, metalness: 0 }),
   matte: () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.92, metalness: 0 }),
+  sand: () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.97, metalness: 0 }),
   metal: () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.28, metalness: 1 }),
   chrome: () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.04, metalness: 1, flatShading: true }),
   neon: () => new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false }),
@@ -803,7 +804,7 @@ export function vScreen(scene, src, p, ry = 0, h = 6, o = {}) {
 /* ---------- запечённый свет для сцен, собранных в коде (AQUA, клуб) ---------- */
 // world/<id>/<id>.glb — та же геометрия Builder (без неона) с UV под карту света; <id>_light.webp — свет (L·0.5, sRGB).
 // Меши Builder этих видов заменяются запечёнными; неон, стекло, лучи и люди остаются как были.
-const BAKED_KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome'];
+const BAKED_KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome', 'sand'];
 export async function applyBake(scene, group, id, o = {}) {
   if (globalThis.__noBake) return;   // dev/export.html выгружает исходную геометрию
   try {
@@ -812,6 +813,17 @@ export async function applyBake(scene, group, id, o = {}) {
     const LM = (o.k ?? 1.6) * Math.PI, env = scene.environment;
     const mk = (kind) => {
       const m = new THREE.MeshBasicMaterial({ vertexColors: true, lightMap: lm, lightMapIntensity: LM });
+      if (kind === 'sand') {
+        // песок: зернистая фактура по мировым координатам (у запечённой сетки UV заняты картой света)
+        const st = sandTex();
+        m.onBeforeCompile = (sh) => {
+          sh.uniforms.sandMap = { value: st };
+          sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <fog_vertex>', '#include <fog_vertex>\nvWP = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+          sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP; uniform sampler2D sandMap;')
+            .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= texture2D(sandMap, vWP.xz * 0.18).rgb * 0.6 + texture2D(sandMap, vWP.xz * 0.9).rgb * 0.55;');
+        };
+        return m;
+      }
       // отражения неонового окружения: глянец и пластик — поверх, металл — вместо цвета
       if (env && kind !== 'matte') {
         m.envMap = env; m.combine = kind === 'metal' || kind === 'chrome' ? THREE.MixOperation : THREE.AddOperation;
@@ -930,6 +942,19 @@ export function bubbles(n = 140, seed = 3) {
     pts.userData.commit();
   };
   return pts;
+}
+
+/* ---------- песок: светлая зернистая фактура с мягкой рябью от ветра ---------- */
+let _sand = null;
+export function sandTex() {
+  if (_sand) return _sand;
+  const c = document.createElement('canvas'); c.width = c.height = 512; const x = c.getContext('2d'), R = rng(61);
+  x.fillStyle = '#d8d0c0'; x.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 14; i++) { const y0 = R() * 512; x.strokeStyle = `rgba(${R() < 0.5 ? '255,250,240' : '150,130,100'},.18)`; x.lineWidth = 6 + R() * 10; x.beginPath(); for (let k = 0; k <= 512; k += 16) x.lineTo(k, y0 + Math.sin(k / 60 + i) * 14); x.stroke(); }
+  const im = x.getImageData(0, 0, 512, 512), d = im.data;
+  for (let i = 0; i < d.length; i += 4) { const n = (R() - 0.5) * 46; d[i] += n; d[i + 1] += n; d[i + 2] += n * 0.9; }
+  x.putImageData(im, 0, 0);
+  _sand = new THREE.CanvasTexture(c); _sand.wrapS = _sand.wrapT = THREE.RepeatWrapping; _sand.colorSpace = THREE.SRGBColorSpace; _sand.anisotropy = 8; return _sand;
 }
 
 /* ---------- дымка: мягкие полупрозрачные облака-спрайты в объёме сцены ---------- */

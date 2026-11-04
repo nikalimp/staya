@@ -23,7 +23,7 @@ def mat(kind):
     m = bpy.data.materials.new(kind); m.use_nodes = True; nt = m.node_tree; p = nt.nodes['Principled BSDF']
     ca = nt.nodes.new('ShaderNodeVertexColor'); ca.layer_name = 'Color'
     nt.links.new(ca.outputs['Color'], p.inputs['Base Color'])
-    rough = {'gloss': 0.2, 'plastic': 0.45, 'matte': 0.9, 'metal': 0.3, 'chrome': 0.08, 'neon': 0.5}[kind]
+    rough = {'gloss': 0.2, 'plastic': 0.45, 'matte': 0.9, 'metal': 0.3, 'chrome': 0.08, 'neon': 0.5, 'sand': 0.97}[kind]
     p.inputs['Roughness'].default_value = rough
     if kind in ('metal', 'chrome'): p.inputs['Metallic'].default_value = 1.0
     if kind == 'neon':
@@ -43,6 +43,12 @@ for l in L['lights']:
     if l['t'] == 'point':
         bpy.ops.object.light_add(type='POINT', location=(l['p'][0], -l['p'][2], l['p'][1])); lo = bpy.context.object
         lo.data.energy = 4 * math.pi * l['i']; lo.data.color = srgb_hex(l['c']); lo.data.shadow_soft_size = 0.6
+    elif l['t'] == 'dir':
+        # солнце: светит из позиции источника в центр сцены
+        from mathutils import Vector
+        bpy.ops.object.light_add(type='SUN', location=(0, 0, 30)); lo = bpy.context.object
+        d = -Vector((l['p'][0], -l['p'][2], l['p'][1])).normalized(); lo.rotation_euler = d.to_track_quat('-Z', 'Y').to_euler()
+        lo.data.energy = l['i'] * 1.3; lo.data.color = srgb_hex(l['c']); lo.data.angle = math.radians(1.5)
     elif l['t'] == 'hemi':
         w = bpy.data.worlds.new('w'); sc.world = w; w.use_nodes = True; bg = w.node_tree.nodes['Background']
         a, b = srgb_hex(l['c']), srgb_hex(l['g'])

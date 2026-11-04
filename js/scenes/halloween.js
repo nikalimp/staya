@@ -1,3 +1,4 @@
+import { addLoot } from '../loot.js';
 // 04 · STAYA HALLOWEEN — дворец XIX века: высокий зал, галереи второго этажа, парадная лестница.
 // Двери распахиваются → зал с люстрами и картинами → вокруг фонтана → вверх по лестнице к пульту на площадке →
 // заходим за пульт, и начинается мистика: гаснет свет и музыка, при каждой вспышке девочка ближе,
@@ -214,9 +215,10 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.add(new THREE.HemisphereLight('#ff6a4a', '#1a0505', 0.5));
   const lights = [], L = (c, i, p, d = 60) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); l.userData.k = i; scene.add(l); lights.push(l); };
   // тёплый ключ от люстр, красный заполняющий, холодный лунный свет из окон — больше контраста, чем раньше
-  L('#ff2a14', 460, [0, 14, 10]); L('#ff8a2a', 420, [0, 12, -16]); L('#ffe2b0', 480, [0, 19, 3], 40); L('#ffd8a0', 300, [0, 19, -14], 36); L('#4a5cff', 300, [-17, 12, 0], 34); L('#4a5cff', 300, [17, 12, 0], 34);
+  // четыре лампы вместо девяти: тёплый ключ от люстр, красный заполняющий у входа, холодный лунный из окон, красный над лестницей
+  L('#ffd2a0', 760, [0, 19, 0], 50); L('#ff2a14', 520, [0, 13, 12], 40); L('#4a5cff', 520, [0, 16, -4], 44);
   const flash = new THREE.PointLight('#a9bcff', 0, 80, 1.5); flash.position.set(-14, 21, -4); scene.add(flash);
-  L('#7fd8ff', 90, [0, 4, FZ], 14); L('#ff2a14', 380, [0, 12, LZ + 2], 34);
+  L('#ff2a14', 420, [0, 12, LZ + 2], 34);
 
   await Promise.all(props);
   scene.add(kit.glowPoints(glows));
@@ -237,7 +239,7 @@ export async function build({ THREE, kit, font, renderer }) {
   for (const [sx, z] of [[-1, -14], [-1, 13], [1, -12], [1, 10]]) for (const d of [-0.5, 0, 0.5]) candle(sx * 19.0, 2.62, z + d, d ? 0.26 : 0.36);
   for (let i = 0; i < 8; i++) candle(-7.5 + i * 2.14 + (i > 3 ? 0 : 0), LY, LZ - 0.25, 0.3 + (i % 3) * 0.08);
   for (let i = 0; i < 25; i += 4) for (const sx of [-1, 1]) candle(sx * 3.5, (i + 1) * RISE, SZ0 - i * RUN - RUN / 2, 0.3);
-  const candleL = new THREE.PointLight('#ffb15a', 1.2, 4, 2); candleL.position.set(0, LY + 0.6, LZ - 0.4); scene.add(candleL);
+  const candleL = { intensity: 0 };   // отдельной лампы у свечей больше нет — дрожит только пламя
 
   /* --- летучие мыши кружат под сводом, машут крыльями --- */
   const batS = new THREE.Shape();
@@ -330,5 +332,7 @@ export async function build({ THREE, kit, font, renderer }) {
   const calm = (t) => Math.min(1, Math.max(0, (t - 0.6) / 0.04));   // за пультом и у телефона — без влияния головы и курсора
   // фото в телефоне — живой кадр виллы (рендер следующей сцены); fov подобран так, что в конце пути фото = первый кадр виллы
   const preview = { mesh: photo, t: 0, fov: 2 * Math.atan(0.035 / dEnd) * 180 / Math.PI, live: (t) => t > 0.875 };
+  // предмет для сбора: тыква-фонарь на правом краю пульта, не на пути камеры
+  addLoot(scene, 'pumpkin', 'pumpkin', [1.75, LY + 1.4, BZ + 0.15], { r: 0.6, ry: Math.PI });
   return { scene, cam: kit.camPath(keys), update, near, calm, preview, dark, mute };
 }

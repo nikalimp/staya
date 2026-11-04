@@ -1,3 +1,4 @@
+import { addLoot } from '../loot.js';
 // 05 · STAYA PHUKET — вилла на утёсе над морем, рассвет. Финал маршрута.
 // Геометрия и свет собраны в Blender и запечены в текстуры (Cycles): scripts/blender/villa_build.py, villa_bake.py.
 // Путь: подъезд к вилле → сквозь вход и гостиную → терраса с инфинити-бассейном →
@@ -283,5 +284,7 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   };
   // ссылки в титрах: доли высоты текстуры → v-координата плоскости
   const pick = { mesh: cred, links: links.map((l) => ({ v0: 1 - l.y1 / CH, v1: 1 - l.y0 / CH, href: l.href })), from: 0.9 };
+  // предмет для сбора: кокос с зонтиком у мольберта
+  addLoot(scene, 'coconut', 'coconut', [3.0, 1.35, 4.9], { r: 0.6 });
   return { scene, cam: kit.camPath(keys), update, pick, bloom: 0.12 };
 }

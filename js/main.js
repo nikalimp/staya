@@ -8,6 +8,7 @@ import * as kit from './kit.js';
 import { startHeadTrack } from './headtrack.js';
 import { makeSfx } from './sfx.js';
 import { loadPeople } from './people.js';
+import { lootAt, lootTick, collect, lootCount, LOOT_TOTAL } from './loot.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -158,7 +159,8 @@ function scrollToG(y) {
 }
 function gToScroll(g) { const i = Math.min(N - 1, Math.floor(g)); return (cum[i] + (g - i) * SCENES[i].w) * VH_PER_UNIT * VH; }
 
-let previewTick = false, speedK = 0;
+let previewTick = false, speedK = 0, backK = 0, backT = 0;
+const _dir = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 let cur = 0, target = 0, lastG = -1, curIdx = -1, started = false, jumping = false;
 // Стык 'black' уходит в чёрный, 'water' — в синеву воды (нырок AQUA → выныривание в POOL), 'cut' — склейка без затемнения
 const FADE_COLOR = { black: '#000', water: '#0a5f8f', white: '#fff' };
@@ -186,7 +188,12 @@ function apply(g) {
   const nr = s.near?.(t) ?? 0.05;
   if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); }
   const c = s.cam(t);
-  camera.position.copy(c.p); camera.lookAt(c.l);
+  camera.position.copy(c.p);
+  // прокрутка назад: камера разворачивается на 180° и смотрит на дорогу, по которой идём обратно
+  if (backK > 0.001) {
+    const e = backK * backK * (3 - 2 * backK);
+    _dir.copy(c.l).sub(c.p).applyAxisAngle(_up, Math.PI * e); camera.lookAt(_dir.add(c.p));
+  } else camera.lookAt(c.l);
   if (s.roll) camera.rotateZ(s.roll(t));
   // погружение: камера чуть поворачивается за головой зрителя, кивки в такт качают сцену
   // сдвиг головы — как взгляд в окно (камера уходит в обратную сторону), поворот головы — камера смотрит туда же
@@ -202,6 +209,7 @@ function apply(g) {
     camera.rotateY(-hx * 0.16 - hyaw * 0.3); camera.rotateX(hy * 0.12 + hp * 0.2);
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
+  lootTick(s.scene, performance.now() / 1000);
   // живое превью следующей сцены в телефоне (дворец → вилла)
   // (через кадр: кадр виллы почти неподвижен, а рендер второй сцены дорогой)
   if (s.preview?.live?.(t) && built.has(i + 1) && (previewTick = !previewTick)) { renderPreview(s, built.get(i + 1), true); dirty = true; }
@@ -256,6 +264,12 @@ function loop() {
     const v = lastG >= 0 && !jumping ? Math.min(1, Math.abs(cur - lastG) / 0.012) : 0;
     const sk = speedK + (v - speedK) * (v > speedK ? 0.25 : 0.08);
     if (Math.abs(sk - speedK) > 1e-4) { speedK = sk < 1e-3 ? 0 : sk; dirty = true; }
+    // направление прокрутки: назад — камера плавно разворачивается, вперёд — возвращается
+    const dv = target - cur;
+    if (!reduced && !jumping) { if (dv < -2e-4) backT = 1; else if (dv > 2e-4) backT = 0; }
+    const nowT = performance.now(), dtB = Math.min(0.1, (nowT - (loop.tB || nowT)) / 1000); loop.tB = nowT;
+    const bk = backK + (backT - backK) * (1 - Math.exp(-dtB * 3.2));   // разворот ≈ за секунду, независимо от частоты кадров
+    if (Math.abs(bk - backK) > 1e-4) { backK = Math.abs(bk - backT) < 1e-3 ? backT : bk; dirty = true; }
     // ритм музыки → неон, лучи, огни, свечение
     if (started) { const b = audio.beat(); if (Math.abs(b - kit.pulse.beat) > 0.004) { kit.pulse.apply(b); dirty = true; } }
   }
@@ -286,8 +300,26 @@ function linkAt(ev) {
   const hit = ray.intersectObject(pk.mesh, false)[0]; if (!hit?.uv) return null;
   return pk.links.find((l) => hit.uv.y >= l.v0 && hit.uv.y <= l.v1) || null;
 }
-canvas.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') canvas.style.cursor = linkAt(e) ? 'pointer' : ''; });
-canvas.addEventListener('click', (e) => { const l = linkAt(e); if (l) window.open(l.href, '_blank', 'noopener'); });
+/* ---------- предметы для сбора: нажатие подбирает, всплывает счётчик ---------- */
+function lootUnder(ev) {
+  const s = built.get(curIdx); if (!s) return null;
+  ndc.set((ev.clientX / innerWidth) * 2 - 1, -(ev.clientY / canvas.clientHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera); return lootAt(ray, s.scene);
+}
+const lootEl = $('#loot'); let lootTimer = 0;
+function lootToast(n) {
+  const done = n >= LOOT_TOTAL;
+  lootEl.classList.toggle('done', done);
+  lootEl.innerHTML = done ? `<b>${n}/${LOOT_TOTAL}</b> — все предметы собраны!<br>Приходи на любую тусовку СТАИ и забирай стикерпак в подарок`
+    : `<b>${n}/${LOOT_TOTAL}</b> собрано`;
+  lootEl.classList.add('on'); clearTimeout(lootTimer); lootTimer = setTimeout(() => lootEl.classList.remove('on'), done ? 9000 : 2600);
+}
+canvas.addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') canvas.style.cursor = linkAt(e) || lootUnder(e) ? 'pointer' : ''; });
+canvas.addEventListener('click', (e) => {
+  const it = lootUnder(e);
+  if (it) { const n = collect(it, performance.now() / 1000); audio.fx?.chime(); lootToast(n); dirty = true; return; }
+  const l = linkAt(e); if (l) window.open(l.href, '_blank', 'noopener');
+});
 
 /* ---------- погружение: слежение за головой (только десктоп) ---------- */
 // tgt — последние значения с камеры (~18 раз в секунду), x/y/yaw/pitch — плавно догоняют их каждый кадр
@@ -447,5 +479,6 @@ window.__staya = {
   ready: () => real >= 100,
   scene: (i) => built.get(i)?.scene,
   pick: (x, y) => { const r = new THREE.Raycaster(); r.setFromCamera(new THREE.Vector2(x, y), camera); const s = built.get(curIdx)?.scene; return s ? r.intersectObject(s, true).slice(0, 4).map((h) => [h.object.type, h.object.name, h.object.parent?.name, h.object.material?.type, h.object.material?.name, +h.distance.toFixed(2), h.object.geometry?.type, JSON.stringify(h.object.geometry?.parameters ?? {}).slice(0, 80)]) : []; },
-  dbg: () => ({ g: cur, cam: camera.position.toArray().map((v) => +v.toFixed(4)), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(3) }),
+  loot: () => (built.get(curIdx)?.scene.userData.loot || []).filter((r) => r.visible).map((r) => { const v = r.getWorldPosition(new THREE.Vector3()).project(camera); return [r.userData.loot.id, +((v.x + 1) / 2 * innerWidth).toFixed(0), +((1 - v.y) / 2 * innerHeight).toFixed(0), v.z < 1]; }),
+  dbg: () => ({ back: +backK.toFixed(3), dir: camera.getWorldDirection(new THREE.Vector3()).toArray().map((v) => +v.toFixed(2)), g: cur, cam: camera.position.toArray().map((v) => +v.toFixed(4)), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(3) }),
 };
