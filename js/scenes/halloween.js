@@ -173,16 +173,10 @@ export async function build({ THREE, kit, font, renderer }) {
   kit.text3d(b, font, 'HALLOWEEN', { size: 1.25, color: '#ff4a1a', p: [0, 26.5, Z2 + 0.6], bevel: 0.16 });
   kit.text3d(b, font, 'STAYA', { size: 0.8, color: '#f4e6c8', p: [0, 28.6, Z2 + 0.6], bevel: 0.1, kind: 'metal' });
 
-  /* --- девочка (Sketchfab «Creepy Teen Girl», CC BY): появляется во вспышках света, каждый раз ближе --- */
-  const GIRL = [[8.5, 0, -4], [-1.2, LY, LZ - 0.6], [0, LY, BZ + 1.45]];   // у фонтана → на краю площадки → перед пультом
-  const girl = await kit.prop(scene, 'sf_girl', { p: GIRL[0], ry: Math.PI, h: 1.58 });
-  girl.visible = false; girl.userData.dynamic = true; girl.traverse((c) => (c.userData.dynamic = true));
-  const girlBase = girl.position.clone().sub(new THREE.Vector3(...GIRL[0]));
-  const girlL = new THREE.SpotLight('#bcd0ff', 0, 14, 0.5, 0.6, 1.2); scene.add(girlL, girlL.target);
-  // телефон в её руке — над пультом, экраном к нам
-  const PH = [0.1, LY + 1.32, BZ + 0.95];
+  /* --- телефон лежит на пульте слева от деков, экраном вверх: в нём превью Пхукета --- */
+  const PH = [-1.22, LY + 1.05 + 0.017, BZ - 0.1], TILT = 0.14;   // лёгкий наклон: камера смотрит в экран по нормали без вырожденного «взгляда вниз»
   const phone = new THREE.Group(); phone.rotation.order = 'YXZ';
-  phone.position.set(...PH); phone.rotation.set(0.08, Math.PI, 0); phone.visible = false;
+  phone.position.set(...PH); phone.rotation.set(-Math.PI / 2 + TILT, Math.PI + 0.1, 0);
   const body = new THREE.Mesh(kit.G.rbox(0.078, 0.162, 0.009, 0.01, 3), new THREE.MeshPhysicalMaterial({ color: '#0b0b10', roughness: 0.25, clearcoat: 1 }));
   body.position.z = -0.0047; phone.add(body);
   const ui = kit.canvasTex(512, 1024, (x, w, h) => {
@@ -222,10 +216,7 @@ export async function build({ THREE, kit, font, renderer }) {
 
   await Promise.all(props);
   scene.add(kit.glowPoints(glows));
-  kit.haze(scene, { box: [-18, 18, 0.5, 6, -28, 22], colors: ['#ff5a1f', '#ff8a2a', '#3b4bff'], n: 22, size: 10, opacity: 0.09 });
   scene.add(b.build());
-  // туман стелется по полу
-  kit.haze(scene, { box: [-18, 18, 0.05, 1.1, -28, 22], colors: ['#ffd8c8', '#ff8a6a', '#c8c8ff'], n: 30, size: 7, opacity: 0.13, seed: 41 });
 
   /* --- свечи: на столике, шкафах и у сцены; пламя дрожит --- */
   const flameT = kit.canvasTex(64, 128, (x, w, h) => { const g = x.createRadialGradient(w / 2, h * 0.62, 2, w / 2, h * 0.55, w / 2); g.addColorStop(0, 'rgba(255,250,220,1)'); g.addColorStop(0.35, 'rgba(255,190,90,.9)'); g.addColorStop(1, 'rgba(255,90,20,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(w / 2, h * 0.6, w / 2, h * 0.4, 0, 0, 7); x.fill(); });
@@ -261,7 +252,7 @@ export async function build({ THREE, kit, font, renderer }) {
   }
 
   /* --- камера --- */
-  // телефон стоит вертикально, экраном к нам: камера подходит к нему по нормали
+  // телефон лежит экраном вверх: камера наклоняется над пультом и ныряет в экран по нормали
   const P = (k) => [photoC[0] + nrm.x * k, photoC[1] + nrm.y * k, photoC[2] + nrm.z * k];
   // конец пути: фото (0.07 × 0.07) ровно заполняет кадр по ширине — дальше склейка с первым кадром виллы
   const asp = innerWidth / innerHeight, fov0 = asp < 0.8 ? 72 : asp < 1.2 ? 64 : 54, tn = Math.tan(THREE.MathUtils.degToRad(fov0) / 2);
@@ -282,36 +273,21 @@ export async function build({ THREE, kit, font, renderer }) {
     { p: [0, LY + 1.7, LZ + 1.0], l: [0, LY + 3, LZ2], t: 0.53 },
     // обходим пульт слева и встаём за него — взгляд в зал
     { p: [-2.4, LY + 1.65, BZ - 1.4], l: [0, LY + 1.4, BZ], t: 0.58 },
-    { p: BEH, l: [0, LY - 0.6, -6], t: 0.63 },
-    { p: BEH, l: [0, LY - 0.7, -6], t: 0.9 },
-    // она протягивает телефон — камера ныряет в экран
-    { p: P(0.6), l: photoC, t: 0.93 },
-    { p: P(0.16), l: photoC, t: 0.955 },
+    { p: BEH, l: [0, LY - 0.6, -6], t: 0.66 },
+    { p: BEH, l: [0, LY - 0.7, -6], t: 0.76 },
+    // взгляд опускается на пульт: рядом с деками лежит телефон
+    { p: [PH[0] + 0.25, LY + 1.78, BZ - 1.0], l: photoC, t: 0.84 },
+    // камера ныряет в экран
+    { p: P(0.6), l: photoC, t: 0.9 },
+    { p: P(0.16), l: photoC, t: 0.945 },
     { p: P(dEnd * 1.7), l: photoC },
     { p: P(dEnd), l: photoC, t: 0.985 },
     { p: P(dEnd * 0.97), l: photoC, t: 1 },
   ];
-  // мистика: свет и музыка гаснут; при каждой вспышке девочка ближе
-  const OFF = [[0.665, 0.7], [0.76, 0.795], [0.845, 0.88]], ON = [0.7, 0.795, 0.88];
-  const dark = (t) => {
-    if (t > 0.655 && t < 0.665) return (Math.sin(t * 2600) > 0.2 ? 0.85 : 0);   // свет мигает перед первым отключением
-    return OFF.some(([a, c]) => t >= a && t < c) ? 1 : 0;
-  };
-  const mute = (t) => t >= 0.665;
-  const stage = (t) => (t < ON[0] ? -1 : t < ON[1] ? 0 : t < ON[2] ? 1 : 2);
   const sm = (a, c, t) => { const k = Math.min(1, Math.max(0, (t - a) / (c - a))); return k * k * (3 - 2 * k); };
   const update = (t) => {
     const now = performance.now() / 1000;
     front.open(0.35 + 0.65 * sm(0.0, 0.13, t));
-    // девочка и холодный свет на неё; после первого отключения зал остаётся в полумраке
-    const st = stage(t), mood = t >= 0.665 ? 0.35 : 1;
-    for (const l of lights) l.intensity = l.userData.k * mood;
-    girl.visible = st >= 0;
-    if (st >= 0) {
-      const g2 = GIRL[st]; girl.position.set(g2[0] + girlBase.x, g2[1] + girlBase.y, g2[2] + girlBase.z);
-      girlL.position.set(g2[0], g2[1] + 6, g2[2] - 2.5); girlL.target.position.set(g2[0], g2[1] + 0.8, g2[2]); girlL.intensity = 70;
-    } else girlL.intensity = 0;
-    phone.visible = st === 2;
     // пламя свечей дрожит
     let fl = 0;
     for (const f of flames) { const k = 0.85 + 0.15 * Math.sin(now * 11 + f.userData.ph) * Math.sin(now * 7.3 + f.userData.ph * 2); f.scale.set(0.06 * k, 0.12 * (0.9 + 0.2 * k), 1); fl += k; }
@@ -334,5 +310,5 @@ export async function build({ THREE, kit, font, renderer }) {
   const preview = { mesh: photo, t: 0, fov: 2 * Math.atan(0.035 / dEnd) * 180 / Math.PI, live: (t) => t > 0.875 };
   // предмет для сбора: тыква-фонарь на правом краю пульта, не на пути камеры
   addLoot(scene, 'pumpkin', 'pumpkin', [1.75, LY + 1.4, BZ + 0.15], { r: 0.6, ry: Math.PI });
-  return { scene, cam: kit.camPath(keys), update, near, calm, preview, dark, mute };
+  return { scene, cam: kit.camPath(keys), update, near, calm, preview };
 }

@@ -888,23 +888,6 @@ export function sdfLoops(sdf, x0, x1, z0, z1, step = 0.25) {
   return loops.map((l) => ({ pts: l, depth: loops.filter((o) => o !== l && inside(l[0], o)).length }));
 }
 
-/* ---------- каустика: сетка бегущих бликов (поверхность воды снизу, дно бассейна) ---------- */
-let _cau = null;
-export function causticTex() {
-  if (!_cau) {
-    _cau = canvasTex(512, 512, (x, w2, h2) => {
-      x.fillStyle = '#000'; x.fillRect(0, 0, w2, h2); const C = rng(12), P = [];
-      for (let i = 0; i < 7; i++) for (let j = 0; j < 7; j++) P.push([(i + 0.2 + C() * 0.6) / 7 * w2, (j + 0.2 + C() * 0.6) / 7 * h2]);
-      x.strokeStyle = '#fff'; x.lineWidth = 3; x.shadowColor = '#fff'; x.shadowBlur = 6; x.lineCap = 'round';
-      for (const [ax, ay] of P) for (const [bx, by] of P) for (const ox of [-w2, 0, w2]) for (const oy of [-h2, 0, h2]) {
-        const d = Math.hypot(bx + ox - ax, by + oy - ay); if (d < 1 || d > w2 / 6.2) continue;
-        x.beginPath(); x.moveTo(ax, ay); x.quadraticCurveTo((ax + bx + ox) / 2 + (C() - 0.5) * 20, (ay + by + oy) / 2 + (C() - 0.5) * 20, bx + ox, by + oy); x.stroke();
-      }
-    });
-    _cau.wrapS = _cau.wrapT = THREE.RepeatWrapping;
-  }
-  const t = _cau.clone(); t.needsUpdate = true; return t;
-}
 
 /* ---------- капли: облако светящихся точек, позиции двигает сама сцена ---------- */
 // drops(n, color, size) → Points; pos — Float32Array (x,y,z подряд); после правки — commit()
@@ -957,28 +940,3 @@ export function sandTex() {
   _sand = new THREE.CanvasTexture(c); _sand.wrapS = _sand.wrapT = THREE.RepeatWrapping; _sand.colorSpace = THREE.SRGBColorSpace; _sand.anisotropy = 8; return _sand;
 }
 
-/* ---------- дымка: мягкие полупрозрачные облака-спрайты в объёме сцены ---------- */
-let _hazeTex = null;
-function hazeTex() {
-  if (_hazeTex) return _hazeTex;
-  const c = document.createElement('canvas'); c.width = c.height = 256; const x = c.getContext('2d'), R = rng(77);
-  for (let i = 0; i < 26; i++) {
-    const px = 128 + (R() - 0.5) * 120, py = 128 + (R() - 0.5) * 90, r = 30 + R() * 70;
-    const g = x.createRadialGradient(px, py, 0, px, py, r); g.addColorStop(0, 'rgba(255,255,255,0.18)'); g.addColorStop(1, 'rgba(255,255,255,0)');
-    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
-  }
-  const g = x.createRadialGradient(128, 128, 60, 128, 128, 128); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,1)');
-  x.globalCompositeOperation = 'destination-out'; x.fillStyle = g; x.fillRect(0, 0, 256, 256);
-  _hazeTex = new THREE.CanvasTexture(c); _hazeTex.colorSpace = THREE.SRGBColorSpace; return _hazeTex;
-}
-// box: [x0, x1, y0, y1, z0, z1]; colors — массив цветов; size — размер облака в метрах
-export function haze(scene, { box, colors = ['#ffffff'], n = 18, size = 14, opacity = 0.16, seed = 5 } = {}) {
-  const R = rng(seed), g = new THREE.Group(); g.name = 'haze';
-  for (let i = 0; i < n; i++) {
-    const m = new THREE.SpriteMaterial({ map: hazeTex(), color: pick(colors, i), transparent: true, opacity: opacity * (0.6 + R() * 0.8), depthWrite: false, blending: THREE.AdditiveBlending, fog: false, rotation: R() * 6.28 });
-    const s = new THREE.Sprite(m), k = size * (0.6 + R() * 0.9);
-    s.position.set(box[0] + R() * (box[1] - box[0]), box[2] + R() * (box[3] - box[2]), box[4] + R() * (box[5] - box[4])); s.scale.set(k, k * 0.6, 1); s.renderOrder = 3;
-    g.add(s);
-  }
-  scene.add(g); return g;
-}
