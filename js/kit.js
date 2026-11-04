@@ -840,6 +840,7 @@ export function grandDoor(scene, b, p, ry = 0, s = 1, o = {}) {
 
 /* ---------- сцена с диджейским пультом: пульт Pioneer (Sketchfab, CC BY) на стойке ---------- */
 export function decks(scene, p, ry = 0, w = 1.6) {
+  scene.userData.stage = new THREE.Vector3(...p);   // «сцена» мира: от неё считается пространство звука (main.js → audio.space)
   return prop(scene, 'sf_cdj', { p, ry, w });
 }
 

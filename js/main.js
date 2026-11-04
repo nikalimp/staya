@@ -259,8 +259,11 @@ function apply(g) {
     vigPass.uniforms.uZoom.value = speedK * 0.011; vigPass.uniforms.uRGB.value = speedK * 0.007;
     composer.render();
   } else renderer.render(s.scene, camera);
-  if (i !== curIdx) { curIdx = i; audio.go(i); prefetch(i); kit.playVideos(s.scene); }
-  finalEl.classList.toggle('on', i === N - 1 && t > (SCENES[i].final ?? 0.72));
+  if (i !== curIdx) { if (curIdx >= 0 && started) audio.fx?.rumble(); curIdx = i; audio.go(i); prefetch(i); kit.playVideos(s.scene); if (started) history.replaceState(null, '', '#' + SCENES[i].id); }
+  audio.space(camera, s.scene.userData.stage);
+  const fin = i === N - 1 && t > (SCENES[i].final ?? 0.72);
+  finalEl.classList.toggle('on', fin);
+  if (fin && !finalShown) { finalShown = true; if (lootCount() >= LOOT_TOTAL) confetti(); }
   return true;
 }
 const idle = (fn) => (window.requestIdleCallback ? requestIdleCallback(fn, { timeout: 500 }) : setTimeout(fn, 50));
@@ -343,8 +346,52 @@ function lootUnder(ev) {
   ray.setFromCamera(ndc, camera); return lootAt(ray, s.scene);
 }
 const lootEl = $('#loot'); let lootTimer = 0;
+/* ---------- финал: счёт предметов, картинка для шеринга, конфетти за 8/8 ---------- */
+const scoreEl = document.createElement('p'); scoreEl.className = 'score'; finalEl.prepend(scoreEl);
+const shareBtn = document.createElement('button'); shareBtn.type = 'button'; shareBtn.className = 'share'; shareBtn.textContent = 'Поделиться'; finalEl.querySelector('.row').prepend(shareBtn);
+function scoreText() {
+  const n = lootCount();
+  scoreEl.innerHTML = n >= LOOT_TOTAL ? `<b>${n}/${LOOT_TOTAL}</b> — стикерпак твой! Покажи этот экран на тусовке СТАИ`
+    : n ? `<b>${n}/${LOOT_TOTAL}</b> собрано — вернись и найди остальные` : `Собери <b>${LOOT_TOTAL}</b> предметов по пути — получишь стикерпак`;
+}
+scoreText();
+// картинка 1080×1350: «STAYA WORLD · собрано N/8 · staya.nikalimp.ru»
+function shareImage() {
+  const c = document.createElement('canvas'); c.width = 1080; c.height = 1350; const x = c.getContext('2d'), n = lootCount();
+  const bg = x.createLinearGradient(0, 0, 0, 1350); bg.addColorStop(0, '#12041a'); bg.addColorStop(1, '#3a0a3a'); x.fillStyle = bg; x.fillRect(0, 0, 1080, 1350);
+  for (let i = 0; i < 160; i++) { x.fillStyle = `rgba(255,255,255,${0.2 + Math.random() * 0.6})`; x.beginPath(); x.arc(Math.random() * 1080, Math.random() * 1350, Math.random() * 2.2, 0, 7); x.fill(); }
+  x.textAlign = 'center'; x.textBaseline = 'middle';
+  const grad = (y0, y1) => { const g = x.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, '#ffffff'); g.addColorStop(0.5, '#ff5fc0'); g.addColorStop(1, '#c2187f'); return g; };
+  x.shadowColor = 'rgba(255,63,180,.6)'; x.shadowBlur = 40;
+  x.font = '900 190px Unbounded, Arial Black, sans-serif'; x.fillStyle = grad(330, 520); x.fillText('STAYA', 540, 430); x.fillText('WORLD', 540, 610);
+  x.shadowBlur = 0; x.font = '800 34px Unbounded, sans-serif'; x.fillStyle = '#ffd1ee'; x.fillText('B-DAY 8 YEARS', 540, 720);
+  x.font = '900 120px Unbounded, sans-serif'; x.fillStyle = n >= LOOT_TOTAL ? '#ffd84a' : '#ffffff'; x.fillText(`${n}/${LOOT_TOTAL}`, 540, 900);
+  x.font = '700 40px Manrope, sans-serif'; x.fillStyle = 'rgba(255,255,255,.85)'; x.fillText(n >= LOOT_TOTAL ? 'все предметы собраны — стикерпак мой' : 'предметов собрано', 540, 990);
+  x.font = '700 36px Manrope, sans-serif'; x.fillStyle = 'rgba(255,255,255,.55)'; x.fillText('staya.nikalimp.ru', 540, 1240);
+  return new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9));
+}
+shareBtn.addEventListener('click', async () => {
+  const blob = await shareImage(); if (!blob) return;
+  const file = new File([blob], 'staya-world.jpg', { type: 'image/jpeg' }), text = `STAYA WORLD — собрано ${lootCount()}/${LOOT_TOTAL}`;
+  if (navigator.canShare?.({ files: [file] })) { try { await navigator.share({ files: [file], text, url: location.origin }); return; } catch (e) { /* отмена */ }
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'staya-world.jpg'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+});
+// конфетти: холст поверх всего, 160 частиц, 3 секунды
+function confetti() {
+  if (reduced) return;
+  const c = document.createElement('canvas'); c.className = 'confetti'; c.width = innerWidth; c.height = innerHeight; document.body.appendChild(c);
+  const x = c.getContext('2d'), P = Array.from({ length: 160 }, () => ({ x: innerWidth / 2 + (Math.random() - 0.5) * 80, y: innerHeight * 0.55, vx: (Math.random() - 0.5) * 14, vy: -6 - Math.random() * 11, r: 4 + Math.random() * 6, a: Math.random() * 6, c: ['#ff3fb4', '#2fe6ff', '#ffd84a', '#ffffff'][Math.random() * 4 | 0] }));
+  const t0 = performance.now();
+  (function f() { const k = (performance.now() - t0) / 1000; x.clearRect(0, 0, c.width, c.height);
+    for (const p of P) { p.vy += 0.25; p.x += p.vx; p.y += p.vy; p.a += 0.15; x.save(); x.translate(p.x, p.y); x.rotate(p.a); x.globalAlpha = Math.max(0, 1 - (k - 2) / 1); x.fillStyle = p.c; x.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); x.restore(); }
+    if (k < 3) requestAnimationFrame(f); else c.remove(); })();
+}
+let finalShown = false;
 function lootToast(n) {
   const done = n >= LOOT_TOTAL;
+  if (done) confetti();
+  scoreText();
   lootEl.classList.toggle('done', done);
   lootEl.innerHTML = done ? `<b>${n}/${LOOT_TOTAL}</b> — все предметы собраны!<br>Приходи на любую тусовку СТАИ и забирай стикерпак в подарок`
     : `<b>${n}/${LOOT_TOTAL}</b> собрано`;
@@ -362,6 +409,7 @@ canvas.addEventListener('click', (e) => {
 /* ---------- отклик мира: курсор на десктопе, наклон на телефоне ---------- */
 // ptr — положение «пальца» на экране (−1…1); его движение даёт ветер, луч из камеры — точку касания в мире
 const ptr = { x: 0, y: 0, on: false, vx: 0, vy: 0, t: 0, lx: 0, ly: 0 };
+const _sv = new THREE.Vector3();
 const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _plane = new THREE.Plane(), _hit = new THREE.Vector3(), _wp = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
 let stillT = 0;
 function touchTick(s, t) {
@@ -431,7 +479,10 @@ const audio = {
   init() {
     const AC = window.AudioContext || window.webkitAudioContext; if (!AC || this.ctx) return;
     this.ctx = new AC(); this.master = this.ctx.createGain(); this.master.connect(this.ctx.destination);
-    this.bus = this.ctx.createGain(); this.bus.connect(this.master);   // музыка отдельно от звуковых эффектов: её можно приглушить
+    // музыка: шина → фильтр и панорама (пространство: далеко от сцены — глуше и тише, сцена слева — звук слева) → мастер
+    this.bus = this.ctx.createGain(); this.lp = this.ctx.createBiquadFilter(); this.lp.type = 'lowpass'; this.lp.frequency.value = 20000; this.lp.Q.value = 0.3;
+    this.pan = this.ctx.createStereoPanner ? this.ctx.createStereoPanner() : null;
+    this.bus.connect(this.lp); (this.pan ? this.lp.connect(this.pan).connect(this.master) : this.lp.connect(this.master));
     this.an = this.ctx.createAnalyser(); this.an.fftSize = 1024; this.an.smoothingTimeConstant = 0.5; this.master.connect(this.an);
     this.fq = new Uint8Array(this.an.frequencyBinCount);
     this.fx = makeSfx(this.ctx, this.master);
@@ -465,6 +516,17 @@ const audio = {
       }
     });
     const nx = this.tracks[i + 1]; if (nx && nx !== curTr && nx.ok && nx.el.preload === 'none') { nx.el.preload = 'auto'; nx.el.load(); }
+  },
+  // пространство: положение «сцены» мира (диджейский пульт) относительно камеры → панорама и приглушение вдали
+  _sp: 0,
+  space(cam, stage) {
+    if (!this.ctx || !this.on) return; const now = performance.now(); if (now - this._sp < 120) return; this._sp = now;
+    let pan = 0, dist = 0;
+    if (stage) { _sv.copy(stage).applyMatrix4(cam.matrixWorldInverse); dist = _sv.length(); pan = Math.max(-1, Math.min(1, _sv.x / Math.max(4, dist))) * 0.45; }
+    const far = Math.max(0, Math.min(1, (dist - 10) / 40)), tc = this.ctx.currentTime;
+    this.lp.frequency.setTargetAtTime(20000 - far * 17500, tc, 0.25);
+    if (this.pan) this.pan.pan.setTargetAtTime(pan, tc, 0.25);
+    this.bus.gain.setTargetAtTime(this.musicOn ? 1 - far * 0.3 : 0, tc, 0.25);
   },
   // доля баса 0…1: быстрая огибающая минус медленная — вспышка на каждом ударе бочки.
   // звук выключен — ровный пульс 122 BPM, чтобы сцены не замирали
@@ -526,7 +588,10 @@ ring.addEventListener('click', () => {
   audio.init(); audio.setOn(soundOn);
   pre.classList.add('out'); document.body.classList.remove('locked');
   scrollTo(0, 0); cur = target = 0; started = true; dirty = true;
-  setTimeout(() => tweenScroll(gToScroll(FADE * 1.4), reduced ? 0 : 2600), 350);
+  // ссылка на мир (#pool, #phuket…): после Play прыжок сразу туда
+  const hi = SCENES.findIndex((sc) => '#' + sc.id === location.hash);
+  if (hi > 0) { jumping = true; const g = hi + FADE * 1.4; scrollTo(0, gToScroll(g)); cur = target = g; buildScene(hi).then(() => (dirty = true)); jumping = false; }
+  else setTimeout(() => tweenScroll(gToScroll(FADE * 1.4), reduced ? 0 : 2600), 350);
   // подсказка «листайте» — пока зритель сам не прокрутит дальше вступления
   const sh = $('#scrollhint'), lim = () => gToScroll(FADE * 2.2);
   if (isTouch) $('#scrolltxt').textContent = 'Свайпайте вверх';

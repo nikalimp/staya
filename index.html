@@ -94,6 +94,12 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 #final{position:fixed;z-index:8;left:0;right:0;bottom:calc(28px + var(--safe-b));display:flex;flex-direction:column;align-items:center;gap:14px;padding:0 16px;
   opacity:0;transform:translateY(14px);transition:opacity .6s,transform .6s;pointer-events:none}
 #final.on{opacity:1;transform:none;pointer-events:auto}
+#final .score{margin:0;font:600 15px/1.4 Manrope,system-ui,sans-serif;color:rgba(255,255,255,.75);text-align:center;text-shadow:0 1px 8px rgba(0,0,0,.6)}
+#final .score b{font:800 18px Unbounded,sans-serif;color:#ffd84a}
+#final button.share{all:unset;display:inline-flex;align-items:center;height:46px;padding:0 20px;border-radius:23px;font:800 14px Manrope,sans-serif;color:#fff;cursor:pointer;
+  background:rgba(14,6,20,.6);border:1px solid rgba(255,255,255,.3);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#final button.share:focus-visible{outline:2px solid #fff;outline-offset:3px}
+canvas.confetti{position:fixed;inset:0;z-index:9;pointer-events:none}
 #final .row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
 #final a.made{display:inline-block;height:auto;padding:4px 6px;border:0;border-radius:6px;background:none;backdrop-filter:none;-webkit-backdrop-filter:none;font:600 13px Manrope,sans-serif;color:rgba(255,255,255,.75);text-decoration:none}
 #final .made b{font-weight:800;color:#fff}
