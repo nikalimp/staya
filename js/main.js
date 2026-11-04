@@ -159,8 +159,7 @@ function scrollToG(y) {
 }
 function gToScroll(g) { const i = Math.min(N - 1, Math.floor(g)); return (cum[i] + (g - i) * SCENES[i].w) * VH_PER_UNIT * VH; }
 
-let previewTick = false, speedK = 0, backK = 0, backT = 0;
-const _dir = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+let previewTick = false, speedK = 0;
 let cur = 0, target = 0, lastG = -1, curIdx = -1, started = false, jumping = false;
 // Стык 'black' уходит в чёрный, 'water' — в синеву воды (нырок AQUA → выныривание в POOL), 'cut' — склейка без затемнения
 const FADE_COLOR = { black: '#000', water: '#0a5f8f', white: '#fff' };
@@ -189,11 +188,7 @@ function apply(g) {
   if (camera.near !== nr) { camera.near = nr; camera.updateProjectionMatrix(); }
   const c = s.cam(t);
   camera.position.copy(c.p);
-  // прокрутка назад: камера разворачивается на 180° и смотрит на дорогу, по которой идём обратно
-  if (backK > 0.001) {
-    const e = backK * backK * (3 - 2 * backK);
-    _dir.copy(c.l).sub(c.p).applyAxisAngle(_up, Math.PI * e); camera.lookAt(_dir.add(c.p));
-  } else camera.lookAt(c.l);
+  camera.lookAt(c.l);
   if (s.roll) camera.rotateZ(s.roll(t));
   // погружение: камера чуть поворачивается за головой зрителя, кивки в такт качают сцену
   // сдвиг головы — как взгляд в окно (камера уходит в обратную сторону), поворот головы — камера смотрит туда же
@@ -264,12 +259,6 @@ function loop() {
     const v = lastG >= 0 && !jumping ? Math.min(1, Math.abs(cur - lastG) / 0.012) : 0;
     const sk = speedK + (v - speedK) * (v > speedK ? 0.25 : 0.08);
     if (Math.abs(sk - speedK) > 1e-4) { speedK = sk < 1e-3 ? 0 : sk; dirty = true; }
-    // направление прокрутки: назад — камера плавно разворачивается, вперёд — возвращается
-    const dv = target - cur;
-    if (!reduced && !jumping) { if (dv < -2e-4) backT = 1; else if (dv > 2e-4) backT = 0; }
-    const nowT = performance.now(), dtB = Math.min(0.1, (nowT - (loop.tB || nowT)) / 1000); loop.tB = nowT;
-    const bk = backK + (backT - backK) * (1 - Math.exp(-dtB * 3.2));   // разворот ≈ за секунду, независимо от частоты кадров
-    if (Math.abs(bk - backK) > 1e-4) { backK = Math.abs(bk - backT) < 1e-3 ? backT : bk; dirty = true; }
     // ритм музыки → неон, лучи, огни, свечение
     if (started) { const b = audio.beat(); if (Math.abs(b - kit.pulse.beat) > 0.004) { kit.pulse.apply(b); dirty = true; } }
   }
@@ -480,5 +469,5 @@ window.__staya = {
   scene: (i) => built.get(i)?.scene,
   pick: (x, y) => { const r = new THREE.Raycaster(); r.setFromCamera(new THREE.Vector2(x, y), camera); const s = built.get(curIdx)?.scene; return s ? r.intersectObject(s, true).slice(0, 4).map((h) => [h.object.type, h.object.name, h.object.parent?.name, h.object.material?.type, h.object.material?.name, +h.distance.toFixed(2), h.object.geometry?.type, JSON.stringify(h.object.geometry?.parameters ?? {}).slice(0, 80)]) : []; },
   loot: () => (built.get(curIdx)?.scene.userData.loot || []).filter((r) => r.visible).map((r) => { const v = r.getWorldPosition(new THREE.Vector3()).project(camera); return [r.userData.loot.id, +((v.x + 1) / 2 * innerWidth).toFixed(0), +((1 - v.y) / 2 * innerHeight).toFixed(0), v.z < 1]; }),
-  dbg: () => ({ back: +backK.toFixed(3), dir: camera.getWorldDirection(new THREE.Vector3()).toArray().map((v) => +v.toFixed(2)), g: cur, cam: camera.position.toArray().map((v) => +v.toFixed(4)), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(3) }),
+  dbg: () => ({ dir: camera.getWorldDirection(new THREE.Vector3()).toArray().map((v) => +v.toFixed(2)), g: cur, cam: camera.position.toArray().map((v) => +v.toFixed(4)), fov: +camera.fov.toFixed(2), aspect: +camera.aspect.toFixed(3) }),
 };
