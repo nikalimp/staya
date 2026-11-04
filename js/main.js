@@ -249,6 +249,7 @@ function apply(g) {
   }
   // сила свечения задаётся сценой: на светлом рассвете слабее, иначе небо засвечивает титры
   lootTick(s.scene, performance.now() / 1000); kit.tickTime(performance.now() / 1000);
+  touchTick(s, t);
   // живое превью следующей сцены в телефоне (дворец → вилла)
   // (через кадр: кадр виллы почти неподвижен, а рендер второй сцены дорогой)
   if (s.preview?.live?.(t) && built.has(i + 1) && (previewTick = !previewTick)) { renderPreview(s, built.get(i + 1), true); dirty = true; }
@@ -287,8 +288,9 @@ function loop() {
   target = scrollToG(scrollY);
   if (reduced || jumping) cur = target;
   else {
-    const d = target - cur;
-    cur += Math.sign(d) * Math.min(Math.abs(d) * 0.12, 0.02);
+    // адаптивный темп: при быстрой прокрутке камера не отстаёт (срезает путь), при медленной — плавно доезжает
+    const d = target - cur, fast = Math.min(1, Math.abs(d) / 0.4);
+    cur += Math.sign(d) * Math.min(Math.abs(d) * (0.12 + 0.1 * fast), 0.02 + 0.04 * fast);
     if (Math.abs(target - cur) < 1e-5) cur = target;
   }
   {
@@ -357,6 +359,41 @@ canvas.addEventListener('click', (e) => {
 
 /* ---------- погружение: слежение за головой (только десктоп) ---------- */
 // tgt — последние значения с камеры (~18 раз в секунду), x/y/yaw/pitch — плавно догоняют их каждый кадр
+/* ---------- отклик мира: курсор на десктопе, наклон на телефоне ---------- */
+// ptr — положение «пальца» на экране (−1…1); его движение даёт ветер, луч из камеры — точку касания в мире
+const ptr = { x: 0, y: 0, on: false, vx: 0, vy: 0, t: 0, lx: 0, ly: 0 };
+const _ray = new THREE.Raycaster(), _ndc = new THREE.Vector2(), _plane = new THREE.Plane(), _hit = new THREE.Vector3(), _wp = new THREE.Vector3(), _up = new THREE.Vector3(0, 1, 0);
+let stillT = 0;
+function touchTick(s, t) {
+  const now = performance.now(); const dt = Math.min(0.1, (now - (ptr.t || now)) / 1000); ptr.t = now;
+  // ветер: от скорости курсора, затухает за ~1,5 с
+  const decay = Math.exp(-dt * 1.8);
+  kit.touch.wind.x = kit.touch.wind.x * decay + ptr.vx * 0.9; kit.touch.wind.y = kit.touch.wind.y * decay + ptr.vy * 0.9; ptr.vx = ptr.vy = 0;
+  // «гость разглядывает»: камера стоит дольше 1,2 с → dwell → 1
+  stillT = speedK > 0.02 ? 0 : stillT + dt; const dw = Math.min(1, Math.max(0, (stillT - 1.2) / 1.5));
+  kit.touch.dwell += (dw - kit.touch.dwell) * Math.min(1, dt * 2);
+  // точка касания: луч из камеры через курсор; по воде — пересечение с её плоскостью, иначе точка на луче в 10 м
+  const cw = 1 - (s.calm?.(t) ?? 0), k = ptr.on && !reduced ? cw : 0;
+  kit.touch.k += (k - kit.touch.k) * Math.min(1, dt * 6);
+  if (kit.touch.k > 0.001) {
+    _ndc.set(ptr.x, ptr.y); _ray.setFromCamera(_ndc, camera); let got = false;
+    for (const w of kit.waters) { let r = w; while (r.parent) r = r.parent; if (r !== s.scene || !w.visible) continue; w.getWorldPosition(_wp); _plane.set(_up, -_wp.y);
+      if (_ray.ray.intersectPlane(_plane, _hit) && _hit.distanceTo(camera.position) < 60) { kit.touch.p.copy(_hit); got = true; break; } }
+    if (!got) kit.touch.p.copy(_ray.ray.direction).multiplyScalar(10).add(camera.position);
+  }
+  kit.touch.apply();
+  if (kit.touch.k > 0.001 || kit.touch.dwell > 0.001 || kit.touch.wind.lengthSq() > 1e-5) dirty = true;
+}
+function ptrMove(x, y) { ptr.vx += (x - ptr.lx); ptr.vy += (y - ptr.ly); ptr.lx = ptr.x = x; ptr.ly = ptr.y = y; ptr.on = true; dirty = true; }
+if (!mobile) {
+  addEventListener('pointermove', (e) => { if (e.pointerType === 'mouse') ptrMove((e.clientX / innerWidth) * 2 - 1, -((e.clientY / innerHeight) * 2 - 1)); });
+  document.documentElement.addEventListener('pointerleave', () => { ptr.on = false; });
+} else {
+  // телефон: наклон задаёт «палец» (по горизонтали ±25°, по вертикали вокруг 45°); касание экрана — точно в точку
+  addEventListener('deviceorientation', (e) => { if (e.gamma == null) return; const g = Math.max(-1, Math.min(1, e.gamma / 25)), b = Math.max(-1, Math.min(1, (e.beta - 45) / 25)); ptrMove(g, -b * 0.6); });
+  addEventListener('touchmove', (e) => { const t0 = e.touches[0]; if (t0) ptrMove((t0.clientX / innerWidth) * 2 - 1, -((t0.clientY / innerHeight) * 2 - 1)); }, { passive: true });
+}
+
 const head = { on: false, x: 0, y: 0, yaw: 0, pitch: 0, z: 0, tgt: { x: 0, y: 0, yaw: 0, pitch: 0, z: 0 }, ctl: null };
 const HQ = ['x', 'y', 'yaw', 'pitch', 'z'];
 // без погружения на десктопе камера мягко смотрит в сторону курсора
@@ -485,6 +522,7 @@ async function boot() {
 }
 ring.addEventListener('click', () => {
   if (!ring.classList.contains('ready') || started) return;
+  if (mobile && typeof DeviceOrientationEvent?.requestPermission === 'function') DeviceOrientationEvent.requestPermission().catch(() => {});   // iOS: наклон телефона
   audio.init(); audio.setOn(soundOn);
   pre.classList.add('out'); document.body.classList.remove('locked');
   scrollTo(0, 0); cur = target = 0; started = true; dirty = true;
