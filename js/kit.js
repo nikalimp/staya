@@ -84,8 +84,6 @@ export class Builder {
   }
   build() {
     const group = new THREE.Group();
-    // люди, добавленные через people.person(), собираются в инстансы (см. js/people.js)
-    if (this.people?.length && Builder.peopleBuild) { group.add(Builder.peopleBuild(this.people, this)); this.people = []; }
     for (const [kind, list] of Object.entries(this.b)) {
       if (!list.length) continue;
       const geo = mergeGeometries(list, false);
@@ -651,7 +649,7 @@ export function loadAsset(name) {
 }
 // Ставит копию модели в сцену. o: { p, ry, s, tint } — tint слегка подкрашивает материалы под палитру сцены
 export async function prop(scene, name, o = {}) {
-  const src = await loadAsset(name), m = src.clone(true);
+  const src = await loadAsset(name), m = src.clone(true); m.userData.asset = name;
   m.position.set(...(o.p ?? [0, 0, 0])); m.rotation.set(o.rx ?? 0, o.ry ?? 0, o.rz ?? 0, 'YXZ'); m.scale.setScalar(o.s ?? 1);
   // o.h — нужная высота, o.w — нужная ширина по большей горизонтали (модели из библиотек приходят в разных единицах)
   if (o.h || o.w) {
@@ -684,7 +682,7 @@ export async function painting(scene, img, o = {}) {
   if (o.video) {
     // видео в золотой раме: кадр 9:16, играет вместе с остальными видео сцены
     const v = document.createElement('video');
-    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous' });
+    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none', crossOrigin: 'anonymous' });
     v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.src = img; _videos.push({ scene, v });
     tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex._aspect = 9 / 16;
   } else {
@@ -744,13 +742,14 @@ export function decks(scene, p, ry = 0, w = 1.6) {
 }
 
 /* ---------- экран с видео вечеринки: пока видео нет или оно грузится — картинка-заглушка ---------- */
-// Видео лежат в video/<id>.mp4. Играет только видео текущей сцены (main.js → playVideos).
+// Видео лежат в video/<id>.mp4. Файл начинает грузиться, только когда зритель входит в сцену (main.js → playVideos),
+// до этого экран показывает заглушку. Играет только видео текущей сцены.
 const _videos = [];
 export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null) {
   const m = screen(w, h, fallback, p, r);
   if (!fallback) m.material.color.set('#050508');
   const v = document.createElement('video');
-  Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'auto', crossOrigin: 'anonymous' });
+  Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none', crossOrigin: 'anonymous' });
   v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
   v.addEventListener('loadeddata', () => {
     const t = new THREE.VideoTexture(v); t.colorSpace = THREE.SRGBColorSpace;
@@ -760,19 +759,14 @@ export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null)
     if (a > s) { t.repeat.set(s / a, 1); t.offset.set((1 - s / a) / 2, 0); } else { t.repeat.set(1, a / s); t.offset.set(0, (1 - a / s) / 2); }
   }, { once: true });
   v.addEventListener('error', () => {}, { once: true });
-  v.src = src; _videos.push({ scene, v });
+  _videos.push({ scene, v, src });
   scene.add(m); return m;
 }
 export function playVideos(scene) {
   for (const x of _videos) {
-    if (x.scene === scene) { if (x.v.paused) x.v.play().catch(() => {}); }
+    if (x.scene === scene) { if (!x.v.src) { x.v.preload = 'auto'; x.v.src = x.src; } if (x.v.paused) x.v.play().catch(() => {}); }
     else if (!x.v.paused) x.v.pause();
   }
-}
-// видео сцены загружены до первого кадра (или вышло время) — сцену можно показывать
-export function videosReady(scene, ms = 4000) {
-  const list = _videos.filter((x) => x.scene === scene && x.v.readyState < 2).map((x) => new Promise((r) => { x.v.addEventListener('loadeddata', r, { once: true }); x.v.addEventListener('error', r, { once: true }); }));
-  return Promise.race([Promise.all(list), new Promise((r) => setTimeout(r, ms))]);
 }
 // идёт ли сейчас хоть одно видео сцены: тогда кадр перерисовывается постоянно (иначе видео «замирает»)
 export function videosPlaying(scene) { return _videos.some((x) => x.scene === scene && !x.v.paused && x.v.readyState >= 2); }
