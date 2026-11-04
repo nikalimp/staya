@@ -7,7 +7,6 @@ import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import * as kit from './kit.js';
 import { startHeadTrack } from './headtrack.js';
 import { makeSfx } from './sfx.js';
-import { loadPeople } from './people.js';
 import { lootAt, lootTick, collect, lootCount, LOOT_TOTAL } from './loot.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
@@ -116,8 +115,8 @@ async function buildScene(i) {
     res.scene.traverse((o) => { if ((o.isMesh || o.isPoints) && !o.userData.dynamic) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
     res.scene.updateMatrixWorld(true);
     kit.glowMats.forEach((m) => (m.uniforms.uScale.value = glowScale));
-    // шейдеры компилируются параллельно (KHR_parallel_shader_compile), видео сцены грузятся вместе с ней
-    await Promise.all([renderer.compileAsync ? renderer.compileAsync(res.scene, camera).catch(() => {}) : Promise.resolve(renderer.compile(res.scene, camera)), kit.videosReady(res.scene)]);
+    // шейдеры компилируются параллельно (KHR_parallel_shader_compile); видео сцены грузятся позже, при входе в неё
+    await (renderer.compileAsync ? renderer.compileAsync(res.scene, camera).catch(() => {}) : Promise.resolve(renderer.compile(res.scene, camera)));
     if (DEBUG) console.log(`[staya] ${SCENES[i].id} built in ${(performance.now() - t0).toFixed(0)} ms`);
     built.set(i, res); building.delete(i);
     if (i === curIdx) kit.playVideos(res.scene);   // сцена догрузилась, когда мы уже в ней
@@ -431,7 +430,7 @@ async function boot() {
     const done = () => { setReal(60); res(); };
     a.addEventListener('canplaythrough', done, { once: true }); a.addEventListener('error', done, { once: true }); setTimeout(done, 4000);
   });
-  await Promise.all([fontP, cssFontP, loadPeople().then(() => setReal(45))]);
+  await Promise.all([fontP, cssFontP]); setReal(45);
   // все сцены — сразу, пока крутится кольцо: дальше путешествие идёт без подгрузок
   // на прелоадере собираем первые две сцены; остальные — сразу следом по порядку, без остановки
   await buildScene(0); setReal(70);
