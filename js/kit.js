@@ -367,9 +367,10 @@ export function glowPoints(list) {
   geo.setAttribute('aColor', new THREE.BufferAttribute(col, 3));
   geo.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
   const mat = new THREE.ShaderMaterial({
-    uniforms: { uScale: { value: 600 }, uBeat: pulse.u },
-    vertexShader: `attribute vec3 aColor; attribute float aSize; uniform float uScale, uBeat; varying vec3 vC;
-      void main(){ vC=aColor*(1.+uBeat*0.55); vec4 mv=modelViewMatrix*vec4(position,1.); gl_PointSize=min(aSize*(1.+uBeat*0.18)*uScale/max(-mv.z,0.1), 512.); gl_Position=projectionMatrix*mv; }`,
+    uniforms: { uScale: { value: 600 }, uBeat: pulse.u, uTouch: touch.u.uTouch, uDwell: touch.u.uDwell },
+    vertexShader: `attribute vec3 aColor; attribute float aSize; uniform float uScale, uBeat, uDwell; uniform vec4 uTouch; varying vec3 vC;
+      void main(){ vec4 wp = modelMatrix * vec4(position, 1.); float near = uTouch.w * smoothstep(6., 0.5, distance(wp.xyz, uTouch.xyz));
+        vC=aColor*(1.+uBeat*0.55+near*0.9+uDwell*0.18); vec4 mv=viewMatrix*wp; gl_PointSize=min(aSize*(1.+uBeat*0.18+near*0.35)*uScale/max(-mv.z,0.1), 512.); gl_Position=projectionMatrix*mv; }`,
     fragmentShader: `varying vec3 vC; void main(){ float d=length(gl_PointCoord-.5)*2.; float a=max(0.,1.-d); a=a*a*(0.35+0.65*a*a); gl_FragColor=vec4(vC*a,1.);
       #include <colorspace_fragment>
     }`,
@@ -457,8 +458,19 @@ export function water(w, h, color, o = {}) {
     emissive: new THREE.Color(o.emissive ?? color), emissiveIntensity: o.ei ?? 0.35,
     transparent: o.opacity != null, opacity: o.opacity ?? 1, side: THREE.DoubleSide, depthWrite: o.opacity == null,
   });
+  // круги на воде под курсором: нормаль гнётся кольцами вокруг точки касания (uTouch.xz), сила — uTouch.w
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uTouch: touch.u.uTouch, uTime: touch.u.uTime, uDwell: touch.u.uDwell });
+    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWp;')
+      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec4 uTouch; uniform float uTime, uDwell; varying vec3 vWp;')
+      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
+        { vec2 d = vWp.xz - uTouch.xz; float r = length(d); float R = 3.5;
+          float a = uTouch.w * smoothstep(R, 0.3, r) * (0.3 + 0.12 * uDwell);
+          if (a > 0.001) { float wv = sin(r * 6.0 - uTime * 7.0); vec2 g = normalize(d + 1e-4) * wv * a; normal = normalize(normal + vec3(g.x, 0.0, g.y)); } }`);
+  };
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h, 1, 1), mat);
-  m.rotation.x = -Math.PI / 2;
+  m.rotation.x = -Math.PI / 2; m.userData.water = true; waters.push(m);
   return m;
 }
 
@@ -653,6 +665,7 @@ export function loadAsset(name) {
 // Ставит копию модели в сцену. o: { p, ry, s, tint } — tint слегка подкрашивает материалы под палитру сцены
 export async function prop(scene, name, o = {}) {
   const src = await loadAsset(name), m = src.clone(true); m.userData.asset = name;
+  if (name === 'sf_palm') { const hh = new THREE.Box3().setFromObject(src).getSize(new THREE.Vector3()).y; m.traverse((c) => { if (c.isMesh) windMaterial(c.material, hh); }); }
   m.position.set(...(o.p ?? [0, 0, 0])); m.rotation.set(o.rx ?? 0, o.ry ?? 0, o.rz ?? 0, 'YXZ'); m.scale.setScalar(o.s ?? 1);
   // o.h — нужная высота, o.w — нужная ширина по большей горизонтали (модели из библиотек приходят в разных единицах)
   if (o.h || o.w) {
@@ -706,10 +719,36 @@ export function instanceStatic(scene, cell = 40) {
   return saved;
 }
 
+/* ---------- отклик мира на гостя: курсор (десктоп) или наклон телефона ---------- */
+const _timeU = { value: 0 };   // время сцены для шейдеров (main.js → tickTime)
+export function tickTime(now) { _timeU.value = now; }
+// touch.p — точка в мире, куда «смотрит» курсор; touch.k — сила (0 — курсора нет); touch.wind — ветер от движения курсора;
+// touch.dwell — 1, когда камера стоит на месте (гость разглядывает сцену): неон и огни разгораются
+export const touch = {
+  p: new THREE.Vector3(1e6, 0, 1e6), k: 0, wind: new THREE.Vector2(), dwell: 0,
+  u: { uTouch: { value: new THREE.Vector4(1e6, 0, 1e6, 0) }, uWind: { value: new THREE.Vector2() }, uDwell: { value: 0 }, uTime: _timeU },
+  apply() { this.u.uTouch.value.set(this.p.x, this.p.y, this.p.z, this.k); this.u.uWind.value.copy(this.wind); this.u.uDwell.value = this.dwell; },
+};
+// плоскости воды сцены: по ним считается точка под курсором (круги на воде)
+export const waters = [];
+// пальмы и другие «гнущиеся» модели: вершинный шейдер качает их ветром (сильнее к верхушке)
+export function windMaterial(mat, h) {
+  if (mat.userData.wind) return; mat.userData.wind = true;
+  mat.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, { uWind: touch.u.uWind, uTime: touch.u.uTime, uH: { value: h } });
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nuniform vec2 uWind; uniform float uTime, uH;')
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        { float k = clamp(transformed.y / uH, 0., 1.); k = k * k;
+          float ph = uTime * 1.3 + transformed.x * 0.7 + transformed.z * 0.5;
+          vec2 w = uWind * 0.22 + vec2(sin(ph), cos(ph * 0.8)) * 0.04;
+          transformed.xz += w * k * uH; }`);
+  };
+  mat.needsUpdate = true;
+}
+
 /* ---------- огоньки свечей: все пламена сцены — одни Points, дрожание считает шейдер ---------- */
 // list: [x, y, z, size]; возвращает Points; flicker(now) не нужен — время идёт через uniform uTime (kit.tickTime)
-const _timeU = { value: 0 };
-export function tickTime(now) { _timeU.value = now; }
 export function flamePoints(list, color = '#ffc27a') {
   const n = list.length, pos = new Float32Array(n * 3), siz = new Float32Array(n), ph = new Float32Array(n);
   list.forEach((g, i) => { pos.set([g[0], g[1], g[2]], i * 3); siz[i] = g[3] ?? 0.1; ph[i] = i * 1.7; });
