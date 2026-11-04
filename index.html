@@ -29,6 +29,9 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 #gl{position:fixed;inset:0;width:100vw;height:100lvh;display:block;z-index:0;touch-action:pan-y}
 #spacer{position:relative;width:1px;pointer-events:none}
 #fade{position:fixed;inset:0;background:#000;z-index:5;pointer-events:none;opacity:1}
+/* мир ещё не построен (медленная сеть): подпись на чёрном стыке */
+#fade.wait::after{content:'Мир ещё строится…';position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:700 15px/1 Manrope,system-ui,sans-serif;letter-spacing:.06em;color:rgba(255,255,255,.55);animation:waitPulse 1.6s ease-in-out infinite}
+@keyframes waitPulse{50%{opacity:.35}}
 /* телефон: виньетка без постобработки (на десктопе — в шейдере вместе с расфокусом краёв) */
 #lids{position:fixed;inset:0;z-index:4;pointer-events:none;--sq:0}
 #lids::before,#lids::after{content:"";position:absolute;left:-5%;right:-5%;height:calc(var(--sq) * 30vh + 2vh);background:radial-gradient(120% 100% at 50% 0%,#000 55%,rgba(0,0,0,.85) 75%,rgba(0,0,0,0) 100%);opacity:min(1,calc(var(--sq) * 3));filter:blur(6px)}

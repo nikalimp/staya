@@ -220,7 +220,8 @@ function blackAt(i, t) {
 function apply(g) {
   const i = Math.min(N - 1, Math.floor(g)), t = g - i;
   const s = built.get(i);
-  if (!s) { fadeEl.style.opacity = 1; buildScene(i).then(() => (dirty = true)); return false; }
+  if (!s) { fadeEl.style.opacity = 1; fadeEl.classList.add('wait'); buildScene(i).then(() => (dirty = true)); return false; }
+  fadeEl.classList.remove('wait');
   // сцена может сама погасить свет (мистика во дворце) и выключить музыку
   const fk = blackAt(i, t), dk = s.dark?.(t) ?? 0;
   if (dk > fk && fadeEl.dataset.c !== '#000') { fadeEl.style.background = '#000'; fadeEl.dataset.c = '#000'; }
@@ -476,11 +477,9 @@ async function boot() {
     a.addEventListener('canplaythrough', done, { once: true }); a.addEventListener('error', done, { once: true }); setTimeout(done, 4000);
   });
   await Promise.all([fontP, cssFontP]); setReal(45);
-  // все сцены — сразу, пока крутится кольцо: дальше путешествие идёт без подгрузок
-  // на прелоадере собираем первые две сцены; остальные — сразу следом по порядку, без остановки
-  await buildScene(0); setReal(70);
-  await buildScene(1); setReal(95);
-  (async () => { for (let i = 2; i < N; i++) { await buildScene(i).catch(() => {}); await new Promise((r) => idle(r)); } })();
+  // прелоадер ждёт только первый мир и начало его музыки; остальные миры строятся по порядку уже во время прогулки
+  await buildScene(0); setReal(90);
+  (async () => { for (let i = 1; i < N; i++) { await buildScene(i).catch(() => {}); await new Promise((r) => idle(r)); } })();
   await firstTrack;
   setReal(100);
 }
