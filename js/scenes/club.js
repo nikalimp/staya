@@ -1,3 +1,4 @@
+import { addLoot } from '../loot.js';
 // 03 · STAYA 2K17 — клуб в духе 2017 года. Камера от первого лица.
 // Белая вспышка: взгляд вверх на диско-шар, вращение продолжается из POOL → опускаемся к пульту в центре круговой сцены →
 // круговой обзор: толпа слушает наш сет → свободный проход к гримёрке (BACKSTAGE) → лестница вниз →
@@ -202,10 +203,11 @@ export async function build({ THREE, kit, font, renderer }) {
 
   /* --- свет --- */
   scene.add(new THREE.HemisphereLight('#6a3bd0', '#0c0614', 0.55));
-  const L = (c, i, p, d = 45) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
-  L(PINK, 200, [0, 11.5, 37.5], 18); L(PINK, 120, [0, 8, 27], 18); L(VIO, 380, [0, 10, -8]); L('#ffffff', 90, [2.5, 12.2, 2.5], 8); L('#ffe6f4', 160, [-9.2, 3.2, 6.4], 7); L(CY, 120, [-6, 2.5, 8], 6); L('#fff1d6', 120, [0, 11, 2], 16); L(CY, 220, [-10, 5, 0]); L(PINK, 220, [10, 5, 0]); L('#fff1d6', 40, [0, 5, 0], 10); L(PINK, 70, [18, 2.8, -7.5], 9); L('#ff2a55', 90, [24, -2, -7.5], 10); L(PINK, 90, [33, LY + 2.8, -7.5], 11);
+  // все лампы нужны для запекания стен; на сайте остаются только отмеченные keep — они светят на кирпич и реквизит
+  const lights = [], L = (c, i, p, d = 45, keep = false) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); l.userData.keep = keep; scene.add(l); lights.push(l); };
+  L(PINK, 200, [0, 11.5, 37.5], 18); L(PINK, 120, [0, 8, 27], 18); L(VIO, 380, [0, 10, -8], 45, true); L('#ffffff', 90, [2.5, 12.2, 2.5], 8); L('#ffe6f4', 160, [-9.2, 3.2, 6.4], 7); L(CY, 120, [-6, 2.5, 8], 6); L('#fff1d6', 120, [0, 11, 2], 16); L(CY, 220, [-10, 5, 0], 45, true); L(PINK, 220, [10, 5, 0], 45, true); L('#fff1d6', 40, [0, 5, 0], 10); L(PINK, 70, [18, 2.8, -7.5], 9); L('#ff2a55', 90, [24, -2, -7.5], 10); L(PINK, 90, [33, LY + 2.8, -7.5], 11);
   // свет у парадной двери в конце коридора
-  L('#ffb15a', 140, [X3 - 1.6, LY + 2.7, CZ], 6);
+  L('#ffb15a', 140, [X3 - 1.6, LY + 2.7, CZ], 6, true);
   scene.add(kit.glowPoints(glows));
   // реквизит 2017 (Poly Haven, CC0): бумбокс на сцене, кассетники и бутылки на столиках лаунжа
   await Promise.all([
@@ -221,7 +223,8 @@ export async function build({ THREE, kit, font, renderer }) {
   kit.haze(scene, { box: [-15, 15, 1.2, 10, -15, 14], colors: ['#ff2fd0', '#8a3dff', '#2fe6ff'], n: 36, size: 12, opacity: 0.19 });
   kit.haze(scene, { box: [-14, 14, 0.2, 1.4, -14, 13], colors: ['#d8c8ff', '#ff9ad8'], n: 16, size: 7, opacity: 0.12, seed: 21 });
   kit.haze(scene, { box: [17, 39, -5, 2.8, -8.6, -6.4], colors: ['#ff3fb4'], n: 8, size: 4, opacity: 0.14, seed: 9 });
-  await kit.applyBake(scene, built, 'club', { k: 26 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
+  await kit.applyBake(scene, built, 'club', { k: 26 });
+  if (!globalThis.__noBake) lights.filter((l) => !l.userData.keep).forEach((l) => scene.remove(l));   // 14 → 4 источника   // свет запечён в Blender (scripts/blender/bake_scene.py)
 
   /* --- толпа вокруг круговой сцены: мы — артист, все слушают наш сет; свободен только проход к гримёрке --- */
   const exit = [16, -7.5];
@@ -271,5 +274,8 @@ export async function build({ THREE, kit, font, renderer }) {
     pong.position.set(PT[0] + lx * ca, ly, PT[2] - lx * sa);
   };
   const calm = (t) => Math.min(1, Math.max(0, (0.56 - t) / 0.06));   // вращение со сцены — без влияния головы и курсора
+  // предметы для сбора: кассета на колонке у прохода, золотой микрофон перед дверью
+  addLoot(scene, 'cassette', 'cassette', [2.12, 2.75, -3.12], { r: 0.6, ry: -0.6 });
+  addLoot(scene, 'mic', 'mic', [X3 - 2.4, LY + 1.35, CZ + 0.4], { r: 0.55 });
   return { scene, cam, update, calm };
 }

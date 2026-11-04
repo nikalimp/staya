@@ -1,18 +1,20 @@
+import { addLoot } from '../loot.js';
 // 01 · STAYA AQUA — ночной аквапарк под куполом.
 // Камера скатывается по тёмной трубе горки (в ней светятся только ленты, в «окнах» видно аквапарк),
 // облетает диджейский пульт, проходит между спинами диджеев и прыгает в бассейн.
 export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M, V } = kit;
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color('#04020c');
-  scene.fog = new THREE.FogExp2('#0b0626', 0.011);
-  scene.environment = kit.env(renderer, ['#ff2fa8', '#2fe6ff', '#8a4dff', '#ffffff', '#2f6bff', '#ff8ad8']);
+  // днём: светлое небо за стеклянным куполом, солнце, песок вместо палубы
+  scene.background = new THREE.Color('#9fd6ff');
+  scene.fog = new THREE.FogExp2('#cfe8fa', 0.0028);
+  scene.environment = kit.env(renderer, ['#ffffff', '#bfe6ff', '#ffe8c8', '#7fd0ff', '#ffd28a', '#ffffff'], '#bfe0ff');
   const b = new Builder(), glows = [], R = kit.rng(11);
   b.rim = ['#2fe6ff', '#ff3fb4', '#7ff2ff'];   // контровой свет силуэтов
   const PINK = '#ff2fa8', CYAN = '#2fe6ff', VIOLET = '#8a4dff', YEL = '#ffd84a';
 
   /* --- бассейн-лагуна со скруглёнными берегами и «ленивая река»: выходит из лагуны, огибает экраны и возвращается --- */
-  const deck = '#7d74a6', top = 0.4, FLOOR = -2.1;
+  const deck = '#e8d2a0', top = 0.4, FLOOR = -2.1;   // песок
   const rbox = (x, z, hx, hz, r) => { const qx = Math.abs(x) - hx + r, qz = Math.abs(z) - hz + r; return Math.hypot(Math.max(qx, 0), Math.max(qz, 0)) + Math.min(Math.max(qx, qz), 0) - r; };
   const smin = (a, b, k) => { const h = Math.max(k - Math.abs(a - b), 0) / k; return Math.min(a, b) - h * h * k * 0.25; };
   const RIVER = new THREE.CatmullRomCurve3([[-11.5, 6.5], [-16.8, 11], [-16.8, 17.5], [-12.5, 21.5], [12.5, 21.5], [16.8, 17.5], [16.8, 11], [11.5, 6.5]].map(([x, z]) => V(x, 0, z)), false, 'centripetal');
@@ -27,7 +29,7 @@ export async function build({ THREE, kit, font, renderer }) {
   // палуба: плита с вырезом лагуны и реки + острова между ними
   const deckShape = toShape([[-50, -49], [50, -49], [50, 49], [-50, 49]]);
   outer.forEach((l) => deckShape.holes.push(toShape(l.pts, THREE.Path)));
-  for (const sh of [deckShape, ...isles.map((l) => toShape(l.pts))]) b.add(flat(new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, curveSegments: 4 }), top - 1), deck, 'plastic', new THREE.Matrix4());
+  for (const sh of [deckShape, ...isles.map((l) => toShape(l.pts))]) b.add(flat(new THREE.ExtrudeGeometry(sh, { depth: 1, bevelEnabled: false, curveSegments: 4 }), top - 1), deck, 'sand', new THREE.Matrix4());
   // дно и вода: внешние контуры, острова — дырки
   const waterShapes = outer.map((l) => { const sh = toShape(l.pts); isles.forEach((il) => sh.holes.push(toShape(il.pts, THREE.Path))); return sh; });
   b.add(flat(new THREE.ShapeGeometry(waterShapes), FLOOR), '#0a7fa8', 'plastic', new THREE.Matrix4());
@@ -55,19 +57,21 @@ export async function build({ THREE, kit, font, renderer }) {
   const DR = 46, DC = [0, 0, -4];
   // сплошной купол аквапарка (без звёздного неба): ночная синева с сеткой панелей
   const domeT = kit.canvasTex(1024, 512, (x, w, h) => {
-    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#1a1550'); g.addColorStop(0.6, '#0f1a4a'); g.addColorStop(1, '#0a1236'); x.fillStyle = g; x.fillRect(0, 0, w, h);
-    x.strokeStyle = 'rgba(160,190,255,.16)'; x.lineWidth = 2;
+    const g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, '#2f8fe8'); g.addColorStop(0.65, '#6fbcf5'); g.addColorStop(1, '#c4e6fb'); x.fillStyle = g; x.fillRect(0, 0, w, h);
+    // облака за стеклом
+    const C = kit.rng(5); for (let i = 0; i < 60; i++) { const cx = C() * w, cy = h * (0.35 + C() * 0.55), r = 20 + C() * 60; const cg = x.createRadialGradient(cx, cy, 0, cx, cy, r); cg.addColorStop(0, 'rgba(255,255,255,.75)'); cg.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = cg; x.fillRect(cx - r, cy - r, r * 2, r * 2); }
+    x.strokeStyle = 'rgba(255,255,255,.55)'; x.lineWidth = 3;
     for (let i = 0; i <= 32; i++) { x.beginPath(); x.moveTo((i / 32) * w, 0); x.lineTo((i / 32) * w, h); x.stroke(); }
     for (let j = 1; j < 10; j++) { x.beginPath(); x.moveTo(0, (j / 10) * h); x.lineTo(w, (j / 10) * h); x.stroke(); }
   });
   const dome = new THREE.Mesh(new THREE.SphereGeometry(DR + 0.6, 64, 24, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ map: domeT, side: THREE.BackSide, fog: false }));
   dome.position.set(...DC); scene.add(dome);
-  const ring = new THREE.Mesh(new THREE.CylinderGeometry(DR + 0.6, DR + 0.6, 3, 64, 1, true), new THREE.MeshBasicMaterial({ color: '#0a1236', side: THREE.BackSide, fog: false }));
+  const ring = new THREE.Mesh(new THREE.CylinderGeometry(DR + 0.6, DR + 0.6, 3, 64, 1, true), new THREE.MeshBasicMaterial({ color: '#d9f1ff', side: THREE.BackSide, fog: false }));
   ring.position.set(DC[0], -1.4, DC[2]); scene.add(ring);
-  for (let i = 0; i < 12; i++) b.add(G.tor(DR, 0.28, 6, 72, Math.PI), '#b8b0ff', 'metal', M(DC, [0, (i / 12) * Math.PI, 0]));
+  for (let i = 0; i < 12; i++) b.add(G.tor(DR, 0.28, 6, 72, Math.PI), '#f4f6ff', 'gloss', M(DC, [0, (i / 12) * Math.PI, 0]));
   for (const h of [10, 22, 33, 41]) {
     const r = Math.sqrt(DR * DR - h * h);
-    b.add(G.tor(r, 0.32, 6, 96), '#d6d0ff', 'metal', M([DC[0], h, DC[2]], [Math.PI / 2, 0, 0]));
+    b.add(G.tor(r, 0.32, 6, 96), '#f4f6ff', 'gloss', M([DC[0], h, DC[2]], [Math.PI / 2, 0, 0]));
     if (h === 10) for (let a = 0; a < 64; a++) { const t = (a / 64) * Math.PI * 2; glows.push([DC[0] + Math.cos(t) * (r - 0.5), h - 0.4, DC[2] + Math.sin(t) * (r - 0.5), a % 2 ? PINK : '#ffd2a1', 0.9, 1.2]); }
   }
   const TW = [-26, 0, 14];   // вышка горки
@@ -151,7 +155,8 @@ export async function build({ THREE, kit, font, renderer }) {
   const glassM = new THREE.Mesh(part(clear), new THREE.MeshPhysicalMaterial({ color: '#56dcff', transparent: true, opacity: 0.22, roughness: 0.06, clearcoat: 1, side: THREE.DoubleSide, depthWrite: false }));
   glassM.renderOrder = 2; scene.add(glassM);
   // свет лент внутри трубы едет вместе с камерой
-  const tl1 = new THREE.PointLight(PINK, 14, 7, 2), tl2 = new THREE.PointLight(CYAN, 14, 7, 2); scene.add(tl1, tl2);
+  // свет лент в трубе: одна лампа едет вместе с камерой (было две)
+  const tl1 = new THREE.PointLight('#ff8ad8', 18, 8, 2), tl2 = { position: new THREE.Vector3(), intensity: 0 }; scene.add(tl1);
   for (let i = 1; i < 60; i++) {
     const u = i / 60, p = slide.getPointAt(u), tg = slide.getTangentAt(u);
     const q = new THREE.Quaternion().setFromUnitVectors(V(0, 0, 1), tg);
@@ -247,16 +252,14 @@ export async function build({ THREE, kit, font, renderer }) {
   props.push(kit.prop(scene, 'sf_diveboard', { p: [TWX + 2.4, top + TWH + 0.15, TZ], ry: -Math.PI / 2, w: 4.2 }));
 
   /* --- свет --- */
-  scene.add(new THREE.HemisphereLight('#5b4bdf', '#12061f', 0.55));
-  const L = (c, i, p, d = 70) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
-  L(PINK, 380, [0, 9, -9]); L(CYAN, 300, [-8, 4, 4]); L(VIOLET, 360, [10, 7, 6]); L(CYAN, 260, [-24, 12, 14], 40);
-  L(PINK, 300, [AX - 6, 12, 6], 45); L(CYAN, 240, [AX + 6, 7, -8], 40); L(YEL, 200, [AX - 4, 18, 0], 40);
+  // днём два источника вместо восьми: небо и солнце (оба запекаются, на сайте освещают модели)
+  scene.add(new THREE.HemisphereLight('#d6eeff', '#e8d0a0', 1.15));
+  const sun = new THREE.DirectionalLight('#fff1d8', 3.2); sun.position.set(36, 64, 28); scene.add(sun);
   scene.add(kit.glowPoints(glows));
   await Promise.all(props);
   const built = b.build(); scene.add(built);
-  kit.haze(scene, { box: [-26, 26, 4, 14, -22, 10], colors: ['#8a4dff', '#2fe6ff', '#ff2fa8'], n: 16, size: 16, opacity: 0.05 });
-  await kit.applyBake(scene, built, 'aqua', { k: 32 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
-  const w = kit.water(30, 18, '#0b8fc0', { tile: 5, ei: 0.5, opacity: 0.88, emissive: '#0a6fa8' });
+  await kit.applyBake(scene, built, 'aqua', { k: 2.4 });   // свет запечён в Blender (scripts/blender/bake_scene.py)
+  const w = kit.water(30, 18, '#2fc6ea', { tile: 5, ei: 0.22, opacity: 0.86, emissive: '#1aa6d8' });
   w.geometry.dispose(); w.geometry = new THREE.ShapeGeometry(waterShapes); w.material.normalMap.repeat.set(0.2, 0.2);
   w.position.y = 0.1; scene.add(w);
   // по реке плывут надувные круги
@@ -314,7 +317,7 @@ export async function build({ THREE, kit, font, renderer }) {
   const jumpRings = [0, 1, 2].map((i) => { const r = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ringMat.clone()); r.rotation.x = -Math.PI / 2; r.position.set(-10.6, 0.14, TZ); r.visible = false; r.userData.dynamic = true; scene.add(r); return r; });
   const wn = w.material.normalMap;
   // под водой — плотная синяя дымка (нырок)
-  const fogC = scene.fog.color.clone(), fogD = scene.fog.density, blue = new THREE.Color('#0a5f8f');
+  const fogC = scene.fog.color.clone(), fogD = scene.fog.density, blue = new THREE.Color('#1a8fc0');
   const update = (t) => {
     const now = performance.now() / 1000;
     const u = Math.min(0.97, (t / 0.2) * 0.97);
@@ -336,5 +339,8 @@ export async function build({ THREE, kit, font, renderer }) {
     if (beamM) beamM.opacity = 0.16 * (1 - 0.7 * Math.max(0, Math.min(1, (t - 0.6) / 0.03, (0.79 - t) / 0.03)));
   };
   const beamM = built.getObjectByName('beam')?.material;
-  return { scene, cam: path, update };
+  // предметы для сбора: золотая пластинка у сцены, очки-сердечки на доске вышки
+  addLoot(scene, 'vinyl', 'vinyl', [-4.2, ST + 1.0, SZ + 2.6], { r: 0.7 });
+  addLoot(scene, 'glasses', 'glasses', [TWX + 3.3, top + TWH + 0.95, TZ], { r: 0.6 });
+  return { scene, cam: path, update, bloom: 0.2 };
 }

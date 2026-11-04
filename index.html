@@ -44,6 +44,19 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 .logo{font-family:Unbounded,sans-serif;font-weight:900;letter-spacing:-.02em;line-height:.9;font-size:clamp(64px,19vw,200px);
   background:linear-gradient(180deg,#fff 0%,#ffd1ee 18%,#ff5fc0 48%,#c2187f 100%);-webkit-background-clip:text;background-clip:text;color:transparent;
   filter:drop-shadow(0 0 28px rgba(255,63,180,.45)) drop-shadow(0 6px 0 #5a0a3a)}
+/* название в две строки: STAYA / WORLD, подзаголовок — день рождения */
+.brand{display:flex;flex-direction:column;align-items:center;gap:clamp(10px,2vh,18px);text-align:center}
+.brand .logo{font-size:clamp(46px,12vw,150px);max-width:12ch}
+.brand .sub{font:800 clamp(13px,2.2vw,20px)/1 Unbounded,sans-serif;letter-spacing:.32em;padding-left:.32em;color:#ffd1ee;text-shadow:0 0 18px rgba(255,63,180,.7)}
+.loot-hint{margin:0;font:600 13px/1.4 Manrope,system-ui,sans-serif;color:rgba(255,255,255,.62);letter-spacing:.02em}
+/* счётчик собранных предметов: всплывает после каждой находки */
+#loot{position:fixed;left:50%;bottom:max(28px,env(safe-area-inset-bottom));z-index:6;transform:translate(-50%,20px);opacity:0;pointer-events:none;
+  padding:12px 20px;border-radius:999px;background:rgba(14,6,20,.72);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  border:1px solid rgba(255,95,192,.45);box-shadow:0 0 30px rgba(255,63,180,.35);color:#fff;font:700 15px/1.35 Manrope,system-ui,sans-serif;text-align:center;
+  transition:opacity .35s,transform .35s;max-width:min(92vw,440px)}
+#loot.on{opacity:1;transform:translate(-50%,0)}
+#loot b{font:800 18px Unbounded,sans-serif;background:linear-gradient(90deg,#fff,#ff8ad8);-webkit-background-clip:text;background-clip:text;color:transparent}
+#loot.done{border-radius:22px;padding:18px 24px;border-color:#ffd84a;box-shadow:0 0 44px rgba(255,216,74,.45)}
 #ring{all:unset;position:relative;width:120px;height:120px;border-radius:50%;display:grid;place-items:center;cursor:default;-webkit-tap-highlight-color:transparent}
 #ring svg.track{position:absolute;inset:0;transform:rotate(-90deg)}
 #ring circle{fill:none;stroke-width:3}
@@ -105,7 +118,8 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 
 <div id="pre" role="dialog" aria-label="Загрузка STAYA">
   <div class="pre-in">
-    <div class="logo" aria-hidden="true">STAYA</div>
+    <div class="brand" aria-hidden="true"><div class="logo">STAYA WORLD</div><div class="sub">B-DAY 8 YEARS</div></div>
+    <p class="loot-hint">Найди 8 предметов по пути — нажми на них</p>
     <div class="pre-row">
     <button id="snd" class="pre-opt" aria-pressed="true" aria-label="Звук включён" title="Звук">
       <svg class="on" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/><path d="M19 6a8.5 8.5 0 0 1 0 12"/></svg>
@@ -133,6 +147,7 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 <div id="vig"></div>
 <div id="lids" aria-hidden="true"></div>
 <div id="fade"></div>
+<div id="loot" role="status" aria-live="polite"></div>
 
 <!-- Текст сайта для поиска и нейросетей. На экране — только путешествие. -->
 <main class="sr">
