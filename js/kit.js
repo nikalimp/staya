@@ -604,6 +604,9 @@ export function moonMesh(radius, lightDir = null, o = {}) {
 /* ---------- GLB из Blender (сжатие meshopt через gltfpack) ---------- */
 // текстуры моделей — KTX2 (Basis Universal): видеокарта получает их сжатыми, без распаковки на основном потоке
 let _gltf, _ktx2;
+// уровень качества (main.js → TIERS): суффикс запечённых текстур, анизотропия, видео на экранах
+export let quality = { tex: '', aniso: 4, video: true };
+export function setQuality(q) { quality = q; }
 export function useRenderer(renderer) {
   _ktx2 = new KTX2Loader().setTranscoderPath(new URL('../vendor/addons/libs/basis/', import.meta.url).href).detectSupport(renderer);
 }
@@ -674,6 +677,65 @@ export async function prop(scene, name, o = {}) {
   scene.add(m); return m;
 }
 
+/* ---------- инстансы: одинаковые неподвижные меши сцены сливаются в InstancedMesh ---------- */
+// Кандидаты — меши с общей геометрией и материалом (копии одной модели через prop()), без предков с userData.dynamic
+// или userData.base (качающиеся игрушки). Исходные меши скрываются, на их месте — один вызов отрисовки на группу.
+export function instanceStatic(scene, cell = 40) {
+  const groups = new Map(), _v = new THREE.Vector3();
+  scene.updateMatrixWorld(true);
+  const matKey = (m) => (m.isShaderMaterial || m.isRawShaderMaterial) ? m.uuid
+    : [m.type, m.color?.getHex(), m.emissive?.getHex(), m.emissiveIntensity, m.roughness, m.metalness, m.map?.uuid, m.emissiveMap?.uuid, m.normalMap?.uuid, m.lightMap?.uuid, m.alphaMap?.uuid, m.transparent, m.opacity, m.side, m.blending, m.depthWrite, m.toneMapped, m.fog, m.clearcoat, m.transmission].join(',');
+  const geoKey = (g) => g.parameters ? g.type + JSON.stringify(g.parameters) : g.uuid;
+  scene.traverse((o) => {
+    if (!o.isMesh || o.isInstancedMesh || !o.visible || o.isSkinnedMesh || o.morphTargetInfluences || Array.isArray(o.material) || o.userData.lootHit) return;
+    for (let k = o; k && !k.isScene; k = k.parent) if (k.userData.dynamic || k.userData.base || k.userData.loot || !k.visible) return;
+    // одна группа — одинаковая геометрия и материал в одной ячейке пространства (чтобы отсечение по кадру работало)
+    o.getWorldPosition(_v);
+    const key = geoKey(o.geometry) + '|' + matKey(o.material) + '|' + Math.floor(_v.x / cell) + ',' + Math.floor(_v.z / cell);
+    (groups.get(key) || groups.set(key, []).get(key)).push(o);
+  });
+  let saved = 0;
+  for (const list of groups.values()) {
+    if (list.length < 2) continue;
+    const im = new THREE.InstancedMesh(list[0].geometry, list[0].material, list.length);
+    list.forEach((m, i) => { im.setMatrixAt(i, m.matrixWorld); m.visible = false; });
+    im.instanceMatrix.needsUpdate = true; im.computeBoundingSphere(); im.renderOrder = list[0].renderOrder;
+    im.name = 'inst:' + (list[0].name || list[0].geometry.type); im.matrixAutoUpdate = false; im.userData.inst = true;
+    scene.add(im); saved += list.length - 1;
+  }
+  return saved;
+}
+
+/* ---------- огоньки свечей: все пламена сцены — одни Points, дрожание считает шейдер ---------- */
+// list: [x, y, z, size]; возвращает Points; flicker(now) не нужен — время идёт через uniform uTime (kit.tickTime)
+const _timeU = { value: 0 };
+export function tickTime(now) { _timeU.value = now; }
+export function flamePoints(list, color = '#ffc27a') {
+  const n = list.length, pos = new Float32Array(n * 3), siz = new Float32Array(n), ph = new Float32Array(n);
+  list.forEach((g, i) => { pos.set([g[0], g[1], g[2]], i * 3); siz[i] = g[3] ?? 0.1; ph[i] = i * 1.7; });
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute('aSize', new THREE.BufferAttribute(siz, 1));
+  geo.setAttribute('aPh', new THREE.BufferAttribute(ph, 1));
+  const tex = canvasTex(64, 64, (x, w, h) => { const g = x.createRadialGradient(w / 2, h * 0.6, 1, w / 2, h * 0.5, w / 2); g.addColorStop(0, 'rgba(255,250,220,1)'); g.addColorStop(0.3, 'rgba(255,190,90,.9)'); g.addColorStop(1, 'rgba(255,90,20,0)'); x.fillStyle = g; x.fillRect(0, 0, w, h); });
+  const mat = new THREE.ShaderMaterial({
+    uniforms: { uScale: { value: 600 }, uTime: _timeU, uTex: { value: tex }, uColor: { value: new THREE.Color(color) } },
+    vertexShader: `attribute float aSize, aPh; uniform float uScale, uTime; varying float vK;
+      void main(){ float k = 0.85 + 0.15 * sin(uTime * 11. + aPh) * sin(uTime * 7.3 + aPh * 2.); vK = k;
+        vec4 mv = modelViewMatrix * vec4(position + vec3(0., aSize * 0.5 * (k - 0.85), 0.), 1.);
+        gl_PointSize = min(aSize * (0.9 + 0.2 * k) * uScale / max(-mv.z, 0.1), 256.); gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: `uniform sampler2D uTex; uniform vec3 uColor; varying float vK;
+      void main(){ vec4 t = texture2D(uTex, gl_PointCoord); gl_FragColor = vec4(t.rgb * uColor * 1.6 * vK, t.a * vK);
+      #include <colorspace_fragment>
+    }`,
+    blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false,
+  });
+  glowMats.add(mat);
+  const pts = new THREE.Points(geo, mat); pts.frustumCulled = false; pts.renderOrder = 3; pts.matrixAutoUpdate = false; pts.userData.dynamic = true;
+  pts.userData.dispose = () => glowMats.delete(mat);
+  return pts;
+}
+
 /* ---------- картина в золотой раме: рама Poly Haven (CC0), полотно — Cleveland Museum of Art (CC0) ---------- */
 // img — world/art/<file>.webp; h — высота рамы; рама растягивается под пропорции картины
 const _artTex = new Map();
@@ -683,8 +745,9 @@ export async function painting(scene, img, o = {}) {
     // видео в золотой раме: кадр 9:16, играет вместе с остальными видео сцены
     const v = document.createElement('video');
     Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none', crossOrigin: 'anonymous' });
-    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); v.src = img; _videos.push({ scene, v });
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); _videos.push({ scene, v, src: img });
     tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex._aspect = 9 / 16;
+    if (!quality.video) { tex = await new THREE.TextureLoader().loadAsync(img.replace(/\.mp4$/, '.webp')); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex._aspect = 9 / 16; }
   } else {
     if (!_artTex.has(img)) _artTex.set(img, new THREE.TextureLoader().loadAsync(img).then((t) => { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; t.flipY = false; return t; }));
     tex = await _artTex.get(img);
@@ -748,15 +811,16 @@ const _videos = [];
 export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null) {
   const m = screen(w, h, fallback, p, r);
   if (!fallback) m.material.color.set('#050508');
+  // кадр-постер (video/<id>.webp): виден до загрузки видео и на уровне low, где видео выключено
+  const fit = (t, a) => { t.colorSpace = THREE.SRGBColorSpace; const s = w / h; if (a > s) { t.repeat.set(s / a, 1); t.offset.set((1 - s / a) / 2, 0); } else { t.repeat.set(1, a / s); t.offset.set(0, (1 - a / s) / 2); } return t; };
+  let live = false;
+  new THREE.TextureLoader().loadAsync(src.replace(/\.mp4$/, '.webp')).then((t) => { if (live) return; m.material.map = fit(t, t.image.width / t.image.height); m.material.color.set('#ffffff'); m.material.needsUpdate = true; }).catch(() => {});
   const v = document.createElement('video');
   Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none', crossOrigin: 'anonymous' });
   v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
   v.addEventListener('loadeddata', () => {
-    const t = new THREE.VideoTexture(v); t.colorSpace = THREE.SRGBColorSpace;
-    m.material.map = t; m.material.color.set('#ffffff'); m.material.needsUpdate = true;
-    // кадр видео вписывается в экран по ширине или высоте (без растяжения)
-    const a = v.videoWidth / v.videoHeight, s = w / h;
-    if (a > s) { t.repeat.set(s / a, 1); t.offset.set((1 - s / a) / 2, 0); } else { t.repeat.set(1, a / s); t.offset.set(0, (1 - a / s) / 2); }
+    live = true; m.material.map = fit(new THREE.VideoTexture(v), v.videoWidth / v.videoHeight);   // кадр вписан без растяжения
+    m.material.color.set('#ffffff'); m.material.needsUpdate = true;
   }, { once: true });
   v.addEventListener('error', () => {}, { once: true });
   _videos.push({ scene, v, src });
@@ -764,7 +828,7 @@ export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null)
 }
 export function playVideos(scene) {
   for (const x of _videos) {
-    if (x.scene === scene) { if (!x.v.src) { x.v.preload = 'auto'; x.v.src = x.src; } if (x.v.paused) x.v.play().catch(() => {}); }
+    if (x.scene === scene) { if (!quality.video) continue; if (!x.v.src) { x.v.preload = 'auto'; x.v.src = x.src; } if (x.v.paused) x.v.play().catch(() => {}); }
     else if (!x.v.paused) x.v.pause();
   }
 }
@@ -802,7 +866,7 @@ const BAKED_KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome', 'sand'];
 export async function applyBake(scene, group, id, o = {}) {
   if (globalThis.__noBake) return;   // dev/export.html выгружает исходную геометрию
   try {
-    const [g, lm] = await Promise.all([loadGLB(`world/${id}/${id}.glb`), new THREE.TextureLoader().loadAsync(`world/${id}/${id}_light.webp`)]);
+    const [g, lm] = await Promise.all([loadGLB(`world/${id}/${id}.glb`), new THREE.TextureLoader().loadAsync(`world/${id}/${id}_light${quality.tex === '-s' ? '-s' : ''}.webp`)]);
     lm.flipY = false; lm.colorSpace = THREE.SRGBColorSpace; lm.channel = 0;
     const LM = (o.k ?? 1.6) * Math.PI, env = scene.environment;
     const mk = (kind) => {

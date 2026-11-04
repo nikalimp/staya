@@ -219,17 +219,16 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.add(b.build());
 
   /* --- свечи: на столике, шкафах и у сцены; пламя дрожит --- */
-  const flameT = kit.canvasTex(64, 128, (x, w, h) => { const g = x.createRadialGradient(w / 2, h * 0.62, 2, w / 2, h * 0.55, w / 2); g.addColorStop(0, 'rgba(255,250,220,1)'); g.addColorStop(0.35, 'rgba(255,190,90,.9)'); g.addColorStop(1, 'rgba(255,90,20,0)'); x.fillStyle = g; x.beginPath(); x.ellipse(w / 2, h * 0.6, w / 2, h * 0.4, 0, 0, 7); x.fill(); });
-  const flames = [];
+  const flames = [], candleM = new THREE.MeshStandardMaterial({ color: '#f4ead8', roughness: 0.6, emissive: '#ffcf9a', emissiveIntensity: 0.15 });
   const candle = (x, y, z, hgt = 0.22) => {
-    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.03, hgt, 10), new THREE.MeshStandardMaterial({ color: '#f4ead8', roughness: 0.6, emissive: '#ffcf9a', emissiveIntensity: 0.15 }));
+    const c = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.03, hgt, 10), candleM);
     c.position.set(x, y + hgt / 2, z); scene.add(c);
-    const f = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameT, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
-    f.position.set(x, y + hgt + 0.05, z); f.scale.set(0.06, 0.12, 1); f.userData = { dynamic: true, ph: flames.length * 1.7 }; scene.add(f); flames.push(f);
+    flames.push([x, y + hgt + 0.05, z, 0.12]);
   };
   for (const [sx, z] of [[-1, -14], [-1, 13], [1, -12], [1, 10]]) for (const d of [-0.5, 0, 0.5]) candle(sx * 19.0, 2.62, z + d, d ? 0.26 : 0.36);
   for (let i = 0; i < 8; i++) candle(-7.5 + i * 2.14 + (i > 3 ? 0 : 0), LY, LZ - 0.25, 0.3 + (i % 3) * 0.08);
   for (let i = 0; i < 25; i += 4) for (const sx of [-1, 1]) candle(sx * 3.5, (i + 1) * RISE, SZ0 - i * RUN - RUN / 2, 0.3);
+  scene.add(kit.flamePoints(flames));   // все огоньки — один вызов отрисовки
   const candleL = { intensity: 0 };   // отдельной лампы у свечей больше нет — дрожит только пламя
 
   /* --- летучие мыши кружат под сводом, машут крыльями --- */
@@ -241,9 +240,11 @@ export async function build({ THREE, kit, font, renderer }) {
     const wl = new THREE.Mesh(wingG, batM), wr = new THREE.Mesh(wingG, batM); wr.scale.x = -1;
     wl.rotation.x = wr.rotation.x = -Math.PI / 2; [wl, wr].forEach((w2) => (w2.userData.dynamic = true));
     const pl = new THREE.Group(), pr = new THREE.Group(); pl.add(wl); pr.add(wr); g.add(pl, pr); pl.userData.dynamic = pr.userData.dynamic = true;
-    g.scale.setScalar(0.45 + R() * 0.35); scene.add(g);
-    return { g, pl, pr, r: 5 + R() * 10, cz: -20 + R() * 36, y: 16 + R() * 12, sp: (0.25 + R() * 0.35) * (i % 2 ? 1 : -1), ph: R() * 6.28 };
+    g.scale.setScalar(0.45 + R() * 0.35);   // группа не в сцене: она только считает матрицы для инстансов
+    return { g, pl, pr, wl, wr, r: 5 + R() * 10, cz: -20 + R() * 36, y: 16 + R() * 12, sp: (0.25 + R() * 0.35) * (i % 2 ? 1 : -1), ph: R() * 6.28 };
   });
+  // все крылья — один InstancedMesh (один вызов отрисовки вместо 28)
+  const batI = new THREE.InstancedMesh(wingG, batM, bats.length * 2); batI.userData.dynamic = true; batI.frustumCulled = false; scene.add(batI);
 
   /* --- молнии за окнами: вспышка в окнах и холодный свет по залу --- */
   const winM = new THREE.MeshBasicMaterial({ color: '#cfd8ff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
@@ -289,15 +290,16 @@ export async function build({ THREE, kit, font, renderer }) {
     const now = performance.now() / 1000;
     front.open(0.35 + 0.65 * sm(0.0, 0.13, t));
     // пламя свечей дрожит
-    let fl = 0;
-    for (const f of flames) { const k = 0.85 + 0.15 * Math.sin(now * 11 + f.userData.ph) * Math.sin(now * 7.3 + f.userData.ph * 2); f.scale.set(0.06 * k, 0.12 * (0.9 + 0.2 * k), 1); fl += k; }
-    candleL.intensity = 3 * (fl / flames.length);
+    candleL.intensity = 3 * (0.85 + 0.1 * Math.sin(now * 9));
     // мыши
     for (const b2 of bats) {
       const a = b2.ph + now * b2.sp, x = Math.cos(a) * b2.r, z = b2.cz + Math.sin(a) * b2.r * 0.8, y = b2.y + Math.sin(now * 1.3 + b2.ph) * 0.6;
       b2.g.position.set(x, y, z); b2.g.rotation.y = -a + (b2.sp > 0 ? 0 : Math.PI);
       const w2 = Math.sin(now * 14 + b2.ph) * 0.7; b2.pl.rotation.z = w2; b2.pr.rotation.z = -w2;
+      b2.g.updateMatrixWorld(true); const k = bats.indexOf(b2) * 2;
+      batI.setMatrixAt(k, b2.wl.matrixWorld); batI.setMatrixAt(k + 1, b2.wr.matrixWorld);
     }
+    batI.instanceMatrix.needsUpdate = true;
     // молния: раз в ~7 с двойная вспышка
     const q = (now + 2.3) % 7.3, lf = q < 0.08 ? 1 : q > 0.16 && q < 0.26 ? 0.7 : q < 0.6 ? Math.max(0, 0.35 - (q - 0.26)) : 0;
     winM.opacity = lf; flash.intensity = lf * 900;

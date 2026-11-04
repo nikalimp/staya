@@ -9,7 +9,7 @@ const T = 0.3, SZ = -22, HZ = 19;   // сцена с осьминогом ото
 const DX = 36, DZ = -1, DS = 18;          // танцпол за коридором экранов: центр и размер
 const MOON = [DX, 8.8, DZ], MR = 3.2;      // Луна — арт-объект STAYA — висит над центром танцпола
 
-export async function build({ THREE, kit, font, renderer, mobile }) {
+export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   const { Builder } = kit;
   const scene = new THREE.Scene();
   const NIGHT = new THREE.Color('#0d0b2a'), DEEP = new THREE.Color('#0a5f8f');
@@ -22,10 +22,10 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   const glows = [];
 
   /* --- двор из Blender: GLB + запечённые текстуры --- */
-  const sz = mobile ? '-m' : '';
+  const sz = quality.tex;   // размер запечённых текстур по уровню качества: '' 4K, '-m' 2K, '-s' 1K
   const tl = new THREE.TextureLoader();
   const tex = (name, srgb = true) => tl.loadAsync(BASE + name + sz + '.webp').then((t) => {
-    t.flipY = false; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = 4; return t;
+    t.flipY = false; t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace; t.anisotropy = quality.aniso; return t;
   });
   const [gltf, groundT, nearA, nearL, farA, farL, glossT] = await Promise.all([
     kit.loadGLB(BASE + 'pool.glb'),

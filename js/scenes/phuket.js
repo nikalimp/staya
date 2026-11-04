@@ -7,7 +7,7 @@ const BASE = 'world/villa/';
 const Y2 = 5.2;   // пол второго этажа: терраса с бассейном и диджейской стойкой
 
 import { CREDITS, DEV } from '../credits.js';
-export async function build({ THREE, kit, font, renderer, mobile }) {
+export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   const { Builder } = kit;
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2('#e9a27a', 0.0016);
@@ -27,9 +27,9 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   sea.position.y = SEA; scene.add(sea);
 
   /* --- вилла из Blender: GLB + запечённые текстуры --- */
-  const sz = mobile ? '-m' : '';
+  const sz = quality.tex;   // размер запечённых текстур по уровню качества: '' 4K, '-m' 2K, '-s' 1K
   const tl = new THREE.TextureLoader();
-  const tex = (name) => tl.loadAsync(BASE + name + sz + '.webp').then((t) => { t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4; return t; });
+  const tex = (name) => tl.loadAsync(BASE + name + sz + '.webp').then((t) => { t.flipY = false; t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = quality.aniso; return t; });
   const [gltf, groundT, nearA, nearL, innerA, innerL, farA, farL, glossT] = await Promise.all([
     kit.loadGLB(BASE + 'villa.glb'),
     tex('ground'), tex('near_albedo'), tex('near_light'), tex('inner_albedo'), tex('inner_light'), tex('far_albedo'), tex('far_light'), tex('gloss'),
