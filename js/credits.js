@@ -51,7 +51,6 @@ export const CREDITS = [
   { what: 'Ferrari 288 GTO', who: 'Randomness · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/ferrari-288-gto-e83da098149746b5a3ba6f1661645b09' },
   { what: 'Koenigsegg One:1', who: 'iSteven · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/koenigsegg-one1-b4e5a4c5fa5d4d45acd6715d3325254f' },
   { what: 'Porsche 911 GT3 RS (991.1) ’16', who: 'Mona x Supercars · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/porsche-911-gt3-rs-9911-16-c08b312e73754d0db8ab1e266eca8a28' },
-  { what: 'Creepy Teen Girl', who: 'Purple.Point · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/creepy-teen-girl-638cbdfa3430453898f30b6b90cbe130' },
   { what: 'Fancy Picture Frame 01', who: 'Rob Tuytel · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/fancy_picture_frame_01' },
   // картины во дворце — открытая коллекция Cleveland Museum of Art (CC0)
   { what: 'Scenes of Witchcraft: Night', who: 'Salvator Rosa · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1977.37.4' },

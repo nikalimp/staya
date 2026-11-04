@@ -157,10 +157,6 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
       m.position.set(x, 2.2, 0.35); m.userData.dynamic = true; scene.add(m);
       curtains.push({ m, base: Float32Array.from(g.attributes.position.array), ph: x });
     } }
-  /* --- блики на дне инфинити-бассейна --- */
-  const cauT = kit.causticTex(); cauT.repeat.set(6, 3.7);
-  const cauM = new THREE.Mesh(new THREE.PlaneGeometry(18, 11), new THREE.MeshBasicMaterial({ map: cauT, color: '#bff6ff', transparent: true, opacity: 0.32, blending: THREE.AdditiveBlending, depthWrite: false }));
-  cauM.rotation.x = -Math.PI / 2; cauM.position.set(0, -1.48, -12); cauM.userData.dynamic = true; scene.add(cauM);
   const EP = [4.4, 0.02, 3.6], ery = -0.98;
   props.push(kit.prop(scene, 'sf_easel', { p: EP, ry: ery, h: 2.2 }).then((m) => m.traverse((c) => { if (c.isMesh && /LOD1/.test(c.name + (c.parent?.name ?? ''))) c.visible = false; })));
   { const fw = 0.86, fh = fw * 16 / 9, off = new THREE.Vector3(0, 1.62, 0.12).applyAxisAngle(new THREE.Vector3(0, 1, 0), ery);
@@ -187,7 +183,6 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
   for (const x of [-11, -8.8, -6.6]) glows.push([x, Y2 + 0.5, -2.4, '#bff6ff', 1.2, 1.1]);
   glows.push([0, Y2 + 0.85, 5.5, '#ff3fb4', 1.6, 0.8]);
   scene.add(kit.glowPoints(glows));
-  kit.haze(scene, { box: [-60, 80, -24, -8, -160, -40], colors: ['#ffd2b0', '#ffb07a'], n: 14, size: 60, opacity: 0.08 });
 
   /* --- финальная композиция: солнце слева, по центру титры встают ровно из-за горизонта --- */
   const CP = new THREE.Vector3(0, 2.6, -21.5);
@@ -268,7 +263,6 @@ export async function build({ THREE, kit, font, renderer, mobile }) {
     const now = performance.now() / 1000;
     // волны: бегущая рябь на море и в бассейнах, блики на дне
     for (const [nm, v] of waters) nm.offset.set(now * v, now * v * 0.6);
-    cauT.offset.set(now * 0.02, -now * 0.013);
     // шторы колышутся: волна вдоль ширины, сильнее внизу
     for (const c of curtains) {
       const p = c.m.geometry.attributes.position, b = c.base;

@@ -3,7 +3,6 @@ import { addLoot } from '../loot.js';
 // Белая вспышка: взгляд вверх на диско-шар, вращение продолжается из POOL → опускаемся к пульту в центре круговой сцены →
 // круговой обзор: толпа слушает наш сет → свободный проход к гримёрке (BACKSTAGE) → лестница вниз →
 // коридор с видео на одной стене → парадная двустворчатая дверь, как во дворце.
-import { crowd, scatter } from '../crowd.js';
 export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M } = kit;
   const scene = new THREE.Scene();
@@ -219,18 +218,10 @@ export async function build({ THREE, kit, font, renderer }) {
     kit.prop(scene, 'sf_beerpong', { p: [-9.2, 0.05, 6.4], ry: 0.25, w: 2.5 }),
   ]);
   const built = b.build(); scene.add(built);
-  // дым: лучи прожекторов становятся видимыми объёмами
-  kit.haze(scene, { box: [-15, 15, 1.2, 10, -15, 14], colors: ['#ff2fd0', '#8a3dff', '#2fe6ff'], n: 36, size: 12, opacity: 0.19 });
-  kit.haze(scene, { box: [-14, 14, 0.2, 1.4, -14, 13], colors: ['#d8c8ff', '#ff9ad8'], n: 16, size: 7, opacity: 0.12, seed: 21 });
-  kit.haze(scene, { box: [17, 39, -5, 2.8, -8.6, -6.4], colors: ['#ff3fb4'], n: 8, size: 4, opacity: 0.14, seed: 9 });
   await kit.applyBake(scene, built, 'club', { k: 26 });
   if (!globalThis.__noBake) lights.filter((l) => !l.userData.keep).forEach((l) => scene.remove(l));   // 14 → 4 источника   // свет запечён в Blender (scripts/blender/bake_scene.py)
 
-  /* --- толпа вокруг круговой сцены: мы — артист, все слушают наш сет; свободен только проход к гримёрке --- */
   const exit = [16, -7.5];
-  const segD = (x, z) => { const ux = exit[0] - SC[0], uz = exit[1] - SC[2], t = Math.max(0, Math.min(1, ((x - SC[0]) * ux + (z - SC[2]) * uz) / (ux * ux + uz * uz))); return Math.hypot(x - SC[0] - ux * t, z - SC[2] - uz * t); };
-  const spots = scatter(SC[0], SC[2], SR + 0.9, 16, 0.8, (x, z) => Math.abs(x) < 15.2 && Math.abs(z) < 15.2 && segD(x, z) > 1.6 && Math.hypot(x + 9.2, z - 6.4) > 2.4 && !(x < -12.6 && z > 0.5 && z < 12) && !(Math.abs(x) < 2.8 && z > 12.2), 5, 6000);
-  const fans = crowd({ pos: spots, rim: [PINK, CY, VIO], fog: scene.fog, seed: 9 }); scene.add(fans);
 
   /* --- камера --- */
   const EYE = 1.62, SY = 2.6;
@@ -267,7 +258,6 @@ export async function build({ THREE, kit, font, renderer }) {
   const PT = [-9.2, 0.05, 6.4], ca = Math.cos(0.25), sa = Math.sin(0.25), TOPY = 0.82;
   const update = (t) => {
     const now = performance.now() / 1000;
-    fans.userData.tick(now);
     door.open(0.35 * sm(0.93, 1, t)); ball.rotation.y = t * 9 + now * 0.5; ball.material.uniforms.time.value = now;
     const q = (now % 1.7) / 1.7, lx = -1.05 + q * 1.95;
     const ly = q < 0.62 ? TOPY + 0.35 + Math.sin((q / 0.62) * Math.PI) * 0.75 - (q / 0.62) * 0.3 : TOPY + 0.05 + Math.abs(Math.sin(((q - 0.62) / 0.38) * Math.PI * 2)) * 0.18 * (1 - (q - 0.62) / 0.38);
