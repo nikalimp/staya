@@ -241,6 +241,9 @@ function apply(g) {
   camera.position.copy(c.p);
   camera.lookAt(c.l);
   if (s.roll) camera.rotateZ(s.roll(t));
+  // операторская пластика: крен в поворотах (как у стедикама) и едва заметное «дыхание» камеры в покое
+  camera.rotateZ(bankAt(s, t));
+  if (!reduced) { const bt = performance.now() / 1000, cw0 = 1 - (s.calm?.(t) ?? 0); camera.translateY(Math.sin(bt * 0.9) * 0.012 * cw0); camera.rotateX(Math.sin(bt * 0.7 + 1) * 0.0035 * cw0); camera.rotateZ(Math.sin(bt * 0.5 + 2) * 0.003 * cw0); }
   // погружение: камера чуть поворачивается за головой зрителя, кивки в такт качают сцену
   // сдвиг головы — как взгляд в окно (камера уходит в обратную сторону), поворот головы — камера смотрит туда же
   // у переходов (телефон, стакан) кадр центрируется: влияние головы и курсора плавно гаснет
@@ -415,6 +418,22 @@ canvas.addEventListener('click', (e) => {
 
 /* ---------- погружение: слежение за головой (только десктоп) ---------- */
 // tgt — последние значения с камеры (~18 раз в секунду), x/y/yaw/pitch — плавно догоняют их каждый кадр
+/* ---------- крен камеры в поворотах ---------- */
+// смотрим, как меняется курс камеры чуть дальше по пути; поворот направо → лёгкий наклон кадра направо (до 2°), сглажено
+let bank = 0;
+const _d1 = new THREE.Vector3(), _d2 = new THREE.Vector3(), _p1 = new THREE.Vector3();
+function bankAt(s, t) {
+  let want = 0;
+  if (!reduced && t < 0.996) {
+    const a = s.cam(t); _d1.copy(a.l).sub(a.p); _p1.copy(a.p);
+    const b = s.cam(t + 0.004); _d2.copy(b.l).sub(b.p);
+    const y1 = Math.atan2(_d1.x, _d1.z), y2 = Math.atan2(_d2.x, _d2.z); let dy = y2 - y1; if (dy > Math.PI) dy -= 2 * Math.PI; if (dy < -Math.PI) dy += 2 * Math.PI;
+    const moving = _p1.distanceTo(b.p) > 0.02;   // стоя на месте (вращение на танцполе) крена нет
+    want = moving ? Math.max(-0.035, Math.min(0.035, -dy * 0.9)) * (1 - (s.calm?.(t) ?? 0)) : 0;
+  }
+  bank += (want - bank) * 0.06; return bank;
+}
+
 /* ---------- отклик мира: курсор на десктопе, наклон на телефоне ---------- */
 // ptr — положение «пальца» на экране (−1…1); его движение даёт ветер, луч из камеры — точку касания в мире
 const ptr = { x: 0, y: 0, on: false, vx: 0, vy: 0, t: 0, lx: 0, ly: 0 };
