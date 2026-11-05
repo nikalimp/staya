@@ -15,7 +15,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const SCENES = [
-  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.7, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.93, 'whoosh'], [0.97, 'splash']] },
+  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.7, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.95, 'whoosh'], [0.99, 'splash']] },
   { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.8, out: 'strobe', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.94, 'chime']] },
   { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.6, out: 'cut', sfx: [[0.02, 'chime'], [0.97, 'door']] },
   { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.93, 'whoosh']] },
@@ -53,9 +53,9 @@ LINKS.filter((l) => l.href).forEach((l) => {
 // Уровень задаёт плотность пикселей, размер запечённых текстур, bloom, сглаживание и видео на экранах.
 // Выбор: по видеокарте и памяти при старте; через 4 секунды после старта — проверка реальной частоты кадров.
 const TIERS = {
-  low: { pr: 1, tex: '-s', bloom: false, aa: false, video: false, aniso: 1 },
+  low: { pr: 1, tex: '-s', bloom: false, aa: false, video: true, aniso: 1 },
   mid: { pr: 1.5, tex: '-m', bloom: false, aa: false, video: true, aniso: 2 },
-  high: { pr: 2, tex: '', bloom: true, aa: true, video: true, aniso: 4 },
+  high: { pr: 1.75, tex: '', bloom: true, aa: true, video: true, aniso: 4 },
 };
 const TIER_ORDER = ['low', 'mid', 'high'];
 function detectTier(gl) {
@@ -97,8 +97,8 @@ if (quality.bloom) {
         float k = smoothstep(0.5, 0.98, r);
         vec2 dir = (vUv - 0.5) * (0.0032 * k + uZoom * smoothstep(0.1, 0.8, r));
         vec4 c = vec4(0.0);
-        for (int i = 0; i < 8; i++) c += texture2D(tDiffuse, vUv - dir * float(i));
-        c /= 8.0;
+        for (int i = 0; i < 4; i++) c += texture2D(tDiffuse, vUv - dir * float(i) * 2.0);
+        c /= 4.0;
         if (uRGB > 0.0) { vec2 o = (vUv - 0.5) * uRGB; c.r = texture2D(tDiffuse, vUv + o).r; c.b = texture2D(tDiffuse, vUv - o).b; }
         c.rgb *= mix(1.0, 0.42, smoothstep(0.38, 0.95, r));
         gl_FragColor = c;
@@ -166,6 +166,7 @@ async function buildScene(i) {
     // шейдеры компилируются параллельно (KHR_parallel_shader_compile); видео сцены грузятся позже, при входе в неё
     await (renderer.compileAsync ? renderer.compileAsync(res.scene, camera).catch(() => {}) : Promise.resolve(renderer.compile(res.scene, camera)));
     if (DEBUG) console.log(`[staya] ${SCENES[i].id} built in ${(performance.now() - t0).toFixed(0)} ms`);
+    queueUploads(res.scene);
     built.set(i, res); building.delete(i);
     if (i === curIdx) kit.playVideos(res.scene);   // сцена догрузилась, когда мы уже в ней
     // превью следующей сцены (фото в телефоне во дворце)
@@ -176,6 +177,21 @@ async function buildScene(i) {
   p.catch((e) => { console.error('[staya] scene', SCENES[i].id, e); setTimeout(() => building.delete(i), 3000); });
   building.set(i, p);
   return p;
+}
+// Текстуры собранной сцены уходят в видеокарту заранее, по одной-две за кадр, а не все разом при первом показе:
+// иначе первый кадр новой сцены ждёт загрузки десятков мегапикселей и камера дёргается.
+const uploads = [], seenTex = new WeakSet();
+function queueUploads(scene) {
+  scene.traverse((o) => {
+    const ms = Array.isArray(o.material) ? o.material : o.material ? [o.material] : [];
+    for (const m of ms) for (const k of ['map', 'lightMap', 'emissiveMap', 'normalMap', 'roughnessMap', 'metalnessMap', 'aoMap', 'alphaMap']) {
+      const t = m[k]; if (t && !t.isVideoTexture && !t.isRenderTargetTexture && !seenTex.has(t)) { seenTex.add(t); uploads.push(t); }
+    }
+  });
+}
+function uploadTick() {
+  const t0 = performance.now();
+  while (uploads.length && performance.now() - t0 < 4) { const t = uploads.shift(); if (t.image) try { renderer.initTexture(t); } catch (e) { /* текстура ещё не готова */ } }
 }
 // Рендерим первый кадр следующей сцены в текстуру — это «фотография» в соцсети
 function renderPreview(owner, next, again = false) {
@@ -262,7 +278,7 @@ function apply(g) {
   touchTick(s, t);
   // живое превью следующей сцены в телефоне (дворец → вилла)
   // (через кадр: кадр виллы почти неподвижен, а рендер второй сцены дорогой)
-  if (s.preview?.live?.(t) && built.has(i + 1) && (previewTick = !previewTick)) { renderPreview(s, built.get(i + 1), true); dirty = true; }
+  if (tier === 'high' && s.preview?.live?.(t) && built.has(i + 1) && (previewTick = !previewTick)) { renderPreview(s, built.get(i + 1), true); dirty = true; }
   fpsSample();
   if (composer) {
     renderPass.scene = s.scene; bloomPass.strength = (s.bloom ?? 0.42) * (1 + 0.3 * kit.pulse.beat);
@@ -288,36 +304,42 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => held.delete(e.code));
 addEventListener('blur', () => held.clear());
 let keyVel = 0;
-function keyScroll() {
+function keyScroll(f) {
   let dir = 0; for (const c of held) dir += keyDir[c];
   dir = Math.sign(dir);
-  // плавный разгон и торможение; скорость — доля высоты окна за кадр
-  keyVel += (dir * innerHeight * 0.022 - keyVel) * 0.12;
-  if (Math.abs(keyVel) > 0.3) scrollBy(0, keyVel); else keyVel = 0;
+  // плавный разгон и торможение; скорость — доля высоты окна за 1/60 с (f — длина кадра в шестидесятых долях секунды)
+  keyVel += (dir * innerHeight * 0.022 - keyVel) * (1 - Math.pow(0.88, f));
+  if (Math.abs(keyVel) > 0.3) scrollBy(0, keyVel * f); else keyVel = 0;
 }
+// Движение считается по времени, а не по кадрам: пропущенный кадр — просто шаг побольше, без остановки и рывка;
+// на экранах 60, 90 и 120 Гц камера едет с одной скоростью.
+let lastT = 0;
+const damp = (k60, f) => 1 - Math.pow(1 - k60, f);   // доля пути за кадр длиной f (k60 — доля за 1/60 с)
 
-function loop() {
-  keyScroll();
+function loop(now = performance.now()) {
+  const f = Math.min(4, Math.max(0.25, lastT ? (now - lastT) / (1000 / 60) : 1)); lastT = now;
+  keyScroll(f);
   target = scrollToG(scrollY);
   if (reduced || jumping) cur = target;
   else {
     // адаптивный темп: при быстрой прокрутке камера не отстаёт (срезает путь), при медленной — плавно доезжает
     const d = target - cur, fast = Math.min(1, Math.abs(d) / 0.4);
-    cur += Math.sign(d) * Math.min(Math.abs(d) * (0.12 + 0.1 * fast), 0.02 + 0.04 * fast);
+    cur += Math.sign(d) * Math.min(Math.abs(d) * damp(0.12 + 0.1 * fast, f), (0.02 + 0.04 * fast) * f);
     if (Math.abs(target - cur) < 1e-5) cur = target;
   }
   {
     let moved = 0;
     for (const q of HQ) {
       const to = head.tgt[q], d = to - head[q];
-      if (Math.abs(d) > 0.0005) { head[q] += d * 0.075; moved = 1; } else head[q] = to;
+      if (Math.abs(d) > 0.0005) { head[q] += d * damp(0.075, f); moved = 1; } else head[q] = to;
     }
     if (moved) dirty = true;
   }
+  uploadTick();
   {
-    // скорость прокрутки (доля сцены за кадр) → растяжение кадра и смазывание по краям
-    const v = lastG >= 0 && !jumping ? Math.min(1, Math.abs(cur - lastG) / 0.012) : 0;
-    const sk = speedK + (v - speedK) * (v > speedK ? 0.25 : 0.08);
+    // скорость прокрутки (доля сцены за 1/60 с) → растяжение кадра и смазывание по краям
+    const v = lastG >= 0 && !jumping ? Math.min(1, Math.abs(cur - lastG) / (0.012 * f)) : 0;
+    const sk = speedK + (v - speedK) * damp(v > speedK ? 0.25 : 0.08, f);
     if (Math.abs(sk - speedK) > 1e-4) { speedK = sk < 1e-3 ? 0 : sk; dirty = true; }
     // ритм музыки → неон, лучи, огни, свечение
     if (started) { const b = audio.beat(); if (Math.abs(b - kit.pulse.beat) > 0.004) { kit.pulse.apply(b); dirty = true; } }

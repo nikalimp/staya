@@ -1,25 +1,7 @@
-// Источники и лицензии — выводятся в конце финальных титров (и в скрытом тексте сайта).
-// Каждый ассет из библиотек добавляем сюда: что, автор, лицензия, ссылка.
+// Источники, которые по лицензии требуют указать автора, — выводятся в конце финальных титров (и в скрытом тексте сайта).
+// Сюда — только то, что реально используется на сайте и требует упоминания (CC BY). CC0, MIT, OFL, Apache указания на сайте не требуют.
 export const CREDITS = [
-  { what: 'Шрифт Unbounded', who: 'Google Fonts', lic: 'SIL OFL 1.1', url: 'https://fonts.google.com/specimen/Unbounded' },
-  { what: 'Шрифт Manrope', who: 'Mikhail Sharanda, Google Fonts', lic: 'SIL OFL 1.1', url: 'https://fonts.google.com/specimen/Manrope' },
-  { what: '3D-движок three.js', who: 'three.js authors', lic: 'MIT', url: 'https://threejs.org' },
-  { what: 'Слежение за головой: MediaPipe Face Detector', who: 'Google', lic: 'Apache 2.0', url: 'https://ai.google.dev/edge/mediapipe/solutions/vision/face_detector' },
-  { what: 'Сцены собраны и запечены в Blender', who: 'Blender Foundation', lic: 'GPL (инструмент)', url: 'https://www.blender.org' },
-  // модели Poly Haven (CC0)
-  { what: 'Chandelier 01', who: 'Kirill Sannikov · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/Chandelier_01' },
-  { what: 'Chandelier 02', who: 'Kirill Sannikov · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/Chandelier_02' },
-  { what: 'Chandelier 03', who: 'Kirill Sannikov · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/Chandelier_03' },
-  { what: 'Lantern Chandelier 01', who: 'Kirill Sannikov · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/lantern_chandelier_01' },
-  { what: 'Gothic Cabinet 01', who: 'Kirill Sannikov · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/GothicCabinet_01' },
-  { what: 'Boombox', who: 'Thomas Paul Mouilleron · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/boombox' },
-  { what: 'Portable Cassette Player', who: 'Mateusz Sadek · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/portable_cassette_player' },
-  { what: 'Wine Bottles 01', who: 'Rico Cilliers, Jurita Burger · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/wine_bottles_01' },
-  { what: 'Modern Arm Chair 01', who: 'Vibrant Nordic · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/modern_arm_chair_01' },
-  { what: 'Mid Century Lounge Chair', who: 'Kuutti Siitonen · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/mid_century_lounge_chair' },
-  { what: 'Outdoor Table Chair Set 01', who: 'James Ray Cock · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/outdoor_table_chair_set_01' },
-  { what: 'Potted Plant 04', who: 'James Ray Cock · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/potted_plant_04' },
-  // модели Sketchfab (CC BY 4.0 — с указанием автора)
+  // модели Sketchfab (CC BY 4.0 — лицензия требует указать автора)
   { what: 'Pioneer CDJ 3000 Pioneer DJM A9', who: 'MaxTht · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/pioneer-cdj-3000-pioneer-djm-a9-de807aa8a5e146bb866b95b58d0c531b' },
   { what: 'Pool Float', who: 'arloopa · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/pool-float-764914c4e5a14df4bdee6dde8429a325' },
   { what: 'Duck Pool Float 3D Model FREE', who: 'Mohammad Rajabloo · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/duck-pool-float-3d-model-free-39ccaac9232d45f79895dae243cc79ef' },
@@ -36,7 +18,6 @@ export const CREDITS = [
   { what: 'Plastic lounge chair', who: 'RunemarkStudio · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/plastic-lounge-chair-4b7ac7b3a92d40849a1005b74e26be1c' },
   { what: 'Beach Ball', who: 'Maggatron · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/beach-ball-25e1816c0e22444bb62816d3999d1b0b' },
   { what: 'Beach Ball (Free Download)', who: 'Riku_Tatsu · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/beach-ball-free-download-c915a99e9bae4dbe8dd7be3215e19ba0' },
-  { what: 'Diving Board', who: 'danielisthebosss · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/diving-board-581cc7f80f4f44a7a0f535b4df44d93b' },
   { what: 'Lamborghini Gallardo 2010', who: 'Artem P · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/lamborghini-gallardo-2010-ff0eb2242d0e42eb8b7034b4db639e56' },
   { what: 'Porsche 911 (930) Turbo 1975', who: 'Lexyc16 · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/porsche-911-930-turbo-1975-de1ffd344c41481892511f7fd332c136' },
   { what: 'Mercedes-Benz 300 SL Gullwing', who: 'Lexyc16 · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/mercedes-benz-300-sl-gullwing-505241c829c540a4921533000736904e' },
@@ -45,15 +26,5 @@ export const CREDITS = [
   { what: 'Ferrari 288 GTO', who: 'Randomness · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/ferrari-288-gto-e83da098149746b5a3ba6f1661645b09' },
   { what: 'Koenigsegg One:1', who: 'iSteven · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/koenigsegg-one1-b4e5a4c5fa5d4d45acd6715d3325254f' },
   { what: 'Porsche 911 GT3 RS (991.1) ’16', who: 'Mona x Supercars · Sketchfab', lic: 'CC BY 4.0', url: 'https://sketchfab.com/3d-models/porsche-911-gt3-rs-9911-16-c08b312e73754d0db8ab1e266eca8a28' },
-  { what: 'Fancy Picture Frame 01', who: 'Rob Tuytel · Poly Haven', lic: 'CC0', url: 'https://polyhaven.com/a/fancy_picture_frame_01' },
-  // картины во дворце — открытая коллекция Cleveland Museum of Art (CC0)
-  { what: 'Scenes of Witchcraft: Night', who: 'Salvator Rosa · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1977.37.4' },
-  { what: 'Portrait of a Woman', who: 'Rembrandt van Rijn · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1944.90' },
-  { what: 'Portrait of Isabella Brant', who: 'Peter Paul Rubens · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1947.207' },
-  { what: 'Portrait of the Jester Calabazas', who: 'Diego Velázquez · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1965.15' },
-  { what: 'Portrait of Cardinal Guillaume Dubois', who: 'Hyacinthe Rigaud · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1967.17' },
-  { what: 'Portrait of the Ladies Amabel and Mary Jemima Yorke', who: 'Joshua Reynolds · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1942.645' },
-  { what: 'Scenes of Witchcraft', who: 'Salvator Rosa · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1977.37' },
-  { what: 'Pan and Syrinx', who: 'Jean François de Troy · Cleveland Museum of Art', lic: 'CC0', url: 'https://clevelandart.org/art/1973.212' },
 ];
 export const DEV = { label: 'Разработка сайта', name: 'nikalimp.ru', url: 'https://nikalimp.ru' };

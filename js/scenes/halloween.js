@@ -1,6 +1,6 @@
 import { addLoot } from '../loot.js';
-// 04 · STAYA HALLOWEEN — дворец XIX века: высокий зал, галереи второго этажа, парадная лестница.
-// Двери распахиваются → зал с люстрами и картинами → вокруг фонтана → вверх по лестнице к пульту на площадке →
+// 04 · STAYA HALLOWEEN — дворец XIX века: длинный высокий зал с колоннадой, большой фонтан, парадная лестница.
+// Камера всё время идёт по полу: двери распахиваются → зал с люстрами и картинами → вокруг фонтана → вверх по лестнице к пульту →
 // заходим за пульт, и начинается мистика: гаснет свет и музыка, при каждой вспышке девочка ближе,
 // в третий раз она стоит перед нами и протягивает телефон с постом про Пхукет — камера ныряет в экран.
 export async function build({ THREE, kit, font, renderer }) {
@@ -11,29 +11,29 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.environment = kit.env(renderer, ['#ff2a14', '#ff8a2a', '#ffd28a', '#3b4bff', '#8a0d1a'], '#070203');
   const b = new Builder(), glows = [], props = [], R = kit.rng(31);
   const STONE = '#d9c7a4', GOLD = '#c9a24a', RED = '#7e0a16', WALL = '#bfa07e';
-  const Z1 = 24.6, Z2 = -31, L0 = Z1 - Z2, C0 = (Z1 + Z2) / 2;
-  const FZ = -3;                              // фонтан в центре зала
+  const Z1 = 36, Z2 = -31, L0 = Z1 - Z2, C0 = (Z1 + Z2) / 2;
+  const FZ = 1, FR = 7.6;                     // большой фонтан в центре зала: центр и радиус чаши
   const WH = 34, VY = 32;                     // высота стен и центр свода — потолки выше прежнего
   const SZ0 = -12, LZ = -20, LY = 5, LZ2 = -27.5, BZ = -23.4;   // лестница: низ, край площадки, высота площадки, задний край, пульт
 
   /* --- пол-шахматка и красные дорожки, обходящие фонтан --- */
-  const chk = kit.canvasTex(128, 128, (x, w, h) => { x.fillStyle = '#e9e2d6'; x.fillRect(0, 0, w, h); x.fillStyle = '#16100e'; x.fillRect(0, 0, w / 2, h / 2); x.fillRect(w / 2, h / 2, w / 2, h / 2); }, { repeat: [20, 28] });
+  const chk = kit.canvasTex(128, 128, (x, w, h) => { x.fillStyle = '#e9e2d6'; x.fillRect(0, 0, w, h); x.fillStyle = '#16100e'; x.fillRect(0, 0, w / 2, h / 2); x.fillRect(w / 2, h / 2, w / 2, h / 2); }, { repeat: [20, 33.5] });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(40, L0), new THREE.MeshStandardMaterial({ map: chk, roughness: 0.22, metalness: 0.05 }));
   floor.rotation.x = -Math.PI / 2; floor.position.set(0, 0, C0); scene.add(floor);
   const runner = (z0, z1) => {
     b.add(G.box(6, 0.03, z0 - z1), RED, 'matte', M([0, 0.015, (z0 + z1) / 2]));
     for (const sx of [-3, 3]) b.add(G.box(0.15, 0.035, z0 - z1), GOLD, 'metal', M([sx, 0.02, (z0 + z1) / 2]));
   };
-  runner(Z1, FZ + 7.5); runner(FZ - 7.5, SZ0);
-  b.add(G.cyl(8.4, 8.4, 0.03, 64), RED, 'matte', M([0, 0.015, FZ]));
-  b.add(G.tor(8.4, 0.07, 6, 64), GOLD, 'metal', M([0, 0.03, FZ], [Math.PI / 2, 0, 0]));
+  runner(Z1, FZ + FR + 3); runner(FZ - FR - 2.2, SZ0);
+  b.add(G.cyl(FR + 3, FR + 3, 0.03, 72), RED, 'matte', M([0, 0.015, FZ]));
+  b.add(G.tor(FR + 3, 0.07, 6, 72), GOLD, 'metal', M([0, 0.03, FZ], [Math.PI / 2, 0, 0]));
 
   /* --- стены и свод --- */
   for (const sx of [-1, 1]) b.add(G.box(1, WH, L0), WALL, 'matte', M([sx * 20.5, WH / 2, C0]));
   b.add(G.box(42, WH, 1), WALL, 'matte', M([0, WH / 2, Z2 - 0.5]));
   b.add(new THREE.CylinderGeometry(20.5, 20.5, L0, 48, 1, true, Math.PI / 2, Math.PI), '#5a3020', 'matte', M([0, VY, C0], [Math.PI / 2, 0, 0], [1, 1, 0.35]));   // только верхняя половина: нижняя закрывала роспись
   for (let z = Z1 - 2; z >= Z2 + 2; z -= 6) b.add(G.tor(20.3, 0.2, 5, 40, Math.PI), GOLD, 'metal', M([0, VY, z], [0, 0, 0], [1, 0.35, 1]));
-  for (const sx of [-1, 1]) for (let z = -24; z <= 18; z += 7) {
+  for (const sx of [-1, 1]) for (let z = -24; z <= Z1 - 6; z += 7) {
     b.add(G.box(0.1, 9, 3), '#2f3cff', 'neon', M([sx * 19.95, 20.5, z]));
     b.add(G.cyl(1.5, 1.5, 0.1, 18, false), '#2f3cff', 'neon', M([sx * 19.95, 25, z], [0, 0, Math.PI / 2]));
     glows.push([sx * 19, 21, z, '#3b4bff', 7, 0.35]);
@@ -78,37 +78,29 @@ export async function build({ THREE, kit, font, renderer }) {
   const vault = new THREE.Mesh(new THREE.CylinderGeometry(20.35, 20.35, L0, 64, 1, true, Math.PI / 2, Math.PI), new THREE.MeshStandardMaterial({ map: fresco, emissive: '#ffffff', emissiveMap: fresco, emissiveIntensity: 0.75, roughness: 0.8, side: THREE.BackSide }));
   vault.position.set(0, VY, C0); vault.rotation.x = Math.PI / 2; vault.scale.set(1, 1, 0.35); scene.add(vault);
 
-  /* --- галереи второго этажа: к ним ведут боковые марши парадной лестницы --- */
+  /* --- колоннада: один ярус крупных мраморных колонн (второго этажа больше нет), сверху антаблемент --- */
+  // колонна — мраморная модель (Sketchfab «Classical Marble Column», CC BY)
+  const CX = 13.6, CHT = 16;
   for (const sx of [-1, 1]) {
-    b.add(G.box(9, 0.8, L0), '#8a6a50', 'plastic', M([sx * 16.5, 10, C0]));
-    b.add(G.box(0.3, 0.2, L0), GOLD, 'metal', M([sx * 12, 10.45, C0]));
-    for (let z = Z2 + 1; z <= Z1 - 1; z += 0.7) b.add(G.cyl(0.08, 0.12, 1, 6), STONE, 'gloss', M([sx * 12, 10.9, z]));
-    b.add(G.box(0.4, 0.15, L0), STONE, 'gloss', M([sx * 12, 11.45, C0]));
-    for (let z = -22; z <= 18; z += 10) glows.push([sx * 12, 12.2, z, '#ffb15a', 1.4, 1.6]);
-  }
-  // колонны — одна мраморная модель (Sketchfab «Classical Marble Column», CC BY), по обоим этажам
-  for (const sx of [-1, 1]) for (let z = -24; z <= 20; z += 8.8) {
-    props.push(kit.prop(scene, 'sf_column', { p: [sx * 12, 0, z], h: 9.6 }));
-    props.push(kit.prop(scene, 'sf_column', { p: [sx * 12, 11.5, z], h: 12 }));
+    for (let z = Z2 + 7; z <= Z1 - 4; z += 11) props.push(kit.prop(scene, 'sf_column', { p: [sx * CX, 0, z], h: CHT }));
+    b.add(G.box(2.4, 1.1, L0 - 1), STONE, 'gloss', M([sx * CX, CHT + 0.55, C0]));
+    b.add(G.box(2.6, 0.18, L0 - 1), GOLD, 'metal', M([sx * CX, CHT + 1.15, C0]));
+    for (let z = Z2 + 7; z <= Z1 - 4; z += 11) glows.push([sx * (CX - 1.3), CHT - 0.4, z, '#ffb15a', 1.6, 1.4]);
   }
   /* --- люстры (Poly Haven, CC0) --- */
-  [['Chandelier_01', 14], ['Chandelier_02', 3], ['Chandelier_03', -14]].forEach(([n, z]) => {
+  [['Chandelier_01', 25], ['Chandelier_02', 12], ['Chandelier_03', -1], ['Chandelier_01', -14]].forEach(([n, z]) => {
     kit.rod(b, [0, VY, z], [0, 22.1, z], 0.05, GOLD, 'metal');
     props.push(kit.prop(scene, n, { p: [0, 22.2, z], s: 6.2, anchor: 'top', emissive: '#ffb15a', ei: 0.35 }));
     for (let k = 0; k < 12; k++) { const a = (k / 12) * Math.PI * 2; glows.push([Math.cos(a) * 1.4, 20.2, z + Math.sin(a) * 1.4, '#ffc27a', 0.6, 2]); }
     glows.push([0, 19.8, z, '#ffb15a', 7, 0.5]);
   });
-  for (const sx of [-1, 1]) for (const z of [-12, 6]) {
-    props.push(kit.prop(scene, 'lantern_chandelier_01', { p: [sx * 16.5, 9.6, z], s: 2.3, anchor: 'top', emissive: '#ffb15a', ei: 0.3 }));
-    glows.push([sx * 16.5, 8.4, z, '#ffc27a', 2.2, 0.8]);
-  }
-  for (const [sx, z] of [[-1, -14], [-1, 13], [1, -12], [1, 10]]) props.push(kit.prop(scene, 'GothicCabinet_01', { p: [sx * 19.2, 0, z], ry: -sx * Math.PI / 2, s: 2.1 }));
+  for (const [sx, z] of [[-1, -14], [-1, 19], [1, -12], [1, 24]]) props.push(kit.prop(scene, 'GothicCabinet_01', { p: [sx * 19.2, 0, z], ry: -sx * Math.PI / 2, s: 2.1 }));
 
   /* --- картины: полотна Cleveland Museum of Art (CC0) в рамах Poly Haven; видео в раме на левой стене --- */
   const ART = ['149108', '124089', '125247', '141549', '143206', '122349', '149104', '147479'];
   const art = (i, p, ry, h) => props.push(kit.painting(scene, `world/art/cma_${ART[i % ART.length]}.webp`, { p, ry, h }));
   props.push(kit.painting(scene, 'video/halloween-v.mp4', { video: true, p: [-19.85, 5.6, -1], ry: Math.PI / 2, h: 7.6 }));
-  [[-1, -19], [-1, 15], [1, -19], [1, -1], [1, 15]].forEach(([sx, z], i) => art(i, [sx * 19.9, 4.8, z], sx < 0 ? Math.PI / 2 : -Math.PI / 2, 4.6));
+  [[-1, -19], [-1, 15], [-1, 28], [1, -19], [1, -1], [1, 15], [1, 28]].forEach(([sx, z], i) => art(i, [sx * 19.9, 4.8, z], sx < 0 ? Math.PI / 2 : -Math.PI / 2, 4.6));
   for (const sx of [-1, 1]) art(sx < 0 ? 5 : 6, [sx * 14.5, 22, Z2 + 0.1], 0, 6.5);
   art(7, [0, 22, Z1 - 0.5], Math.PI, 5.5);
 
@@ -118,13 +110,14 @@ export async function build({ THREE, kit, font, renderer }) {
   const front = kit.grandDoor(scene, b, [0, 0, Z1], 0, 1);
   b.add(G.box(6, 0.04, 0.1), '#ff8a2a', 'neon', M([0, 0.03, Z1 - 0.3]));
 
-  /* --- фонтан в центре зала (Sketchfab «Fountain with three putts, Brno», CC BY) --- */
-  b.add(G.cyl(5.2, 5.4, 0.9, 48), STONE, 'gloss', M([0, 0.45, FZ]));
-  b.add(G.tor(5.2, 0.25, 8, 48), STONE, 'gloss', M([0, 0.9, FZ], [Math.PI / 2, 0, 0]));
-  const fw = kit.water(9.6, 9.6, '#1a6a8a', { tile: 2, ei: 0.4, emissive: '#2a8ac0', opacity: 0.85 });
-  fw.geometry.dispose(); fw.geometry = new THREE.CircleGeometry(5.0, 48); fw.position.set(0, 0.78, FZ); scene.add(fw);
-  props.push(kit.prop(scene, 'sf_fountain', { p: [0, 0.75, FZ], h: 5.2 }));
-  for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; glows.push([Math.cos(a) * 4.4, 0.95, FZ + Math.sin(a) * 4.4, '#7fd8ff', 0.9, 1.2]); }
+  /* --- большой фонтан в центре зала (Sketchfab «Fountain with three putts, Brno», CC BY) --- */
+  b.add(G.cyl(FR, FR + 0.25, 1.1, 64), STONE, 'gloss', M([0, 0.55, FZ]));
+  b.add(G.tor(FR, 0.32, 8, 64), STONE, 'gloss', M([0, 1.1, FZ], [Math.PI / 2, 0, 0]));
+  b.add(G.cyl(FR + 0.9, FR + 1.0, 0.25, 64), STONE, 'gloss', M([0, 0.125, FZ]));
+  const fw = kit.water(FR * 2, FR * 2, '#1a6a8a', { tile: 2, ei: 0.4, emissive: '#2a8ac0', opacity: 0.85 });
+  fw.geometry.dispose(); fw.geometry = new THREE.CircleGeometry(FR - 0.2, 64); fw.position.set(0, 0.98, FZ); scene.add(fw);
+  props.push(kit.prop(scene, 'sf_fountain', { p: [0, 0.95, FZ], h: 8.4 }));
+  for (let k = 0; k < 14; k++) { const a = (k / 14) * Math.PI * 2; glows.push([Math.cos(a) * (FR - 0.8), 1.15, FZ + Math.sin(a) * (FR - 0.8), '#7fd8ff', 1.1, 1.2]); }
 
   /* --- парадная лестница: центральный марш к площадке с пультом, боковые марши — на галереи --- */
   const NS = 25, RISE = LY / NS, RUN = (SZ0 - LZ) / NS;
@@ -136,24 +129,6 @@ export async function build({ THREE, kit, font, renderer }) {
   b.add(G.box(22, LY, LZ - LZ2), STONE, 'gloss', M([0, LY / 2, (LZ + LZ2) / 2]));
   b.add(G.box(16, 0.03, LZ - LZ2 - 0.6), RED, 'matte', M([0, LY + 0.015, (LZ + LZ2) / 2]));
   b.add(G.box(22, 0.25, 0.3), GOLD, 'metal', M([0, LY - 0.1, LZ + 0.1]));
-  const GY = 10.4, NS2 = Math.round((GY - LY) / RISE), RUN2 = 12 / NS2;
-  for (const sx of [-1, 1]) {
-    for (let i = 0; i < NS2; i++) {
-      const y = LY + (i + 1) * RISE, z = LZ + i * RUN2 + RUN2 / 2;
-      b.add(G.box(3.6, 0.3, RUN2), STONE, 'gloss', M([sx * 8.6, y - 0.15, z]));
-      b.add(G.box(2.4, 0.03, RUN2 + 0.02), RED, 'matte', M([sx * 8.6, y + 0.015, z]));
-    }
-    // косоур под маршем и мостик на галерею
-    const ang = Math.atan2(GY - LY, 12), len = Math.hypot(GY - LY, 12);
-    b.add(G.box(3.6, 0.5, len), STONE, 'gloss', M([sx * 8.6, (LY + GY) / 2 - 0.45, LZ + 6], [-ang, 0, 0]));
-    b.add(G.box(5.4, 0.8, 3.2), STONE, 'gloss', M([sx * 9.5, GY - 0.4, LZ + 12 + 1.6]));
-    // перила с балясинами и золотым поручнем
-    for (const ex of [6.8, 10.4]) {
-      const rl = [];
-      for (let i = 0; i <= NS2; i += 3) { const y = LY + i * RISE, z = LZ + i * RUN2; rl.push([sx * ex, y + 1.05, z]); b.add(G.cyl(0.06, 0.1, 1.0, 8), STONE, 'gloss', M([sx * ex, y + 0.5, z])); }
-      b.add(G.tube(rl, 0.08, 30, 8), GOLD, 'metal');
-    }
-  }
   for (const sx of [-1, 1]) {
     const rl = [];
     for (let i = 0; i <= NS; i += 3) { const y = i * RISE, z = SZ0 - i * RUN; rl.push([sx * 4, y + 1.1, z]); b.add(G.cyl(0.07, 0.11, 1.0, 8), STONE, 'gloss', M([sx * 4, y + 0.5, z])); }
@@ -169,7 +144,11 @@ export async function build({ THREE, kit, font, renderer }) {
   props.push(kit.decks(scene, [0, LY + 1.05, BZ], 0, 1.7));
   kit.vScreen(scene, 'video/halloween-v2.mp4', [0, LY + 1.6, Z2 + 0.3], 0, 13, { edge: '#ff4a1a', stand: false });
   for (const sx of [-1, 1]) { kit.speaker(b, [sx * 5.4, LY, BZ - 0.6], 0, 1.8, 1.3); kit.speaker(b, [sx * 5.4, LY + 1.8, BZ - 0.6], 0, 1.4, 1.1); }
-  for (const sx of [-1, 1]) props.push(kit.prop(scene, 'sf_angel', { p: [sx * 9.2, LY, LZ2 + 1.4], ry: -sx * 0.4, h: 18 }));
+  // ангелы у экрана: правый — зеркальная копия левого, пара симметрична
+  for (const sx of [-1, 1]) props.push(kit.prop(scene, 'sf_angel', { p: [sx * 9.2, LY, LZ2 + 1.4], ry: -sx * 0.4, h: 18 }).then((o) => {
+    if (sx > 0) { o.scale.x *= -1; o.userData.dynamic = true; }   // отражение левого: поворот −0,4 и зеркало по X
+    return o;
+  }));
   kit.text3d(b, font, 'HALLOWEEN', { size: 1.25, color: '#ff4a1a', p: [0, 26.5, Z2 + 0.6], bevel: 0.16 });
   kit.text3d(b, font, 'STAYA', { size: 0.8, color: '#f4e6c8', p: [0, 28.6, Z2 + 0.6], bevel: 0.1, kind: 'metal' });
 
@@ -216,7 +195,8 @@ export async function build({ THREE, kit, font, renderer }) {
 
   await Promise.all(props);
   scene.add(kit.glowPoints(glows));
-  scene.add(b.build());
+  const built = b.build(); scene.add(built);
+  await kit.applyBake(scene, built, 'halloween', { k: 8 });   // свет зала запечён в Blender (scripts/blender/bake_scene.py); живые лампы светят только моделям
 
   /* --- свечи: на столике, шкафах и у сцены; пламя дрожит --- */
   const flames = [], candleM = new THREE.MeshStandardMaterial({ color: '#f4ead8', roughness: 0.6, emissive: '#ffcf9a', emissiveIntensity: 0.15 });
@@ -225,7 +205,7 @@ export async function build({ THREE, kit, font, renderer }) {
     c.position.set(x, y + hgt / 2, z); scene.add(c);
     flames.push([x, y + hgt + 0.05, z, 0.12]);
   };
-  for (const [sx, z] of [[-1, -14], [-1, 13], [1, -12], [1, 10]]) for (const d of [-0.5, 0, 0.5]) candle(sx * 19.0, 2.62, z + d, d ? 0.26 : 0.36);
+  for (const [sx, z] of [[-1, -14], [-1, 19], [1, -12], [1, 24]]) for (const d of [-0.5, 0, 0.5]) candle(sx * 19.0, 2.62, z + d, d ? 0.26 : 0.36);
   for (let i = 0; i < 8; i++) candle(-7.5 + i * 2.14 + (i > 3 ? 0 : 0), LY, LZ - 0.25, 0.3 + (i % 3) * 0.08);
   for (let i = 0; i < 25; i += 4) for (const sx of [-1, 1]) candle(sx * 3.5, (i + 1) * RISE, SZ0 - i * RUN - RUN / 2, 0.3);
   scene.add(kit.flamePoints(flames));   // все огоньки — один вызов отрисовки
@@ -248,7 +228,7 @@ export async function build({ THREE, kit, font, renderer }) {
 
   /* --- молнии за окнами: вспышка в окнах и холодный свет по залу --- */
   const winM = new THREE.MeshBasicMaterial({ color: '#cfd8ff', transparent: true, opacity: 0, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false });
-  for (const sx of [-1, 1]) for (let z = -24; z <= 18; z += 7) {
+  for (const sx of [-1, 1]) for (let z = -24; z <= Z1 - 6; z += 7) {
     const m = new THREE.Mesh(new THREE.PlaneGeometry(3, 10.6), winM); m.position.set(sx * 19.84, 21.2, z); m.rotation.y = -sx * Math.PI / 2; scene.add(m);
   }
 
@@ -258,29 +238,28 @@ export async function build({ THREE, kit, font, renderer }) {
   // конец пути: фото (0.07 × 0.07) ровно заполняет кадр по ширине — дальше склейка с первым кадром виллы
   const asp = innerWidth / innerHeight, fov0 = asp < 0.8 ? 72 : asp < 1.2 ? 64 : 54, tn = Math.tan(THREE.MathUtils.degToRad(fov0) / 2);
   const dEnd = 0.0345 / (tn * Math.max(1, asp));
-  const BEH = [0, LY + 1.72, BZ - 1.15];         // за пультом, близко к нему: зал виден поверх деков
+  const EY = 1.72, BEH = [0, LY + EY, BZ - 1.15];         // за пультом, близко к нему: зал виден поверх деков
   const keys = [
     // склейка с дверью клуба: тот же кадр в масштабе дворца, створки приоткрыты так же — и распахиваются
-    { p: [0, 4.2, 27.5], l: [0, 3.75, 24.6], t: 0 },
-    { p: [0, 3.9, 27.0], l: [0, 3.8, 20], t: 0.1 },
-    // в зал: высокий свод, люстры, галереи; видео в золотой раме слева
-    // кран под свод: камера поднимается к люстрам и смотрит вниз на зал — фонтан, лестница, галереи
-    { p: [0, 6.5, 20], l: [0, 15, 2], t: 0.14 },
-    { p: [0, 11.5, 16.5], l: [0, 4, -6], t: 0.19 },
-    { p: [-2.6, 7.5, 11], l: [-16, 5.5, -1], t: 0.23 },
-    { p: [-3.8, 3.3, 8], l: [-19.8, 5.8, -1.2], t: 0.26 },
-    // вокруг фонтана: впереди парадная лестница, пульт на площадке, экран и ангелы
-    { p: [-7.6, 3.2, -1], l: [0, 2.5, FZ], t: 0.32 },
-    { p: [-4.6, 3.2, -9.4], l: [0, 8, LZ2], t: 0.4 },
+    { p: [0, 4.2, Z1 + 2.9], l: [0, 3.75, Z1], t: 0 },
+    { p: [0, 3.4, Z1 + 2.2], l: [0, 3.4, Z1 - 5], t: 0.08 },
+    // идём по полу по красной дорожке: длинный зал, колоннада, люстры
+    { p: [0, EY, Z1 - 4], l: [0, 6.5, FZ], t: 0.15 },
+    { p: [-1.6, EY, Z1 - 15], l: [-8, 5, FZ + 4], t: 0.22 },
+    // видео в золотой раме на левой стене
+    { p: [-5.2, EY, FZ + 12.5], l: [-19.8, 5.6, -1], t: 0.27 },
+    // вокруг фонтана слева: впереди парадная лестница, пульт на площадке, экран и ангелы
+    { p: [-11.0, EY, FZ + 2], l: [0, 3.5, FZ], t: 0.33 },
+    { p: [-8.2, EY, FZ - 8.6], l: [0, 8, LZ2], t: 0.4 },
     // вверх по лестнице
-    { p: [0, 3.3, SZ0 + 1.2], l: [0, 8, LZ2], t: 0.46 },
-    { p: [0, LY + 1.7, LZ + 1.0], l: [0, LY + 3, LZ2], t: 0.53 },
+    { p: [0, EY, SZ0 + 1.4], l: [0, 7, LZ2], t: 0.46 },
+    { p: [0, LY + EY, LZ + 1.0], l: [0, LY + 3, LZ2], t: 0.53 },
     // обходим пульт слева и встаём за него — взгляд в зал
-    { p: [-2.4, LY + 1.65, BZ - 1.4], l: [0, LY + 1.4, BZ], t: 0.58 },
+    { p: [-2.4, LY + EY, BZ - 1.4], l: [0, LY + 1.4, BZ], t: 0.58 },
     { p: BEH, l: [0, LY - 0.6, -6], t: 0.64 },
-    // кран назад и вверх: зал целиком поверх пульта — лестницы, фонтан, парадная дверь
-    { p: [0, LY + 3.2, BZ - 2.6], l: [0, 2.2, 6], t: 0.71 },
-    { p: [0, LY + 1.9, BZ - 1.3], l: [0, LY - 0.5, -6], t: 0.77 },
+    // стоим за пультом и осматриваем зал: вправо, на фонтан
+    { p: [0.6, LY + EY, BZ - 1.2], l: [9, LY - 1, 6], t: 0.71 },
+    { p: [0, LY + EY, BZ - 1.25], l: [0, LY - 0.8, -4], t: 0.77 },
     // взгляд опускается на пульт: рядом с деками лежит телефон
     { p: [PH[0] + 0.25, LY + 1.78, BZ - 1.0], l: photoC, t: 0.84 },
     // камера ныряет в экран
@@ -317,6 +296,6 @@ export async function build({ THREE, kit, font, renderer }) {
   const preview = { mesh: photo, t: 0, fov: 2 * Math.atan(0.035 / dEnd) * 180 / Math.PI, live: (t) => t > 0.875 };
   // предмет для сбора: тыква-фонарь на правом краю пульта, не на пути камеры
   addLoot(scene, 'pumpkin', 'pumpkin', [1.75, LY + 1.4, BZ + 0.15], { r: 0.6, ry: Math.PI });
-  addLoot(scene, 'star', 'star', [0, 18.6, 3], { r: 1.1, glow: 1.6 });   // тайный 9-й предмет: под центральной люстрой, виден тому, кто смотрит вверх
+  addLoot(scene, 'star', 'star', [0, 17.5, 12], { r: 1.1, glow: 1.6 });   // тайный 9-й предмет: под центральной люстрой, виден тому, кто смотрит вверх
   return { scene, cam: kit.camPath(keys), update, near, calm, preview };
 }

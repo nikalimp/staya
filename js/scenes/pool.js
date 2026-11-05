@@ -5,8 +5,10 @@ import { addLoot } from '../loot.js';
 // Путь от первого лица: выныриваем в центре бассейна, взгляд с неба вниз на осьминога → плывём к лестнице →
 // коридор из двух диагональных экранов → арка танцпола, большие экраны по сторонам → медленно к Луне → белая вспышка.
 const BASE = 'world/pool/';
-const T = 0.3, SZ = -22, HZ = 19;   // сцена с осьминогом отодвинута: при выныривании камера смотрит на неё почти горизонтально
-const DX = 36, DZ = -1, DS = 18;          // танцпол за коридором экранов: центр и размер
+const T = 0.3, SZ = -13, HZ = 19;   // сцена с осьминогом стоит у самого бассейна (запечённая сцена была на z = −22)
+const OLDZ = -22;                         // где была запечённая сцена в GLB: её треугольники вырезаются
+const DX = 36, DZ = -1, DS = 18;          // танцпол: центр; DS — прежний размер (для окружения)
+const PRAD = 13, PAP = PRAD * Math.cos(Math.PI / 5);   // танцпол-пентагон: радиус вершин и расстояние до сторон
 const MOON = [DX, 8.8, DZ], MR = 3.2;      // Луна — арт-объект STAYA — висит над центром танцпола
 
 export async function build({ THREE, kit, font, renderer, mobile, quality }) {
@@ -51,6 +53,24 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
       o.material = new THREE.MeshBasicMaterial({ color: c.clone().multiplyScalar(name === 'neon_bulb' ? 1.6 : 1.25), toneMapped: false });
     }
   });
+  // запечённая сцена с мультяшным осьминогом убрана: новая сцена и осьминог (как настоящий арт-объект STAYA) — ниже, в коде
+  const cut = (mesh, drop) => {
+    const g = mesh.geometry, pos = g.attributes.position, idx = g.index ? g.index.array : [...Array(pos.count).keys()], keep = [], v = new THREE.Vector3();
+    for (let i = 0; i < idx.length; i += 3) {
+      v.set(0, 0, 0); for (let k = 0; k < 3; k++) v.x += pos.getX(idx[i + k]) / 3, v.y += pos.getY(idx[i + k]) / 3, v.z += pos.getZ(idx[i + k]) / 3;
+      v.applyMatrix4(mesh.matrixWorld); if (!drop(v)) keep.push(idx[i], idx[i + 1], idx[i + 2]);
+    }
+    g.setIndex(keep);
+  };
+  gltf.scene.updateMatrixWorld(true);
+  const oldStage = (v) => Math.abs(v.x) < 12.5 && v.z < OLDZ + 5 && v.z > OLDZ - 9;
+  gltf.scene.traverse((o) => {
+    if (!o.isMesh) return;
+    const n = o.material.name || o.name;
+    if (/gloss_static|letters_|neon_logo|neon_par_(cyan|green|red)/.test(o.name)) o.visible = false;
+    else if (o.name === 'far' || o.name === 'neon_par_pink') cut(o, oldStage);
+    else if (o.name === 'near') cut(o, (v) => oldStage(v) && v.y > 0.35);
+  });
   scene.add(gltf.scene);
   gltf.scene.updateMatrixWorld(true);
   // опора каждой надувной надписи — центр её основания (буквы растут от опоры)
@@ -59,30 +79,104 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     const bb = new THREE.Box3().setFromObject(o), c = bb.getCenter(new THREE.Vector3());
     const g = new THREE.Group(); g.position.set(c.x, bb.min.y, c.z); scene.add(g); g.attach(o); return g;
   };
-  const pv = { STAYA: pivot(letters.STAYA), POOL: pivot(letters.POOL) };
+  const pv = {};
 
   /* --- живая вода поверх запечённой чаши --- */
   const w = kit.water(22, 10, '#13c8f0', { tile: 4, ei: 0.55, emissive: '#0aa8e0', opacity: 0.82 });
   w.position.y = 0.12; scene.add(w);
 
   const b = new Builder(), R2 = kit.rng(23);
-  const props = [kit.decks(scene, [0, T + 2.1, SZ + 1.0], 0, 1.7)];
-  /* --- главная сцена: горизонтальное видео --- */
+  /* --- главная сцена у бассейна (собрана как сцена AQUA): подиум, фермы, светодиодные колонны, колонки, пульт, экран --- */
+  const { G, M } = kit, RH = 1.4, ST = T + RH, PINK = '#ff2fa8', CYAN = '#2fe6ff', VIOLET = '#8a4dff';
+  b.add(G.rbox(22, RH, 7, 0.08), '#120e1e', 'gloss', M([0, T + RH / 2, SZ]));
+  b.add(G.box(22, 0.08, 0.08), PINK, 'neon', M([0, ST, SZ + 3.52])); b.add(G.box(22, 0.06, 0.06), CYAN, 'neon', M([0, T + 0.12, SZ + 3.52]));
+  kit.djBooth(b, [0, ST, SZ + 1.0], 0, { w: 3.4, decks: false });
+  const props = [kit.decks(scene, [0, ST + 1.05, SZ + 1.0], 0, 1.7)];
+  const TY = 10.5;
+  for (const sx of [-1, 1]) {
+    for (const z of [SZ + 2.8, SZ - 2.8]) kit.truss(b, [sx * 9, ST, z], [sx * 9, TY, z], 0.5);
+    kit.truss(b, [sx * 9, TY, SZ + 2.8], [sx * 9, TY, SZ - 2.8], 0.5);
+    b.add(G.box(1.3, 7.6, 0.5), '#0b0a12', 'gloss', M([sx * 7.4, ST + 3.8, SZ - 2.6]));
+    for (let k = 0; k < 12; k++) b.add(G.box(1.1, 0.34, 0.06), [PINK, CYAN, VIOLET][k % 3], 'neon', M([sx * 7.4, ST + 0.5 + k * 0.6, SZ - 2.32]));
+    kit.speaker(b, [sx * 12.2, T, SZ + 2], 0, 1.8, 1.5); kit.speaker(b, [sx * 12.2, T + 1.8, SZ + 2], 0, 1.8, 1.5);
+    for (let k = 0; k < 5; k++) b.add(G.box(1.2, 0.42, 0.9), '#16161c', 'metal', M([sx * 9, TY - 1.2 - k * 0.46, SZ + 3.6], [0.05 * k, 0, 0]));
+    for (let i = 0; i < 4; i++) b.add(G.box(2.2, 0.35, 0.5), '#1a1528', 'gloss', M([sx * 6.5, T + 0.17 + i * 0.35, SZ + 4.0 - i * 0.45]));
+  }
+  kit.truss(b, [-9, TY, SZ + 2.8], [9, TY, SZ + 2.8], 0.5);
+  ['#ff3fb4', '#39ff6a', '#ff2a2a', '#2fe6ff', '#ff2a2a', '#39ff6a', '#ff3fb4'].forEach((c, i) => { b.add(G.cyl(0.22, 0.28, 0.5, 10), '#1a1a20', 'metal', M([-6 + i * 2, TY - 0.55, SZ + 2.8])); glows.push([-6 + i * 2, TY - 0.85, SZ + 2.8, c, 2.2, 2]); });
   const vidTex = kit.canvasTex(512, 256, (x, w, h) => { const g = x.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#2a0f5c'); g.addColorStop(1, '#0b6c9c'); x.fillStyle = g; x.fillRect(0, 0, w, h); kit.gradText(x, 'STAYA POOL', w / 2, h / 2, 60, '#fff', '#7ff2ff', { glow: '#2fe6ff' }); });
-  kit.videoScreen(scene, 'video/pool-h.mp4', 15.2, 6.4, [0, T + 1.0 + 3.4, SZ - 2.42], [0, 0, 0], vidTex);
-  /* --- коридор из двух экранов прямо от лестницы: развёрнуты к зрителю по диагонали --- */
-  kit.vScreen(scene, 'video/pool-v.mp4', [18.2, T + 0.3, -5.6], -0.99, 4.6, { edge: '#2fe6ff' });
-  kit.vScreen(scene, 'video/pool-v2.mp4', [18.2, T + 0.3, 2.6], -2.15, 4.6, { edge: '#ff3fb4' });
+  kit.videoScreen(scene, 'video/pool-h.mp4', 12.4, 5.6, [0, ST + 0.6 + 2.8, SZ - 2.7], [0, 0, 0], vidTex);
+  const facade = await kit.logoSign('world/logo.svg', 5.2, ['#ff4fb8', '#ffffff', '#7ff2ff']);
+  facade.position.set(0, T + RH / 2, SZ + 3.56); scene.add(facade); glows.push([0, T + RH / 2, SZ + 3.9, PINK, 6, 0.22]);
+
+  /* --- осьминог: огромная надувная голова над сценой, светящиеся глаза, щупальца с присосками обнимают сцену --- */
+  // по фото настоящего арт-объекта STAYA: тёмно-индиговый в ультрафиолете, белые глаза, щупальца завиваются наружу
+  const octM = new THREE.MeshStandardMaterial({ color: '#2b2296', emissive: '#2a17a6', emissiveIntensity: 0.55, roughness: 0.32, metalness: 0, envMapIntensity: 0.8 });
+  const suckM = new THREE.MeshStandardMaterial({ color: '#8a78ff', emissive: '#6a4dff', emissiveIntensity: 0.9, roughness: 0.3 });
+  const oct = new THREE.Group(); oct.userData.dynamic = true; scene.add(oct);
+  const OH = [0, 15.2, SZ - 1.5];
+  const head = new THREE.Mesh(new THREE.SphereGeometry(5.6, 48, 32), octM); head.scale.set(1.12, 0.9, 0.82); head.position.set(...OH); oct.add(head);
+  // лоб-гребень и «брови» над глазами
+  const ridge = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 16), octM); ridge.scale.set(0.7, 1.5, 0.6); ridge.position.set(0, OH[1] + 1.6, OH[2] + 3.7); oct.add(ridge);
+  for (const sx of [-1, 1]) {
+    const brow = new THREE.Mesh(new THREE.TorusGeometry(1.75, 0.55, 12, 28, Math.PI * 1.15), octM);
+    brow.position.set(sx * 2.4, OH[1] + 0.3, OH[2] + 4.35); brow.rotation.set(0.25, 0, sx < 0 ? -0.1 : Math.PI - Math.PI * 0.15 + 0.1); oct.add(brow);
+    const eye = new THREE.Mesh(new THREE.SphereGeometry(1.45, 32, 20), new THREE.MeshBasicMaterial({ color: '#eef4ff', toneMapped: false }));
+    eye.scale.set(1.05, 0.78, 0.5); eye.position.set(sx * 2.4, OH[1] + 0.1, OH[2] + 4.45); eye.rotation.z = sx * -0.25; oct.add(eye);
+    glows.push([sx * 2.4, OH[1] + 0.1, OH[2] + 5.3, '#cfe0ff', 7, 0.5]);
+    // щёки-мешки под глазами
+    const cheek = new THREE.Mesh(new THREE.SphereGeometry(1.6, 20, 14), octM); cheek.scale.set(1.2, 0.8, 0.9); cheek.position.set(sx * 1.6, OH[1] - 2.6, OH[2] + 3.6); oct.add(cheek);
+  }
+  // щупальце: труба по кривой, толщина убывает к кончику; на лицевой стороне — присоски-кольца
+  const suck = [];
+  const tentacle = (pts, r0, r1, n = 120) => {
+    const c = new THREE.CatmullRomCurve3(pts.map((q) => new THREE.Vector3(...q)), false, 'centripetal');
+    const geo = new THREE.TubeGeometry(c, n, 1, 14, false), pos = geo.attributes.position, P = new THREE.Vector3();
+    for (let i = 0; i <= n; i++) {
+      const u = i / n; c.getPointAt(u, P); const r = r0 + (r1 - r0) * Math.pow(u, 0.8);
+      for (let j = 0; j <= 14; j++) { const k = i * 15 + j; pos.setXYZ(k, P.x + (pos.getX(k) - P.x) * r, P.y + (pos.getY(k) - P.y) * r, P.z + (pos.getZ(k) - P.z) * r); }
+    }
+    geo.computeVertexNormals(); oct.add(new THREE.Mesh(geo, octM));
+    // присоски смотрят к зрителю (+z), по одной через равный шаг
+    const tg = new THREE.Vector3(), off = new THREE.Vector3();
+    for (let u = 0.12; u < 0.97; u += 0.065) {
+      c.getPointAt(u, P); c.getTangentAt(u, tg); const r = r0 + (r1 - r0) * Math.pow(u, 0.8);
+      off.set(0, 0, 1).addScaledVector(tg, -tg.z).normalize();
+      suck.push([P.clone().addScaledVector(off, r * 0.92), off.clone(), r * 0.42]);
+    }
+  };
+  for (const sx of [-1, 1]) {
+    const X = (v) => v * sx;
+    // передние: спускаются от головы к краю подиума и завиваются наружу у пола — «усы» по краям пульта
+    tentacle([[X(1.6), OH[1] - 3.5, SZ + 1.6], [X(3.4), 9.5, SZ + 4.6], [X(5.2), 5.0, SZ + 5.6], [X(6.4), 1.4, SZ + 5.9], [X(8.6), 0.9, SZ + 5.6], [X(9.6), 2.4, SZ + 5.2], [X(8.6), 3.4, SZ + 5.0], [X(7.9), 2.6, SZ + 5.0]], 1.35, 0.3);
+    // верхние: рогами вверх и наружу
+    tentacle([[X(3.6), OH[1] + 3.0, OH[2]], [X(6.0), OH[1] + 6.0, OH[2] + 0.5], [X(8.6), OH[1] + 6.8, OH[2] + 1.0], [X(10.2), OH[1] + 5.4, OH[2] + 1.2], [X(9.6), OH[1] + 3.9, OH[2] + 1.3], [X(8.6), OH[1] + 4.5, OH[2] + 1.3]], 1.15, 0.28);
+    // средние: аркой над фермами и вниз, кольцо завитка снаружи сцены
+    tentacle([[X(4.8), OH[1] - 0.5, OH[2] + 0.4], [X(9.5), OH[1] + 0.6, OH[2] + 1.0], [X(13.5), OH[1] - 2.0, SZ + 0.6], [X(15.2), 7.0, SZ + 1.2], [X(14.2), 3.6, SZ + 1.6], [X(12.4), 4.4, SZ + 1.8], [X(12.8), 6.2, SZ + 1.8], [X(14.0), 5.8, SZ + 1.8]], 1.25, 0.3);
+    // нижние: стелются по земле наружу
+    tentacle([[X(4.6), OH[1] - 3.2, OH[2] + 0.2], [X(8.6), 7.6, SZ + 1.0], [X(12.4), 2.4, SZ + 3.4], [X(16.2), 0.8, SZ + 4.6], [X(18.4), 1.8, SZ + 5.0], [X(17.6), 3.4, SZ + 5.0], [X(16.4), 2.6, SZ + 4.8]], 1.1, 0.26);
+  }
+  const sm0 = new THREE.InstancedMesh(new THREE.TorusGeometry(1, 0.32, 8, 18), suckM, suck.length), mq = new THREE.Matrix4(), qq = new THREE.Quaternion();
+  suck.forEach(([p, n, r], i) => { qq.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n); mq.compose(p, qq, new THREE.Vector3(r, r, r)); sm0.setMatrixAt(i, mq); });
+  oct.add(sm0);
+  glows.push([0, OH[1] + 4, OH[2] + 3, '#6a4dff', 22, 0.12]);
   /* --- танцпол: светодиодный пол, неоновая арка входа, ферма с прожекторами и лазерами --- */
   const floorT = kit.canvasTex(1024, 1024, (x, w, h) => {
     x.fillStyle = '#07060e'; x.fillRect(0, 0, w, h); const n = 12, c = w / n, R = kit.rng(5);
     for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) { const r = R(); x.fillStyle = r < 0.45 ? '#120c22' : r < 0.62 ? '#ff2fb0' : r < 0.78 ? '#7a3dff' : r < 0.92 ? '#21e0ff' : '#ffe14a'; x.fillRect(i * c + 4, j * c + 4, c - 8, c - 8); }
   });
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(DS, DS), new THREE.MeshBasicMaterial({ map: floorT, toneMapped: false }));
+  // танцпол — пентагон: одна сторона (запад) — вход с аркой, на четырёх других — вертикальные экраны с видео
+  floorT.wrapS = floorT.wrapT = THREE.RepeatWrapping; floorT.repeat.set(1.5, 1.5);
+  const floor = new THREE.Mesh(new THREE.CircleGeometry(PRAD, 5, 0), new THREE.MeshBasicMaterial({ map: floorT, toneMapped: false }));
   floor.rotation.x = -Math.PI / 2; floor.position.set(DX, 0.04, DZ); scene.add(floor);
-  for (const sz of [-1, 1]) b.add(kit.G.box(DS, 0.06, 0.06), sz < 0 ? '#2fe6ff' : '#ff3fb4', 'neon', kit.M([DX, 0.08, DZ + sz * DS / 2]));
-  // арка входа — полукольцо из неона, лицом к коридору
-  const AX = DX - DS / 2 - 0.6;
+  const PV = [0, 1, 2, 3, 4].map((k) => { const a = (k * 72) * Math.PI / 180; return [DX + Math.cos(a) * PRAD, DZ + Math.sin(a) * PRAD]; });
+  PV.forEach(([ax, az], k) => {
+    const [bx, bz] = PV[(k + 1) % 5], len = Math.hypot(bx - ax, bz - az);
+    b.add(kit.G.box(len, 0.08, 0.08), k % 2 ? '#ff3fb4' : '#2fe6ff', 'neon', kit.M([(ax + bx) / 2, 0.08, (az + bz) / 2], [0, -Math.atan2(bz - az, bx - ax), 0]));
+    glows.push([ax, 0.3, az, '#ffffff', 1.6, 1.2]);
+  });
+  // арка входа — полукольцо из неона на западной стороне пентагона
+  const AX = DX - PAP - 0.6;
   b.add(kit.G.tor(5.2, 0.28, 10, 48, Math.PI), '#ff3fb4', 'neon', kit.M([AX, 0, DZ], [0, Math.PI / 2, 0]));
   b.add(kit.G.tor(5.9, 0.12, 8, 48, Math.PI), '#2fe6ff', 'neon', kit.M([AX - 0.3, 0, DZ], [0, Math.PI / 2, 0]));
   kit.text3d(b, font, 'STAYA', { size: 0.9, color: '#ffffff', kind: 'neon', p: [AX - 0.1, 6.6, DZ], r: [0, -Math.PI / 2, 0], bevel: 0.01, depth: 0.05 });
@@ -102,11 +196,13 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     glows.push([x, TH - 0.4, z, c, 1.8, 2]);
     kit.laser(b, [x, TH - 0.4, z], [DX + (R2() - 0.5) * 30, 0.5 + R2() * 4, DZ + (z < DZ ? 1 : -1) * (8 + R2() * 10)], c);
   }
-  /* --- два больших вертикальных экрана по сторонам танцпола --- */
-  kit.vScreen(scene, 'video/pool-v3.mp4', [DX, 0.6, DZ - DS / 2 - 1.2], 0, 10, { edge: '#2fe6ff' });
-  kit.vScreen(scene, 'video/pool-v4.mp4', [DX, 0.6, DZ + DS / 2 + 1.2], Math.PI, 10, { edge: '#ff3fb4' });
+  /* --- четыре вертикальных экрана на сторонах пентагона, лицом к центру --- */
+  ['video/pool-v.mp4', 'video/pool-v2.mp4', 'video/pool-v3.mp4', 'video/pool-v4.mp4'].forEach((src, i) => {
+    const phi = [108, 36, -36, -108][i] * Math.PI / 180, r = PAP + 0.8;
+    kit.vScreen(scene, src, [DX + Math.cos(phi) * r, 0.6, DZ + Math.sin(phi) * r], Math.atan2(-Math.cos(phi), -Math.sin(phi)), 9, { edge: i % 2 ? '#ff3fb4' : '#2fe6ff' });
+  });
   /* --- за танцполом: баскетбольная площадка с кольцом — на тусовке можно покидать мяч --- */
-  const BCX = DX + 18, BW = 15, BD = 14;
+  const BCX = DX + 24, BW = 15, BD = 14;
   const courtT = kit.canvasTex(1024, 960, (x, w, h) => {
     x.fillStyle = '#1d4f8f'; x.fillRect(0, 0, w, h);
     const sx = w / BW, sz = h / BD, X = (v) => v * sx, Z = (v) => v * sz;
@@ -144,7 +240,9 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     ['sf_ball1', DX - 2.2, DZ + 3.4, 0, 0.8], ['sf_ball2', DX + 4.1, DZ - 4.6, 1, 0.8], ['sf_ball1', DX + 7.2, DZ + 5.6, 2, 0.8], ['sf_ball2', AX - 2.2, DZ - 6.3, 3, 0.8], ['sf_ball1', DX - 9.8, DZ + 11.5, 4, 0.8]]
     .forEach(([n, x, z, ry, w]) => props.push(kit.prop(scene, n, { p: [x, n.startsWith('sf_ball') ? 0.05 : 0.02, z], ry, w })));
   // надувные круги и мячи в бассейне
-  [['sf_duck', -7.5, -2.6, 2.2, 1.5], ['sf_flamingo', 6.4, 2.8, -0.7, 1.5], ['sf_ball2', -3.2, 3.1, 0, 0.6], ['sf_ball1', 4.5, -3.2, 1, 0.6]]
+  [['sf_duck', -7.5, -2.6, 2.2, 1.5], ['sf_flamingo', 6.4, 2.8, -0.7, 1.5], ['sf_ball2', -3.2, 3.1, 0, 0.6], ['sf_ball1', 4.5, -3.2, 1, 0.6],
+    ['sf_floats', -6.0, 2.4, 0.6, 4.6], ['sf_duck', -3.2, -3.4, 4.0, 1.4], ['sf_flamingo', 2.4, 4.1, 1.4, 1.4], ['sf_duck', 9.4, 3.2, 5.2, 1.4],
+    ['sf_flamingo', -9.6, -0.4, 3.1, 1.5], ['sf_ball2', 1.8, -3.9, 2, 0.6], ['sf_ball1', -9.8, 3.6, 3, 0.6]]
     .forEach(([n, x, z, ry, w]) => props.push(kit.prop(scene, n, { p: [x, 0.0, z], ry, w })));
   /* --- пальмы (Sketchfab «Coconut Palm», CC BY) --- */
   for (const [x, z, ry, h] of [[-24, -8, 0.4, 10], [-30, 6, 2.0, 11], [-26, 15, 4.1, 10], [26, -18, 1.1, 11], [24, 12, 3.0, 10], [-20, -18, 5.0, 11], [DX + 12, DZ - 13, 2.5, 10], [DX + 12, DZ + 12, 0.9, 11], [DX - 12, DZ + 13, 3.6, 10], [DX - 12, DZ - 14, 1.6, 10.5]])
@@ -156,13 +254,13 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   scene.add(new THREE.HemisphereLight('#5b4bdf', '#12061f', 0.6));
   const L = (c, i, p, d = 40) => { const l = new THREE.PointLight(c, i, d, 2); l.position.set(...p); scene.add(l); };
   // двор запечён; живые лампы нужны только моделям: одна у главной сцены, одна над танцполом (было 7)
-  L('#ff8ad8', 420, [0, 8, SZ + 4], 45); L('#8fa8ff', 460, [DX, 10, DZ], 40);
+  L('#ff8ad8', 300, [0, 6, SZ + 6], 40); L('#7a5cff', 380, [0, 16, SZ + 9], 40); L('#8fa8ff', 460, [DX, 10, DZ], 40);
 
   /* --- свечение: подводные фонари, прожекторы, LED, окна, гирлянды --- */
   for (let x = -9; x <= 9; x += 3) glows.push([x, -0.55, -4.85, '#2fe6ff', 1.8, 1.4], [x, -0.55, 4.85, '#2fe6ff', 1.8, 1.4]);
   const PAR = { pink: '#ff3fb4', green: '#39ff6a', red: '#ff2a2a', cyan: '#2fe6ff' };
-  ['pink', 'green', 'red', 'cyan', 'red', 'green', 'pink'].forEach((c, i) => glows.push([-6 + i * 2, 8.45, SZ + 2.85, PAR[c], 2, 2]));
-  const strings = [[[-16, 7.5, HZ], [-19, 6.5, -6]], [[-6, 7.5, HZ], [-8, 9, SZ + 2.4]], [[6, 7.5, HZ], [8, 9, SZ + 2.4]], [[16, 7.5, HZ], [19, 6.5, -7]], [[-19, 6.5, -6], [-8, 9, SZ + 2.4]], [[19, 6.5, -7], [8, 9, SZ + 2.4]]];
+
+  const strings = [[[-16, 7.5, HZ], [-19, 6.5, -6]], [[-6, 7.5, HZ], [-9, TY, SZ + 2.8]], [[6, 7.5, HZ], [9, TY, SZ + 2.8]], [[16, 7.5, HZ], [19, 6.5, -7]], [[-19, 6.5, -6], [-9, TY, SZ + 2.8]], [[19, 6.5, -7], [9, TY, SZ + 2.8]]];
   for (const [a, c] of strings) for (let i = 1; i < 22; i++) {
     const t = i / 22, sag = Math.sin(t * Math.PI) * 2;
     glows.push([a[0] + (c[0] - a[0]) * t, a[1] + (c[1] - a[1]) * t - sag - 0.12, a[2] + (c[2] - a[2]) * t, i % 3 ? '#ffd28a' : '#ff3fb4', 0.7, 1.5]);
@@ -182,27 +280,25 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
 
   /* --- камера: от первого лица --- */
   const STAGE = [0, 6.5, SZ], EYE = T + 1.62;
-  const OCT = [0, 10.6, SZ - 1.2];   // центр осьминога над главной сценой
+
   const keys = [
     // выныриваем в центре бассейна: сначала взгляд в ночное небо, затем вниз — осьминог по центру кадра
     { p: [0.4, -1.35, 2.0], l: [0.2, 30, -0.6], t: 0 },
     { p: [0.15, -0.55, 2.4], l: [0, 30, -1.0], t: 0.03 },
     { p: [0, 0.68, 2.8], l: [0, 30, -1.6], t: 0.05 },
-    { p: [0, 0.74, 3.5], l: [0, 18, SZ + 2], t: 0.12 },
-    { p: [0, 0.76, 4.2], l: [0, 5.5, SZ], t: 0.2 },
-    { p: [0.3, 0.74, 4.0], l: [0, 5.2, SZ], t: 0.25 },
+    { p: [0, 0.74, 3.5], l: [0, 20, SZ + 2], t: 0.12 },
+    { p: [0, 0.76, 4.2], l: [0, 8.5, SZ], t: 0.2 },
+    { p: [0.3, 0.74, 4.0], l: [0, 7.8, SZ], t: 0.25 },
     // плывём к лестнице справа и выбираемся
     { p: [5.5, 0.58, 0.4], l: [9, 0.9, -1.6] },
     { p: [9.7, 0.75, -1.6], l: [13, 1.6, -1.6], t: 0.36 },
     { p: [11.9, EYE, -1.5], l: [18, EYE, -2], t: 0.41 },
-    // прямо — коридор из двух экранов, развёрнутых по диагонали: взгляд налево, направо
-    { p: [13.0, EYE, -1.5], l: [18.2, 2.7, -5.6], t: 0.45 },
-    { p: [14.4, EYE, -1.1], l: [18.2, 2.7, 2.6], t: 0.5 },
-    // впереди арка танцпола
-    { p: [22.4, EYE, -1.2], l: [DX, 5, DZ], t: 0.56 },
+    // прямо к арке танцпола-пентагона; через арку видны экраны на его сторонах
+    { p: [14.0, EYE, -1.4], l: [DX, 4.5, DZ], t: 0.47 },
+    { p: [20.4, EYE, -1.2], l: [DX, 5, DZ], t: 0.55 },
     // присели — низко над плитками под аркой, и выпрямляемся на танцполе
-    { p: [25.4, 0.95, DZ], l: [DX, 1.3, DZ], t: 0.595 },
-    { p: [28.5, EYE, DZ], l: [DX + 8, 3, DZ], t: 0.62 },
+    { p: [AX - 1.2, 0.95, DZ], l: [DX, 1.3, DZ], t: 0.59 },
+    { p: [AX + 3.0, EYE, DZ], l: [DX + 8, 3, DZ], t: 0.62 },
   ];
   const path = kit.camPath(keys);
   // на танцполе: шаг к центру под Луной, обзор площадки против часовой стрелки (если смотреть сверху),
@@ -210,7 +306,7 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   const C = new THREE.Vector3(DX, EYE, DZ), SPIN = (2 * Math.PI) / 0.2, R0 = 0.03;
   const yawAt = (t) => { const x = Math.max(0, t - 0.66); return SPIN * (x < R0 ? (x * x) / (2 * R0) : x - R0 / 2); };
   const sm = (a, c, t) => { const k = Math.min(1, Math.max(0, (t - a) / (c - a))); return k * k * (3 - 2 * k); };
-  const P0 = new THREE.Vector3(28.5, EYE, DZ), out = { p: new THREE.Vector3(), l: new THREE.Vector3() };
+  const P0 = new THREE.Vector3(AX + 3.0, EYE, DZ), out = { p: new THREE.Vector3(), l: new THREE.Vector3() };
   const cam = (t) => {
     if (t < 0.62) return path(t);
     out.p.copy(P0).lerp(C, sm(0.62, 0.68, t));
@@ -235,10 +331,8 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     const s = 0.05 + 0.95 * e; g.scale.set(s, s, s);
   };
   // щупальца осьминога машут: поворот вокруг основания
-  const wave = [['TENTL', [-2, 11.5, SZ - 3], -1], ['TENTR', [2.5, 12, SZ - 2.8], 1]].map(([n, base, sx]) => {
-    const o = letters[n]; if (!o) return null;
-    const g = new THREE.Group(); g.position.set(...base); scene.add(g); g.attach(o); return [g, sx];
-  }).filter(Boolean);
+  // надувной осьминог чуть покачивается и «дышит»
+  const wave = [];
   // салют за Луной: вспышки по очереди, искры разлетаются и падают
   const FW = ['#ff3fb4', '#2fe6ff', '#ffd84a', '#b78bff', '#ffffff'].map((c, i) => {
     const pts = kit.drops(90, c, 0.32, { fog: false }), R = kit.rng(70 + i);
@@ -247,7 +341,7 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   });
   const update = (t) => {
     const now = performance.now() / 1000;
-    for (const [g, sx] of wave) g.rotation.set(Math.sin(now * 1.6 + sx) * 0.07, 0, sx * Math.sin(now * 1.9 + sx) * 0.12);
+    head.scale.set(1.12 + Math.sin(now * 1.3) * 0.012, 0.9 + Math.sin(now * 1.3) * 0.014, 0.82);
     // Луна медленно вращается и у самого края превращается в зеркальный диско-шар
     moonArt.rotation.y = now * 0.05 + t * 1.2;
     const mu = moonArt.material.uniforms; mu.tiles.value = Math.min(1, Math.max(0, (t - 0.91) / 0.08)); mu.time.value = now;
@@ -267,7 +361,7 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     const under = 1 - Math.min(1, Math.max(0, (t - 0.03) / 0.02));
     bub.userData.tick(path(t).p, under, now, 0.08);
     rays.visible = under > 0; rayM.opacity = 0.2 * under * (0.8 + 0.2 * Math.sin(now * 2));
-    blow(pv.STAYA, 0.1, 0.1, t); blow(pv.POOL, 0.14, 0.1, t);
+
   };
   // «прищур» на электро-сцену: камера приближает её, сверху и снизу темнеет, как веки
   const calm = (t) => Math.min(1, Math.max(0, (t - 0.6) / 0.05));   // вращение на танцполе — без влияния головы и курсора

@@ -6,3 +6,9 @@ scripts/blender/*.blend
 scripts/blender/vout/
 scripts/blender/*_points.json
 scripts/blender/*.blend1
+scripts/blender/bvenv/
+scripts/blender/*_src.glb
+scripts/blender/*_lights.json
+scripts/blender/aqua/
+scripts/blender/club/
+scripts/blender/halloween/

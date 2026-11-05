@@ -8,6 +8,7 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { SVGLoader } from 'three/addons/loaders/SVGLoader.js';
 
 export { THREE };
 
@@ -458,17 +459,6 @@ export function water(w, h, color, o = {}) {
     emissive: new THREE.Color(o.emissive ?? color), emissiveIntensity: o.ei ?? 0.35,
     transparent: o.opacity != null, opacity: o.opacity ?? 1, side: THREE.DoubleSide, depthWrite: o.opacity == null,
   });
-  // круги на воде под курсором: нормаль гнётся кольцами вокруг точки касания (uTouch.xz), сила — uTouch.w
-  mat.onBeforeCompile = (sh) => {
-    Object.assign(sh.uniforms, { uTouch: touch.u.uTouch, uTime: touch.u.uTime, uDwell: touch.u.uDwell });
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWp;')
-      .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\nvWp = (modelMatrix * vec4(transformed, 1.0)).xyz;');
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nuniform vec4 uTouch; uniform float uTime, uDwell; varying vec3 vWp;')
-      .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-        { vec2 d = vWp.xz - uTouch.xz; float r = length(d); float R = 3.5;
-          float a = uTouch.w * smoothstep(R, 0.3, r) * (0.3 + 0.12 * uDwell);
-          if (a > 0.001) { float wv = sin(r * 6.0 - uTime * 7.0); vec2 g = normalize(d + 1e-4) * wv * a; normal = normalize(normal + vec3(g.x, 0.0, g.y)); } }`);
-  };
   const m = new THREE.Mesh(new THREE.PlaneGeometry(w, h, 1, 1), mat);
   m.rotation.x = -Math.PI / 2; m.userData.water = true; waters.push(m);
   return m;
@@ -953,6 +943,21 @@ export async function logoSign(url, width, colors = ['#ff4fb8', '#ffffff', '#7ff
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(width, width * H / W), new THREE.MeshBasicMaterial({ map: t, transparent: true, toneMapped: false, depthWrite: false }));
   pulse.mats.add(m.material); return m;
+}
+
+/* ---------- надувной логотип: контуры SVG бренда выдавлены с толстой скруглённой фаской — буквы «надуты» ---------- */
+// width — ширина в метрах; низ букв на y = 0, центр по x; буквы смотрят в +Z
+export async function inflatableLogo(url, width, o = {}) {
+  const data = await new SVGLoader().loadAsync(url);
+  const shapes = data.paths.flatMap((p) => SVGLoader.createShapes(p));
+  const vb = data.xml.viewBox?.baseVal, W = vb?.width || 4480, Hs = vb?.height || 1012, k = width / W;
+  const puff = o.puff ?? 95;   // толщина «надува» в единицах SVG
+  const geo = new THREE.ExtrudeGeometry(shapes, { depth: puff * 0.6, curveSegments: 10, bevelEnabled: true, bevelThickness: puff, bevelSize: puff * 0.62, bevelSegments: 7 });
+  geo.scale(k, k, k); geo.computeBoundingBox();
+  { const bb = geo.boundingBox; geo.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); }   // низ на y = 0, центр по x и z; надпись читается с +Z
+  const mat = new THREE.MeshStandardMaterial({ color: o.color ?? '#ff2a9d', roughness: 0.28, metalness: 0, emissive: o.emissive ?? '#8a0a52', emissiveIntensity: 0.55, envMapIntensity: 0.7 });
+  const g = new THREE.Group(); g.add(new THREE.Mesh(geo, mat)); g.userData.height = Hs * k;
+  return g;
 }
 
 /* ---------- контуры области по функции расстояния (marching squares) ---------- */

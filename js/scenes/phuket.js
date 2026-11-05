@@ -109,12 +109,12 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     // низ кадра растворяется — фигура стоит за перилами, а не обрезана
     x.globalCompositeOperation = 'destination-in'; const g = x.createLinearGradient(0, 0, 0, c.height); g.addColorStop(0, '#000'); g.addColorStop(0.68, '#000'); g.addColorStop(0.97, 'rgba(0,0,0,0)'); x.fillStyle = g; x.fillRect(0, 0, c.width, c.height);
     const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
-    const H = 1.8, W = H * c.width / c.height, X = [8.2, 5.5, 2.8, -2.8, -5.5][i];   // слева направо, как смотрит камера: GULIDIC … PRONTO; середина свободна для неона STAYA
+    const H = 1.8, W = H * c.width / c.height, X = [8.1, 6.6, 5.1, 3.6, 2.1][i];   // слева направо, как смотрит камера: GULIDIC … PRONTO; стоят кучно, плечом к плечу, правее неона STAYA
     const m = new THREE.Mesh(new THREE.PlaneGeometry(W, H), new THREE.MeshBasicMaterial({ map: t, transparent: true, color: '#fff0e4', depthWrite: false }));
     m.position.set(X, Y2 + 0.3 + H / 2, -2.7); m.rotation.y = Math.PI; m.renderOrder = 2; scene.add(m);
     const nt = kit.canvasTex(1024, 192, (x2, w, h) => kit.gradText(x2, nick, w / 2, h / 2, 104, '#ffffff', '#ff8ad8', { glow: '#ff3fb4' }));
-    const nm = new THREE.Mesh(new THREE.PlaneGeometry(2.1, 0.4), new THREE.MeshBasicMaterial({ map: nt, transparent: true, toneMapped: false, depthWrite: false }));
-    nm.position.set(X, Y2 + 0.3 + H + 0.3, -2.7); nm.rotation.y = Math.PI; scene.add(nm);
+    const nm = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 0.27), new THREE.MeshBasicMaterial({ map: nt, transparent: true, toneMapped: false, depthWrite: false }));
+    nm.position.set(X, Y2 + 0.3 + H + 0.2, -2.7); nm.rotation.y = Math.PI; scene.add(nm);
   }));
   /* --- далёкие острова: известняковые скалы-«свечи», как в заливе Пханг-Нга — отвесные стены, подмыв у воды, зелёная шапка --- */
   { const iM = new THREE.MeshLambertMaterial({ vertexColors: true });
@@ -185,7 +185,7 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   scene.add(kit.glowPoints(glows));
 
   /* --- финальная композиция: солнце слева, по центру титры встают ровно из-за горизонта --- */
-  const CP = new THREE.Vector3(0, 2.6, -21.5);
+  const CP = new THREE.Vector3(11.5, Y2 + 1.72, -7.1);   // финал — на боковом балконе второго этажа
   const VD = SV.clone().setY(0).applyAxisAngle(new THREE.Vector3(0, 1, 0), mobile ? -0.17 : -0.3).normalize();   // взгляд финала: солнце левее центра
   const RT = new THREE.Vector3(-VD.z, 0, VD.x);                                                    // вправо от взгляда
   const at = (dist, side, y) => CP.clone().addScaledVector(VD, dist).addScaledVector(RT, side).setY(y);
@@ -206,13 +206,13 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     y += 40; line('Делаем рекламные', 70); line('кампании', 70, '#ffffff', '#ffe2c4', 1.6);
     line('и готовы', 70); line('к коллаборациям', 70, '#ffffff', '#ffe2c4', 2.6);
     // источники и лицензии: каждая строка — ссылка (клик по титрам открывает источник)
-    small('ИСТОЧНИКИ И ЛИЦЕНЗИИ', 34, 0.75, 800); y += 18;
+    small('АВТОРЫ МОДЕЛЕЙ · CC BY 4.0', 34, 0.75, 800); y += 18;
     for (const c of CREDITS) {
       const y0 = y; small(c.what, 42, 1); small(`${c.who} · ${c.lic}`, 34, 0.86, 600); y += 16;
       links.push({ y0, y1: y, href: c.url });
     }
     y += 90; const y0 = y;
-    small(DEV.label, 40, 0.8, 600); line(DEV.name, 96, '#ffffff', '#ffd1ee', 1.2);
+    small(DEV.label, 34, 0.86, 600); small(DEV.name, 42, 1);   // тем же размером, что и строки источников
     links.push({ y0, y1: y, href: DEV.url }); yEnd = y + 20;
   });  credT.anisotropy = 8;
   const CDIST = 700, CWW = mobile ? 400 : 380, CHH = CWW * CH / CW;
@@ -223,7 +223,9 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   const below = (CH - yEnd) / CH * CHH;                                   // пустое поле под последней строкой
   const endBottom = CP.y + CDIST * Math.tan(THREE.MathUtils.degToRad(1.5)) - below;
   // линия горизонта на дистанции титров: луч из глаза к дальнему краю моря (море 3600×3600 с центром в 0)
-  const toEdge = 1800 / Math.max(Math.abs(VD.x), Math.abs(VD.z)) - CP.clone().projectOnVector(VD).length() * Math.sign(CP.dot(VD));
+  // видимый горизонт ближе края моря: дальше ~950 м море растворяется в дымке и сливается с небом (замер по кадру финала).
+  // Раньше линия считалась по краю моря (1870 м) — титры выходили на 1° выше видимого горизонта.
+  const toEdge = 950;
   const yH = CP.y + (SEA - CP.y) * CDIST / toEdge;
   // всё, что ниже горизонта, срезается: титры выезжают именно из линии горизонта, а не из воды перед ней
   renderer.localClippingEnabled = true;
@@ -251,12 +253,15 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     { p: [0.2, 2.4, -3.6], l: [-14, 3.2, -12], t: 0.44 },
     { p: [-3.2, 3.8, -11], l: [-20, 5, 2], t: 0.49 },
     { p: [-6.4, 5.8, -17.5], l: [-4, 6.2, 4], t: 0.545 },
-    // боковой пролёт вдоль террасы: бассейн на крыше → диджейская стойка с экраном → балкон
+    // боковой пролёт вдоль террасы: бассейн на крыше → диджейская стойка с экраном → команда на балконе
     { p: [-13, 7.3, -12.5], l: [-9, 5.6, 2], t: 0.61 },
-    { p: [-2, 7.4, -11.5], l: [1, Y2 + 1.3, -2.7], t: 0.67 },
-    { p: [9.5, 7.2, -12.5], l: [11.5, 5.8, -5], t: 0.72 },
-    // разворот к морю — в восход
-    { p: [5.5, 4.4, -18.5], l: far(600), t: 0.77 },
+    { p: [1.5, 7.4, -11.5], l: [5.1, Y2 + 1.3, -2.7], t: 0.67 },
+    // подлёт к боковому балкону и посадка на него
+    { p: [8.6, 7.8, -11.8], l: [11.5, Y2 + 0.4, -6], t: 0.72 },
+    { p: [11.4, Y2 + 2.5, -7.3], l: [11.5, Y2 + 0.6, -3.5], t: 0.76 },
+    { p: [11.5, Y2 + 1.72, -7.0], l: [8.5, Y2 + 1.4, 0], t: 0.785 },
+    // с балкона — разворот к морю, в восход
+    { p: [11.5, Y2 + 1.72, -7.05], l: [40, Y2 + 0.5, -12], t: 0.805 },
     { p: CP.toArray(), l: fin(1000), t: 0.83 },
     { p: CP.toArray(), l: fin(1000), t: 1 },
   ];
