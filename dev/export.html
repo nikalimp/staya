@@ -6,13 +6,12 @@
 import * as THREE from 'three';
 import { FontLoader } from 'three/addons/loaders/FontLoader.js';
 import * as kit from '/js/kit.js';
-import { loadPeople } from '/js/people.js';
 import { GLTFExporter } from '/dev/GLTFExporter.js';
 globalThis.__noBake = true;
 const id = new URLSearchParams(location.search).get('scene');
-const r = new THREE.WebGLRenderer(); kit.useRenderer(r); const font = await new FontLoader().loadAsync('fonts/unbounded_black.typeface.json'); await loadPeople();
+const r = new THREE.WebGLRenderer(); kit.useRenderer(r); const font = await new FontLoader().loadAsync('fonts/unbounded_black.typeface.json');
 const mod = await import(`/js/scenes/${id}.js`);
-const res = await mod.build({ THREE, kit, font, renderer: r, mobile: false });
+const res = await mod.build({ THREE, kit, font, renderer: r, mobile: false, quality: kit.quality });
 const KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome', 'neon', 'sand'];
 const out = new THREE.Scene(), lights = [];
 res.scene.updateMatrixWorld(true);

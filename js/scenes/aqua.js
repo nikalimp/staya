@@ -1,7 +1,8 @@
 import { addLoot } from '../loot.js';
 // 01 · STAYA AQUA — ночной аквапарк под куполом.
 // Камера скатывается по тёмной трубе горки (в ней светятся только ленты, в «окнах» видно аквапарк),
-// облетает диджейский пульт, проходит между спинами диджеев и прыгает в бассейн.
+// облетает диджейский пульт, боковым пролётом дрона проходит над ним, летит по ленивой реке вокруг
+// экрана-призмы и ныряет с высоты в центр бассейна.
 export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M, V } = kit;
   const scene = new THREE.Scene();
@@ -86,7 +87,9 @@ export async function build({ THREE, kit, font, renderer }) {
     b.add(G.box(1.9, 0.5, 1.9), '#efe3cc', 'gloss', M([x, top + 0.25, z]));
     glows.push([x, top + 10.8, z, '#ffd2a1', 2.2, 0.9]);
   }
-  b.add(G.tor(32, 0.45, 6, 128), '#efe3cc', 'gloss', M([0, top + 10.7, DC[2]], [Math.PI / 2, 0, 0]));
+  // кольцо-антаблемент над колоннами — дуга с разрывом у вышки горки: целое кольцо протыкало трубу горки
+  { const aT = Math.atan2(TW[2] - DC[2], TW[0] - DC[0]), gap = 0.42;
+    b.add(G.tor(32, 0.45, 6, 128, Math.PI * 2 - gap * 2), '#efe3cc', 'gloss', M([0, top + 10.7, DC[2]], [Math.PI / 2, 0, aT + gap])); }
 
   /* --- сцена --- */
   const SZ = -15.5;
@@ -122,11 +125,23 @@ export async function build({ THREE, kit, font, renderer }) {
   // экран за пультом: видео с вечеринки (video/aqua.mp4), пока его нет — заставка
   // экран поднят и отодвинут: когда камера заходит за спины диджеев, он не закрывает полкадра
   kit.videoScreen(scene, 'video/aqua-h.mp4', 15, 7.5, [0, ST + 5.3, SZ - 3.7], [0, 0, 0], tex);
-  // надувные буквы
-  // логотип «СТАЯ» из файла бренда (world/logo.svg) — светящаяся вывеска на ферме
-  const logo = await kit.logoSign('world/logo.svg', 13.5, ['#ff4fb8', '#ffffff', '#7ff2ff']);
-  logo.position.set(0, TY + 2.0, SZ + 0.2); scene.add(logo);
-  glows.push([0, TY + 2.0, SZ - 0.2, PINK, 16, 0.18]);
+  // надувные буквы «СТАЯ» (контуры из файла бренда world/logo.svg) стоят на ферме над сценой
+  const puffy = await kit.inflatableLogo('world/logo.svg', 16);
+  puffy.position.set(0, TY + 0.5, zf + 0.4); scene.add(puffy);   // на передней балке фермы — не прячутся за прожекторами
+  glows.push([0, TY + 1.8, SZ + 2.2, PINK, 14, 0.14]);
+  // светящийся логотип по центру фасада сцены
+  const facade = await kit.logoSign('world/logo.svg', 5.6, ['#ff4fb8', '#ffffff', '#7ff2ff']);
+  facade.position.set(0, top + 0.8, SZ + 3.3); scene.add(facade);
+  glows.push([0, top + 0.8, SZ + 3.6, PINK, 7, 0.22]);
+  /* прокачка сцены: ступени, светодиодные колонны по бокам, подвесные линейные массивы, пушки CO2 */
+  for (const sx of [-1, 1]) {
+    for (let i = 0; i < 4; i++) b.add(G.box(2.2, 0.4, 0.5), '#1a1528', 'gloss', M([sx * 7.6, top + 0.2 + i * 0.4, SZ + 4.6 - i * 0.5]));
+    b.add(G.box(1.3, 8.6, 0.5), '#0b0a12', 'gloss', M([sx * 7.6, ST + 4.3, SZ - 2.2]));
+    for (let k = 0; k < 14; k++) b.add(G.box(1.1, 0.34, 0.06), [PINK, CYAN, VIOLET][k % 3], 'neon', M([sx * 7.6, ST + 0.5 + k * 0.58, SZ - 1.92]));
+    for (let k = 0; k < 6; k++) b.add(G.box(1.2, 0.42, 0.9), '#16161c', 'metal', M([sx * 9.4, TY - 1.1 - k * 0.46, zf - 0.6], [0.04 * k, 0, 0]));
+    for (const dx of [-2.6, 2.6]) { b.add(G.cyl(0.18, 0.22, 0.7, 10), '#d8d8e0', 'metal', M([sx * 4.5 + dx * 0.4, ST + 0.35, SZ + 2.7])); glows.push([sx * 4.5 + dx * 0.4, ST + 0.75, SZ + 2.7, '#ffffff', 0.9, 0.9]); }
+  }
+  for (let k = 0; k < 18; k++) b.add(G.box(0.9, 0.06, 0.06), k % 2 ? PINK : CYAN, 'neon', M([-8.1 + k * 0.95, ST + 0.02, SZ + 3.0]));
 
   // колонки
   for (const sx of [-1, 1]) { kit.speaker(b, [sx * 10.6, top, SZ + 1], 0, 1.7, 1.5); kit.speaker(b, [sx * 10.6, top + 1.7, SZ + 1], 0, 1.7, 1.5); }
@@ -134,8 +149,9 @@ export async function build({ THREE, kit, font, renderer }) {
   /* --- горки --- */
   // опоры вышки — внутри витка горки (радиус витка 6, труба 1.5), чтобы не протыкать трубу
   for (const dx of [-2.4, 2.4]) for (const dz of [-2.4, 2.4]) b.add(G.cyl(0.32, 0.32, 19, 10), '#e8e2f6', 'metal', M([TW[0] + dx, 9.5, TW[2] + dz]));
-  b.add(G.rbox(6.6, 0.5, 6.6, 0.1), '#e8e2f6', 'gloss', M([TW[0], 19.6, TW[2]]));
-  b.add(G.box(6.6, 0.08, 0.08), CYAN, 'neon', M([TW[0], 19.9, TW[2] + 3.3]));
+  // площадка вышки меньше витка горки: углы прежней площадки (6,6 м) протыкали трубу у самого старта
+  b.add(G.rbox(5.2, 0.5, 5.2, 0.1), '#e8e2f6', 'gloss', M([TW[0], 19.9, TW[2]]));
+  b.add(G.box(5.2, 0.08, 0.08), CYAN, 'neon', M([TW[0], 20.2, TW[2] + 2.6]));
   // горка камеры (прозрачная, с неоновыми кольцами)
   const S = [];
   // короткая горка: ровно один виток с вышки; виток кончается там, где его касательная уже смотрит к бассейну,
@@ -146,7 +162,7 @@ export async function build({ THREE, kit, font, renderer }) {
   const slide = new THREE.CatmullRomCurve3(S, false, 'centripetal');
   // труба непрозрачная; несколько коротких «окон» — спойлер того, что снаружи
   const TS = 260, RS = 18, tubeGeo = new THREE.TubeGeometry(slide, TS, 1.5, RS, false);
-  const WIN = [[0.2, 0.25], [0.45, 0.5], [0.7, 0.76], [0.93, 1.01]];
+  const WIN = [[0.42, 0.48]];   // одно окно посередине; начало и конец трубы глухие (в первом окне балка колоннады казалась проткнувшей трубу)
   const isWin = (u) => WIN.some(([a, c]) => u >= a && u < c);
   const idx = tubeGeo.index.array, solid = [], clear = [];
   for (let j = 0; j < TS; j++) (isWin(j / TS) ? clear : solid).push(...idx.slice(j * RS * 6, (j + 1) * RS * 6));
@@ -163,12 +179,27 @@ export async function build({ THREE, kit, font, renderer }) {
     b.add(G.tor(1.46, 0.05, 5, 36), i % 2 ? PINK : CYAN, 'neon', new THREE.Matrix4().compose(p, q, V(1, 1, 1)));
     if (!isWin(u)) glows.push([p.x, p.y + 1.3, p.z, i % 2 ? PINK : CYAN, 1.2, 0.5]);
   }
-  /* --- три вертикальных экрана напротив сцены, через бассейн --- */
-  [['video/aqua-v.mp4', 9], ['video/aqua-v2.mp4', 0], ['video/aqua-v3.mp4', -9]].forEach(([src, x], i) => kit.vScreen(scene, src, [x * 1.05, top + 0.8, 12.6], Math.PI, 13.5, { edge: [CYAN, PINK, CYAN][i] }));
+  /* --- экран-призма на острове внутри ленивой реки: три видео по трём граням; призма поворачивается к камере --- */
+  const PZ = 15, PH = 8, PW = PH * 9 / 16, PB = 1.6, side = PW + 0.5, AP = side / (2 * Math.sqrt(3)), PR = side / Math.sqrt(3);
+  const prism = new THREE.Group(); prism.position.set(0, top, PZ); prism.userData.dynamic = true; scene.add(prism);
+  const pm = (geo, mat, y) => { const m = new THREE.Mesh(geo, mat); m.position.y = y; prism.add(m); return m; };
+  pm(new THREE.CylinderGeometry(PR + 0.5, PR + 0.8, PB, 3, 1, false, Math.PI / 3), new THREE.MeshStandardMaterial({ color: '#f5f3ff', roughness: 0.25 }), PB / 2);
+  pm(new THREE.CylinderGeometry(PR, PR, PH + 0.5, 3, 1, false, Math.PI / 3), new THREE.MeshStandardMaterial({ color: '#0b0a12', roughness: 0.35, metalness: 0.4 }), PB + (PH + 0.5) / 2);
+  const edgeM = new THREE.MeshBasicMaterial({ color: '#ffffff', toneMapped: false });
+  for (let k = 0; k < 3; k++) {
+    const a = Math.PI / 3 + k * (Math.PI * 2 / 3), e = pm(new THREE.CylinderGeometry(0.06, 0.06, PH + 0.6, 6), k === 1 ? new THREE.MeshBasicMaterial({ color: PINK, toneMapped: false }) : edgeM, PB + (PH + 0.5) / 2);
+    e.position.x = Math.sin(a) * PR; e.position.z = Math.cos(a) * PR;
+  }
+  ['video/aqua-v.mp4', 'video/aqua-v2.mp4', 'video/aqua-v3.mp4'].forEach((src, i) => {
+    const a = i * (Math.PI * 2 / 3), m = kit.videoScreen(scene, src, PW, PH, [Math.sin(a) * (AP + 0.02), PB + 0.25 + PH / 2, Math.cos(a) * (AP + 0.02)], [0, a, 0]);
+    prism.add(m);
+  });
+  glows.push([0, top + PB + PH + 0.6, PZ, CYAN, 6, 0.3]);
   /* --- надувные круги: хаотично по бассейну, пара лежит на суше (Sketchfab, CC BY); у места прыжка (x≈-10.6, z≈-2) свободно --- */
-  const FL = [['sf_duck', -11.2, 5.8, 2.2, 1.7], ['sf_flamingo', -4.2, -5.4, -0.7, 1.6], ['sf_duck', 3.4, 6.6, -1.2, 1.5], ['sf_flamingo', 12.2, -6.1, 1.9, 1.7],
-    ['sf_duck', -2.4, 1.2, 0.8, 1.4], ['sf_flamingo', 6.1, 3.1, 2.8, 1.5], ['sf_duck', 11.6, 1.8, 4.1, 1.6], ['sf_flamingo', -11.5, -6.2, 5.2, 1.6]];
-  const floatsP = [kit.prop(scene, 'sf_floats', { p: [-4.5, -0.2, 3.5], ry: 1.1, w: 7.5 }), ...FL.map(([n, x, z, ry, w]) => kit.prop(scene, n, { p: [x, -0.12, z], ry, w }))];
+  // игрушек меньше, центр бассейна свободен — туда ныряет камера
+  const FL = [['sf_duck', -11.2, 5.8, 2.2, 1.7], ['sf_flamingo', -5.2, -6.2, -0.7, 1.6], ['sf_flamingo', 12.2, -6.1, 1.9, 1.7],
+    ['sf_duck', 9.6, 4.6, 4.1, 1.6], ['sf_flamingo', -11.5, -6.2, 5.2, 1.6]];
+  const floatsP = [kit.prop(scene, 'sf_floats', { p: [-7.5, -0.2, 4.2], ry: 1.1, w: 6.5 }), ...FL.map(([n, x, z, ry, w]) => kit.prop(scene, n, { p: [x, -0.12, z], ry, w }))];
   props.push(...floatsP);
   // на суше: фламинго у шезлонгов справа от сцены, утка на западной палубе
   props.push(kit.prop(scene, 'sf_flamingo', { p: [17.6, top, -9.6], ry: 0.6, w: 1.6 }), kit.prop(scene, 'sf_duck', { p: [-19.5, top, 7.8], ry: 2.4, w: 1.5 }));
@@ -176,7 +207,7 @@ export async function build({ THREE, kit, font, renderer }) {
   for (let i = 0; i < 4; i++) props.push(kit.prop(scene, 'sf_lounger', { p: [17.5 + i * 1.6, top, -13.2], ry: 0, w: 1.9 }));
   for (let i = 0; i < 6; i++) props.push(kit.prop(scene, 'sf_lounger', { p: [-28.5, top, -9.5 + i * 1.6], ry: Math.PI / 2, w: 1.9 }));
   // надувные мячи — на палубах и в воде
-  [['sf_ball1', -24.8, top, -7], ['sf_ball2', -25.6, top, 3.4], ['sf_ball1', -8.5, -0.15, -2.4], ['sf_ball2', 7.5, -0.15, -6.5], ['sf_ball2', 20.6, top, -11], ['sf_ball1', 0.5, -0.15, 7.6],
+  [['sf_ball1', -24.8, top, -7], ['sf_ball2', -25.6, top, 3.4], ['sf_ball2', 7.5, -0.15, -6.5], ['sf_ball2', 20.6, top, -11],
     ['sf_ball1', 22.5, top, 9.5], ['sf_ball2', 41, top, 3.5], ['sf_ball1', 39.5, top, 9.2]]
     .forEach(([n, x, y, z], i) => props.push(kit.prop(scene, n, { p: [x, y, z], ry: i, w: 0.7 })));
   for (const [x, z, ry, h] of [[-30, -14, 0.3, 9], [-37, 4, 2.1, 8], [-13.8, 17.5, 4.0, 8.5], [24.5, -10.5, 1.2, 9], [19.5, 12, 3.3, 8], [44, -13, 0.7, 9.5], [45, 12.5, 2.6, 8.5]])
@@ -239,18 +270,6 @@ export async function build({ THREE, kit, font, renderer }) {
   // подсветка аквазоны
   glows.push([AX, top + AH2 + 5.4, AZ, YEL, 3, 1.5], [AX - 3.2, top + AH2 + 2.2, AZ - 3.2, PINK, 2, 1.2], [AX - 3.2, top + AH2 + 2.2, AZ + 3.2, CYAN, 2, 1.2]);
 
-  /* --- вышка для прыжков на западной стороне — с неё виден весь аквапарк и аквазона напротив --- */
-  const TWX = -19.4, TZ = -2, TWH = 10.6;
-  for (const dx of [-1.2, 1.2]) for (const dz of [-1.2, 1.2]) b.add(G.cyl(0.18, 0.2, TWH, 10), '#e8e2f6', 'metal', M([TWX + dx, top + TWH / 2, TZ + dz]));
-  b.add(G.rbox(3.2, 0.3, 3.2, 0.05), '#f5f3ff', 'gloss', M([TWX, top + TWH, TZ]));
-  for (const dz of [-1.55, 1.55]) b.add(G.box(3.2, 0.06, 0.06), '#e8e2f6', 'metal', M([TWX, top + TWH + 1.0, TZ + dz]));
-  b.add(G.box(0.06, 0.06, 3.2), '#e8e2f6', 'metal', M([TWX - 1.55, top + TWH + 1.0, TZ]));
-  for (const dz of [-1.55, 1.55]) for (const dx of [-1.5, 0, 1.5]) b.add(G.cyl(0.03, 0.03, 1.0, 6), '#e8e2f6', 'metal', M([TWX + dx, top + TWH + 0.5, TZ + dz]));
-  for (let i = 0; i < 18; i++) b.add(G.box(0.05, 0.05, 0.7), '#e8e2f6', 'metal', M([TWX - 1.75, top + 0.4 + i * 0.58, TZ]));   // лестница
-  for (const dz of [-0.36, 0.36]) b.add(G.cyl(0.03, 0.03, TWH + 1, 6), '#e8e2f6', 'metal', M([TWX - 1.75, top + (TWH + 1) / 2, TZ + dz]));
-  b.add(G.box(3.2, 0.06, 0.06), PINK, 'neon', M([TWX, top + TWH - 0.18, TZ + 1.62])); b.add(G.box(3.2, 0.06, 0.06), CYAN, 'neon', M([TWX, top + TWH - 0.18, TZ - 1.62]));
-  props.push(kit.prop(scene, 'sf_diveboard', { p: [TWX + 2.4, top + TWH + 0.15, TZ], ry: -Math.PI / 2, w: 4.2 }));
-
   /* --- свет --- */
   // днём два источника вместо восьми: небо и солнце (оба запекаются, на сайте освещают модели)
   scene.add(new THREE.HemisphereLight('#d6eeff', '#e8d0a0', 1.15));
@@ -276,34 +295,34 @@ export async function build({ THREE, kit, font, renderer }) {
     keys.push({ p: [p.x, p.y + 0.35, p.z], l: [l.x, l.y + 0.2, l.z], t: i === 0 ? 0 : i === 14 ? 0.2 : undefined });
   }
   keys.push(
-    // плавный выход из горки: сначала по ходу движения, потом поворот к сцене
+    // плавный выход из горки и низкий пролёт над бассейном к сцене (без подъёма)
     { p: [-10.4, 1.75, 3.9], l: [-4, 3, -1.5] },
-    // кран: камера взмывает над бассейном — сверху видно игрушки на воде, сцену и ферму под куполом
-    { p: [-8.0, 3.2, 3.0], l: [0, 5, -12] },
-    { p: [-4.5, 6.8, 2.6], l: [0, 4, -15] },
-    { p: [0, 10.8, 1.2], l: [0, 1.5, -10], t: 0.36 },
-    // дуга над правой половиной бассейна к сцене и спуск за спины диджеев
-    { p: [6.8, 11.2, -5], l: [0, 3, -15], t: 0.42 },
-    { p: [10.8, 8.6, -12], l: [0, 3.2, -15.5] },
-    { p: [8.2, 5.2, -17.6], l: [0, 3.2, -15.5], t: 0.52 },
-    { p: [4.6, 3.6, -18.2], l: [0, 3.3, -15] },
-    { p: [1.6, 3.45, -17.7], l: [0.85, 3.3, -12], t: 0.6 },
-    // над пультом — три экрана через бассейн, слева направо: боковое движение на запад, к вышке
-    { p: [2.4, 3.6, -13.2], l: [9.5, 7.5, 12.6], t: 0.645 },
-    { p: [-1.2, 3.6, -12.6], l: [0, 7.5, 12.6], t: 0.7 },
-    { p: [-6.8, 3.6, -12.0], l: [-9.5, 7.5, 12.6], t: 0.755 },
-    // пролёт к вышке на западной стороне
-    { p: [-10.5, 6.4, -8.8], l: [-21, 11.5, -3], t: 0.8 },
-    { p: [-15.5, 10.4, -7.6], l: [-21, 12.5, -2], t: 0.845 },
-    { p: [-20.6, 12.9, -5.2], l: [-8, 10.5, 3], t: 0.875 },
-    // на вышке — взгляд на аквапарк и аквазону с горками напротив
-    { p: [-20.2, 13.1, TZ], l: [AX, 7.5, AZ - 1], t: 0.9 },
-    // шаги по доске до самого края, взгляд вниз — и прыжок с конца доски
-    { p: [-18.6, 13.05, TZ], l: [AX, 6.5, AZ - 1], t: 0.925 },
-    { p: [-15.3, 13.0, TZ], l: [-6, 4, TZ], t: 0.955 },
-    { p: [-14.3, 13.5, TZ], l: [-10.4, 1, TZ], t: 0.972 },
-    { p: [-12.0, 6.0, TZ], l: [-10.6, -3, TZ], t: 0.99 },
-    { p: [-10.6, -1.5, TZ], l: [-8.8, -6, TZ + 0.6], t: 1 },
+    { p: [-7.6, 2.7, 2.6], l: [0, 6, -14] },
+    { p: [-4, 3.6, 0.5], l: [0, 7.5, -15] },
+    { p: [0.5, 4.6, -3], l: [0, 8.5, -16], t: 0.33 },
+    // облёт пульта справа и заход за спины диджеев
+    { p: [6.5, 4.2, -9.5], l: [0, 3.2, -15], t: 0.38 },
+    { p: [7.6, 3.7, -15.6], l: [0, 3.2, -16] },
+    { p: [4.6, 3.5, -17.8], l: [0, 3.3, -15] },
+    { p: [1.6, 4.0, -17.7], l: [0.85, 4.2, -12], t: 0.47 },
+    // дрон над пультом: один плавный боковой пролёт на запад, взгляд не меняется — вперёд и чуть вниз, на бассейн
+    { p: [2.8, 4.3, -14.8], l: [1.4, 1.6, -3.5], t: 0.51 },
+    { p: [-1.6, 4.45, -14.2], l: [-3.0, 1.6, -2.9], t: 0.55 },
+    { p: [-6.0, 4.6, -13.4], l: [-7.4, 1.7, -2.1], t: 0.59 },
+    // над западной частью бассейна — к истоку ленивой реки
+    { p: [-11.2, 4.0, -5.0], l: [-9, 4.5, 8], t: 0.635 },
+  );
+  // пролёт над ленивой рекой вокруг экрана-призмы с плавным набором высоты; взгляд — на призму
+  for (let i = 0; i <= 10; i++) {
+    const u = 0.02 + (i / 10) * 0.96, q = RIVER.getPointAt(u), h = 3.2 + (i / 10) * 5.8;
+    keys.push({ p: [q.x, h, q.z], l: [0, top + PB + PH * 0.5 - (i / 10) * 1.2, PZ], t: i === 0 ? 0.67 : i === 10 ? 0.88 : undefined });
+  }
+  keys.push(
+    // набор высоты над бассейном и нырок с высоты в его центр
+    { p: [8.5, 13.5, 2.5], l: [0, 1, -1], t: 0.915 },
+    { p: [2.2, 16.0, 0.6], l: [0, -4, -1.2], t: 0.945 },
+    { p: [0.4, 9.0, 0.1], l: [0, -6, -1.0], t: 0.975 },
+    { p: [0, -1.6, -0.2], l: [0.4, -6, -2.6], t: 1 },
   );
   const path = kit.camPath(keys);
   const bub = kit.bubbles(160, 4); scene.add(bub);
@@ -316,7 +335,7 @@ export async function build({ THREE, kit, font, renderer }) {
     const r = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ringMat.clone()); r.rotation.x = -Math.PI / 2;
     r.position.set(f.userData.base.x, 0.13, f.userData.base.z); r.userData = { dynamic: true, ph: i * 0.37 }; scene.add(r); return r;
   });
-  const jumpRings = [0, 1, 2].map((i) => { const r = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ringMat.clone()); r.rotation.x = -Math.PI / 2; r.position.set(-10.6, 0.14, TZ); r.visible = false; r.userData.dynamic = true; scene.add(r); return r; });
+  const jumpRings = [0, 1, 2].map((i) => { const r = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), ringMat.clone()); r.rotation.x = -Math.PI / 2; r.position.set(0, 0.14, -0.1); r.visible = false; r.userData.dynamic = true; scene.add(r); return r; });
   const wn = w.material.normalMap;
   // под водой — плотная синяя дымка (нырок)
   const fogC = scene.fog.color.clone(), fogD = scene.fog.density, blue = new THREE.Color('#1a8fc0');
@@ -337,12 +356,13 @@ export async function build({ THREE, kit, font, renderer }) {
     jumpRings.forEach((r, i) => { const q = ks * 1.3 - i * 0.18; r.visible = q > 0 && q < 1; r.scale.setScalar(1 + q * 9); r.material.opacity = 0.6 * (1 - q); });
     // круги плывут по реке по кругу
     tubesR.forEach((m) => { const q = (m.userData.ph + now * 0.012) % 1, p = RIVER.getPointAt(q); m.position.set(p.x, 0.16 + Math.sin(now * 1.5 + q * 30) * 0.05, p.z); });
-    // лучи гаснут, пока камера смотрит на экраны напротив
-    if (beamM) beamM.opacity = 0.16 * (1 - 0.7 * Math.max(0, Math.min(1, (t - 0.6) / 0.03, (0.79 - t) / 0.03)));
+    // призма поворачивается к камере; пока камера летит по реке, к ней по очереди выходят три грани
+    const cp = path(t).p, x3 = Math.max(0, Math.min(2.999, (t - 0.66) / 0.22 * 3)), n = Math.floor(x3), fr = x3 - n;
+    const e = Math.max(0, (fr - 0.7) / 0.3), face = Math.min(2, n + e * e * (3 - 2 * e));
+    prism.rotation.y = Math.atan2(cp.x - prism.position.x, cp.z - prism.position.z) - face * (Math.PI * 2 / 3) - 0.2;
   };
-  const beamM = built.getObjectByName('beam')?.material;
-  // предметы для сбора: золотая пластинка у сцены, очки-сердечки на доске вышки
+  // предметы для сбора: золотая пластинка у сцены, очки-сердечки на берегу реки по пути к призме
   addLoot(scene, 'vinyl', 'vinyl', [-4.2, ST + 1.0, SZ + 2.6], { r: 0.7 });
-  addLoot(scene, 'glasses', 'glasses', [TWX + 3.3, top + TWH + 0.95, TZ], { r: 0.6 });
+  addLoot(scene, 'glasses', 'glasses', [-13.2, top + 0.9, 18.6], { r: 0.6 });
   return { scene, cam: path, update, bloom: 0.2 };
 }
