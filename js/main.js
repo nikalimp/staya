@@ -709,6 +709,7 @@ ring.addEventListener('click', () => {
   if (mobile && typeof DeviceOrientationEvent?.requestPermission === 'function') DeviceOrientationEvent.requestPermission().catch(() => {});   // iOS: наклон телефона
   audio.init(); audio.setOn(soundOn);
   pre.classList.add('out'); document.body.classList.remove('locked');
+  setTimeout(() => pre.querySelector('.vhs')?.remove(), 1000);   // фон прелоадера больше не нужен — снять анимации
   scrollTo(0, 0); cur = target = 0; started = true; dirty = true;
   // ссылка на мир (#pool, #phuket…): после Play прыжок сразу туда
   const hi = SCENES.findIndex((sc) => '#' + sc.id === location.hash);
