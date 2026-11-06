@@ -100,7 +100,7 @@ export async function build({ THREE, kit, font, renderer }) {
   /* --- картины: полотна Cleveland Museum of Art (CC0) в рамах Poly Haven; видео в раме на левой стене --- */
   const ART = ['149108', '124089', '125247', '141549', '143206', '122349', '149104', '147479'];
   const art = (i, p, ry, h) => props.push(kit.painting(scene, `world/art/cma_${ART[i % ART.length]}.webp`, { p, ry, h }));
-  props.push(kit.painting(scene, 'video/halloween-v.mp4', { video: true, p: [-19.85, 5.6, -1], ry: Math.PI / 2, h: 7.6 }));
+  art(2, [-19.9, 5.2, -1], Math.PI / 2, 5.6);   // ролик дворца теперь один — на большом экране за пультом
   [[-1, -19], [-1, 15], [-1, 28], [1, -19], [1, -1], [1, 15], [1, 28]].forEach(([sx, z], i) => art(i, [sx * 19.9, 4.8, z], sx < 0 ? Math.PI / 2 : -Math.PI / 2, 4.6));
   for (const sx of [-1, 1]) art(sx < 0 ? 5 : 6, [sx * 14.5, 22, Z2 + 0.1], 0, 6.5);
   art(7, [0, 22, Z1 - 0.5], Math.PI, 5.5);
@@ -143,7 +143,7 @@ export async function build({ THREE, kit, font, renderer }) {
   /* --- пульт на площадке лестницы; за ним экран с видео и ангелы --- */
   kit.djBooth(b, [0, LY, BZ], 0, { w: 3.2, decks: false, front: '#ff4a1a', front2: '#ffb15a', body: '#1a0606' });
   props.push(kit.decks(scene, [0, LY + 1.05, BZ], 0, 1.7));
-  kit.vScreen(scene, 'video/halloween-v2.mp4', [0, LY + 1.6, Z2 + 0.3], 0, 13, { edge: '#ff4a1a', stand: false });
+  kit.vScreen(scene, 'video/halloween-v.mp4', [0, LY + 1.6, Z2 + 0.3], 0, 13, { edge: '#ff4a1a', stand: false });
   for (const sx of [-1, 1]) { kit.speaker(b, [sx * 5.4, LY, BZ - 0.6], 0, 1.8, 1.3); kit.speaker(b, [sx * 5.4, LY + 1.8, BZ - 0.6], 0, 1.4, 1.1); }
   // ангелы у экрана: правый — зеркальная копия левого, пара симметрична
   for (const sx of [-1, 1]) props.push(kit.prop(scene, 'sf_angel', { p: [sx * 9.2, LY, LZ2 + 1.4], ry: -sx * 0.4, h: 18 }).then((o) => {

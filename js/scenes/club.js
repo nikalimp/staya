@@ -9,7 +9,7 @@ export const ARTISTS = [
   'OG BUDA', 'ПЛАТИНА', 'LIL KRYSTALLL', 'YANIX', 'LOVV66', 'AARNE', 'ROCKET', 'SODA LUV', 'MAYOT', 'SCALLY MILANO',
   'UGLYSTEPHAN', 'NKEEEI', 'ARTEM SHILOVETS', 'UNIQE', 'PINQ', 'MAGNUM OPUS', 'FLESH', 'JOHN HOWEVER', 'KARINA ISTOMINA',
 ].map((name) => ({ name, photo: null }));
-const VIDEOS = ['video/2k17-v.mp4', 'video/2k17-v2.mp4', 'video/2k17-v3.mp4'];
+const VIDEOS = ['video/2k17-v2.mp4'];   // один ролик в середине хоровода
 
 export async function build({ THREE, kit, font, renderer }) {
   const { Builder, G, M } = kit;
@@ -83,7 +83,7 @@ export async function build({ THREE, kit, font, renderer }) {
   const RR = 11.5, CH = 3.2, CW = CH * 0.7;
   const items = [];   // порядок по кругу: артисты, после каждого 6-го — видео
   let vi = 0;
-  ARTISTS.forEach((a, i) => { items.push({ a }); if (i % 6 === 5 && vi < VIDEOS.length) items.push({ v: VIDEOS[vi++] }); });
+  ARTISTS.forEach((a, i) => { items.push({ a }); if (i === 9 && vi < VIDEOS.length) items.push({ v: VIDEOS[vi++] }); });
   while (vi < VIDEOS.length) items.push({ v: VIDEOS[vi++] });
   const NSLOT = items.length + 1, STEP = (Math.PI * 2) / NSLOT;   // +1 — пустое место, за которым стоит дверь
   const ring = new THREE.Group(); ring.userData.dynamic = true; scene.add(ring);

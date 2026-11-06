@@ -15,11 +15,11 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 
 const SCENES = [
-  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', w: 1.7, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.95, 'whoosh'], [0.99, 'splash']] },
-  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', w: 1.8, out: 'strobe', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.94, 'chime']] },
-  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', w: 1.6, out: 'cut', sfx: [[0.02, 'chime'], [0.97, 'door']] },
-  { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', w: 1.3, out: 'cut', sfx: [[0.93, 'whoosh']] },
-  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', w: 2.6, out: null, final: 0.975, sfx: [[0.7, 'whoosh'], [0.81, 'chime']] },
+  { id: 'aqua', load: () => import('./scenes/aqua.js'), track: 'music/01-aqua.mp3', loop: [1, 38.988], w: 1.7, out: 'water', sfx: [[0.02, 'whoosh'], [0.2, 'whoosh'], [0.95, 'whoosh'], [0.99, 'splash']] },
+  { id: 'pool', load: () => import('./scenes/pool.js'), track: 'music/03-pool.mp3', loop: [1, 27.30798], w: 1.8, out: 'strobe', sfx: [[0.0, 'bubbles'], [0.04, 'splash'], [0.36, 'splash'], [0.94, 'chime']] },
+  { id: 'club', load: () => import('./scenes/club.js'), track: 'music/02-2k17.mp3', loop: [1, 37.73401], w: 1.6, out: 'cut', sfx: [[0.02, 'chime'], [0.97, 'door']] },
+  { id: 'halloween', load: () => import('./scenes/halloween.js'), track: 'music/04-halloween.mp3', loop: [1, 33.879], w: 1.3, out: 'cut', sfx: [[0.93, 'whoosh']] },
+  { id: 'phuket', load: () => import('./scenes/phuket.js'), track: 'music/05-phuket.mp3', loop: [1, 24.40499], w: 2.6, out: null, final: 0.975, sfx: [[0.7, 'whoosh'], [0.81, 'chime']] },
 ];
 // Кнопки финала. Пустой href — кнопка не показывается.
 const LINKS = [
@@ -601,36 +601,45 @@ const audio = {
     this.an = this.ctx.createAnalyser(); this.an.fftSize = 1024; this.an.smoothingTimeConstant = 0.5; this.master.connect(this.an);
     this.fq = new Uint8Array(this.an.frequencyBinCount);
     this.fx = makeSfx(this.ctx, this.master);
-    // одна дорожка на файл: если у соседних сцен один трек (когда трек повторяется), музыка не прерывается
+    // одна дорожка на файл: если у соседних сцен один трек, музыка не прерывается
     const bySrc = {};
-    this.tracks = SCENES.map((s) => {
-      if (bySrc[s.track]) return bySrc[s.track];
-      const el = new Audio(); el.src = s.track; el.loop = true; el.preload = 'none';
-      const tr = { el, gain: null, ok: true }; el.addEventListener('error', () => (tr.ok = false));
-      return (bySrc[s.track] = tr);
-    });
+    this.tracks = SCENES.map((s) => (bySrc[s.track] ||= { src: s.track, loop: s.loop, buf: null, p: null, node: null, gain: null, ok: true }));
   },
-  wire(tr) {
-    if (tr.gain || !this.ctx) return;
-    const src = this.ctx.createMediaElementSource(tr.el); tr.gain = this.ctx.createGain(); tr.gain.gain.value = 0;
-    src.connect(tr.gain).connect(this.bus);
+  // Трек — короткая петля 20–40 с (лучший фрагмент: 16 тактов припева или куплета). Играет через Web Audio:
+  // источник с loopStart/loopEnd крутит участок без щели (у элемента <audio> MP3 на стыке даёт паузу).
+  load(tr) {
+    if (!tr.p) tr.p = fetch(tr.src).then((r) => r.arrayBuffer()).then((ab) => new Promise((res, rej) => this.ctx.decodeAudioData(ab, res, rej)))
+      .then((b) => (tr.buf = b)).catch(() => { tr.ok = false; tr.p = null; });
+    return tr.p;
   },
+  start(tr) {
+    if (tr.node || !tr.buf) return;
+    if (!tr.gain) { tr.gain = this.ctx.createGain(); tr.gain.gain.value = 0; tr.gain.connect(this.bus); }
+    const n = this.ctx.createBufferSource(); n.buffer = tr.buf; n.loop = true;
+    const [a, b] = tr.loop ?? [0, tr.buf.duration]; n.loopStart = a; n.loopEnd = Math.min(b, tr.buf.duration);
+    n.connect(tr.gain); n.start(0, a); tr.node = n;
+  },
+  stop(tr) { if (tr.node) { try { tr.node.stop(); } catch (e) { /* уже остановлен */ } tr.node.disconnect(); tr.node = null; } },
   go(i) {
     this.idx = i; if (!this.ctx || !this.on) return;
     const now = this.ctx.currentTime;
     const curTr = this.tracks[i];
-    [...new Set(this.tracks)].forEach((tr) => {
+    [...new Set(this.tracks)].forEach((tr, k) => {
       if (tr === curTr) {
-        if (!tr.ok) return; this.wire(tr);
-        if (tr.el.preload === 'none') { tr.el.preload = 'auto'; tr.el.load(); }
-        tr.el.play().catch(() => {});
-        tr.gain.gain.cancelScheduledValues(now); tr.gain.gain.setTargetAtTime(1, now, 0.6);
+        if (!tr.ok) return;
+        this.load(tr).then(() => {
+          if (this.tracks[this.idx] !== tr || !this.on) return;
+          this.start(tr); const t2 = this.ctx.currentTime;
+          tr.gain.gain.cancelScheduledValues(t2); tr.gain.gain.setTargetAtTime(1, t2, 0.6);
+        });
       } else if (tr.gain) {
         tr.gain.gain.cancelScheduledValues(now); tr.gain.gain.setTargetAtTime(0, now, 0.4);
-        setTimeout(() => { if (this.tracks[this.idx] !== tr) tr.el.pause(); }, 2500);
+        setTimeout(() => { if (this.tracks[this.idx] !== tr) this.stop(tr); }, 2500);
       }
     });
-    const nx = this.tracks[i + 1]; if (nx && nx !== curTr && nx.ok && nx.el.preload === 'none') { nx.el.preload = 'auto'; nx.el.load(); }
+    // следующий трек декодируется заранее; треки дальше одного позади освобождают память
+    const nx = this.tracks[i + 1]; if (nx && nx !== curTr && nx.ok) this.load(nx);
+    this.tracks.forEach((tr, k) => { if ((k < i - 1 || k > i + 1) && tr !== curTr && tr !== nx && !tr.node) { tr.buf = null; tr.p = null; } });
   },
   // пространство: положение «сцены» мира (диджейский пульт) относительно камеры → панорама и приглушение вдали
   _sp: 0,
@@ -662,7 +671,7 @@ const audio = {
   setOn(v) {
     this.on = v; if (!this.ctx) return;
     if (v) { this.ctx.resume(); this.master.gain.setTargetAtTime(1, this.ctx.currentTime, 0.2); this.go(this.idx < 0 ? 0 : this.idx); }
-    else { this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15); setTimeout(() => !this.on && new Set(this.tracks).forEach((t) => t.el.pause()), 600); }
+    else { this.master.gain.setTargetAtTime(0, this.ctx.currentTime, 0.15); setTimeout(() => !this.on && new Set(this.tracks).forEach((t) => this.stop(t)), 600); }
   },
 };
 // вкладка скрыта — музыка на паузе
@@ -685,11 +694,8 @@ async function boot() {
   layout(); setReal(8);
   const fontP = new FontLoader().loadAsync('fonts/unbounded_black.typeface.json').then((f) => { font = f; setReal(35); });
   const cssFontP = (document.fonts ? Promise.all([document.fonts.load('900 64px Unbounded'), document.fonts.load('700 32px Unbounded')]) : Promise.resolve()).then(() => setReal(45));
-  const firstTrack = new Promise((res) => {
-    const a = new Audio(); a.preload = 'auto'; a.src = SCENES[0].track;
-    const done = () => { setReal(60); res(); };
-    a.addEventListener('canplaythrough', done, { once: true }); a.addEventListener('error', done, { once: true }); setTimeout(done, 4000);
-  });
+  // первая петля скачивается заранее (декодируется после Play, когда браузер разрешит звук)
+  const firstTrack = Promise.race([fetch(SCENES[0].track).then((r) => r.arrayBuffer()).catch(() => {}), new Promise((r) => setTimeout(r, 4000))]).then(() => setReal(60));
   await Promise.all([fontP, cssFontP]); setReal(45);
   // прелоадер ждёт только первый мир и начало его музыки; остальные миры строятся по порядку уже во время прогулки
   await buildScene(0); setReal(90);
@@ -742,6 +748,7 @@ window.__staya = {
     jumping = true; scrollTo(0, gToScroll(g)); cur = target = g; apply(g); lastG = g; jumping = false;
   },
   tier: () => tier, cam: () => camera, build: (i) => buildScene(i).then(() => true),
+  audio: () => ({ state: audio.ctx?.state, playing: [...new Set(audio.tracks)].filter((t) => t.node).map((t) => [t.src, t.node.loopStart, +t.node.loopEnd.toFixed(2), +t.buf.duration.toFixed(2)]) }),
   info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, progs: renderer.info.programs?.length, texs: renderer.info.memory.textures, built: [...built.keys()] }),
   ready: () => real >= 100,
   scene: (i) => built.get(i)?.scene,

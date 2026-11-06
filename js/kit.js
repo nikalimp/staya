@@ -876,15 +876,17 @@ export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null)
   const fit = (t, a) => { t.colorSpace = THREE.SRGBColorSpace; const s = w / h; if (a > s) { t.repeat.set(s / a, 1); t.offset.set((1 - s / a) / 2, 0); } else { t.repeat.set(1, a / s); t.offset.set(0, (1 - a / s) / 2); } return t; };
   let live = false;
   new THREE.TextureLoader().loadAsync(src.replace(/\.mp4$/, '.webp')).then((t) => { if (live) return; m.material.map = fit(t, t.image.width / t.image.height); m.material.color.set('#ffffff'); m.material.needsUpdate = true; }).catch(() => {});
-  const v = document.createElement('video');
-  Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none', crossOrigin: 'anonymous' });
-  v.setAttribute('muted', ''); v.setAttribute('playsinline', '');
-  v.addEventListener('loadeddata', () => {
-    live = true; m.material.map = fit(new THREE.VideoTexture(v), v.videoWidth / v.videoHeight);   // кадр вписан без растяжения
-    m.material.color.set('#ffffff'); m.material.needsUpdate = true;
-  }, { once: true });
-  v.addEventListener('error', () => {}, { once: true });
-  _videos.push({ scene, v, src, mesh: m }); watchFrames(v);
+  // один ролик на несколько экранов (грани призмы, стороны пентагона): один элемент <video> и один декодер
+  const twin = _videos.find((x) => x.scene === scene && x.src === src);
+  const v = twin ? twin.v : document.createElement('video');
+  if (!twin) {
+    Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none', crossOrigin: 'anonymous' });
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); watchFrames(v);
+    v.addEventListener('error', () => {}, { once: true });
+  }
+  const onData = () => { live = true; m.material.map = fit(new THREE.VideoTexture(v), v.videoWidth / v.videoHeight); m.material.color.set('#ffffff'); m.material.needsUpdate = true; };   // кадр вписан без растяжения
+  if (v.readyState >= 2) onData(); else v.addEventListener('loadeddata', onData, { once: true });
+  _videos.push({ scene, v, src, mesh: m });
   scene.add(m); return m;
 }
 // Новый кадр видео: кадр сцены перерисовывается только тогда, когда видео дало новый кадр (25–30 раз в секунду),
@@ -901,7 +903,7 @@ export function playVideos(scene) {
   }
 }
 // играют только экраны, которые сейчас в кадре и не дальше 70 м; остальные стоят на последнем кадре (или на постере)
-const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere();
+const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere(), _vis = new Map();
 export function videoVisibility(scene, camera) {
   if (!quality.video) return;
   _pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm);
@@ -911,9 +913,15 @@ export function videoVisibility(scene, camera) {
     // экран мог сдвинуться вместе с группой (призма, карусель) — центр берём из мировой матрицы
     x.mesh.updateWorldMatrix(true, false); _sph.center.setFromMatrixPosition(x.mesh.matrixWorld); _sph.radius = x.r * 1.2;
     const vis = _fr.intersectsSphere(_sph) && _sph.center.distanceTo(camera.position) < 70;
-    if (vis) { if (!x.v.getAttribute('src')) { x.v.preload = 'auto'; x.v.src = x.src; } if (x.v.paused) x.v.play().catch(() => {}); }
-    else if (!x.v.paused) x.v.pause();
+    _vis.set(x.v, (_vis.get(x.v) || false) || vis);
   }
+  // ролик на нескольких экранах играет, если в кадре хотя бы один из них
+  for (const [v, vis] of _vis) {
+    const x = _videos.find((y) => y.v === v);
+    if (vis) { if (!v.getAttribute('src')) { v.preload = 'auto'; v.src = x.src; } if (v.paused) v.play().catch(() => {}); }
+    else if (!v.paused) v.pause();
+  }
+  _vis.clear();
 }
 // идёт ли сейчас хоть одно видео сцены
 export function videosPlaying(scene) { return _videos.some((x) => x.scene === scene && !x.v.paused && x.v.readyState >= 2); }

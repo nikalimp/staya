@@ -191,7 +191,8 @@ export async function build({ THREE, kit, font, renderer }) {
     const a = Math.PI / 3 + k * (Math.PI * 2 / 3), e = pm(new THREE.CylinderGeometry(0.06, 0.06, PH + 0.6, 6), k === 1 ? new THREE.MeshBasicMaterial({ color: PINK, toneMapped: false }) : edgeM, PB + (PH + 0.5) / 2);
     e.position.x = Math.sin(a) * PR; e.position.z = Math.cos(a) * PR;
   }
-  ['video/aqua-v.mp4', 'video/aqua-v2.mp4', 'video/aqua-v3.mp4'].forEach((src, i) => {
+  // один ролик на всех трёх гранях: один декодер, призма поворачивается — ролик всегда перед глазами
+  ['video/aqua-v3.mp4', 'video/aqua-v3.mp4', 'video/aqua-v3.mp4'].forEach((src, i) => {
     const a = i * (Math.PI * 2 / 3), m = kit.videoScreen(scene, src, PW, PH, [Math.sin(a) * (AP + 0.02), PB + 0.25 + PH / 2, Math.cos(a) * (AP + 0.02)], [0, a, 0]);
     prism.add(m);
   });

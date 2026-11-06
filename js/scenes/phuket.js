@@ -163,7 +163,9 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     const cv = new THREE.Mesh(new THREE.BoxGeometry(fw + 0.06, fh + 0.06, 0.03), new THREE.MeshStandardMaterial({ color: '#f2ede4', roughness: 0.8 }));
     cv.position.set(EP[0] + off.x, EP[1] + off.y, EP[2] + off.z); cv.rotation.set(-0.1, ery, 0, 'YXZ'); scene.add(cv);
     const front = new THREE.Vector3(0, 0, 0.02).applyEuler(cv.rotation);
-    kit.videoScreen(scene, 'video/phuket.mp4', fw, fh, cv.position.clone().add(front).toArray(), [-0.1, ery, 0]); }
+    // на мольберте — кадр виллы с дрона (картина, не видео: ролик PHUKET один — в гостиной)
+    const pic = kit.screen(fw, fh, null, cv.position.clone().add(front).toArray(), [-0.1, ery, 0]); scene.add(pic);
+    new THREE.TextureLoader().loadAsync('video/phuket.webp').then((t) => { t.colorSpace = THREE.SRGBColorSpace; pic.material.map = t; pic.material.needsUpdate = true; }); }
   for (const [x, y, z, h, ry] of [[-13.6, Y2 + 0.8, 6.6, 6, 0.3], [13.4, Y2 + 0.8, 6.6, 6.5, 2.2], [4.6, Y2 + 0.8, -3.0, 5.5, 4.0],
     [-24, 0, -12, 10, 0.5], [-23, 0, 6, 9, 1.7], [-25, 0, -18, 11, 3.1], [22, 0, -3, 10, 2.4], [23, 0, -17, 9.5, 0.9], [20, 0, 20, 10, 5.0], [-19, 0, 22, 9, 4.2], [26, 0, 8, 11, 1.1], [-30, 0, -4, 10, 2.8]])
     props.push(kit.prop(scene, 'sf_palm', { p: [x, y, z], ry, h }));
