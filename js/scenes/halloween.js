@@ -10,6 +10,7 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.fog = new THREE.FogExp2('#1c0605', 0.018);
   scene.environment = kit.env(renderer, ['#ff2a14', '#ff8a2a', '#ffd28a', '#3b4bff', '#8a0d1a'], '#070203');
   const b = new Builder(), glows = [], props = [], R = kit.rng(31);
+  b.skip = kit.bakeSkip();   // запечённые виды не строятся кодом: готовая геометрия придёт из GLB (kit.applyBake)
   const STONE = '#d9c7a4', GOLD = '#c9a24a', RED = '#7e0a16', WALL = '#bfa07e';
   const Z1 = 36, Z2 = -31, L0 = Z1 - Z2, C0 = (Z1 + Z2) / 2;
   const FZ = 1, FR = 7.6;                     // большой фонтан в центре зала: центр и радиус чаши
@@ -51,7 +52,7 @@ export async function build({ THREE, kit, font, renderer }) {
     for (const [cx, cy] of [[128, 128], [384, 384], [384, -128], [-128, 384], [640, 384], [384, 640], [128, 640], [640, 128]]) motif(cx, cy, 0.9);
   });
   damask.wrapS = damask.wrapT = THREE.RepeatWrapping;
-  const wallM = (w, h) => { const t2 = damask.clone(); t2.needsUpdate = true; t2.repeat.set(w / 2.6, h / 2.6); return new THREE.MeshStandardMaterial({ map: t2, roughness: 0.55, metalness: 0.15 }); };
+  const wallM = (w, h) => { const t2 = damask.clone(); t2.needsUpdate = true; t2.repeat.set(w / 2.6, h / 2.6); return new THREE.MeshLambertMaterial({ map: t2 }); };   // матовый шёлк: простое освещение без бликов — дешевле на огромных стенах
   const panelT = kit.canvasTex(512, 256, (x, w, h) => {
     x.fillStyle = '#2a120a'; x.fillRect(0, 0, w, h); x.strokeStyle = '#c9a24a'; x.lineWidth = 6; x.strokeRect(24, 24, w - 48, h - 48);
     const g = x.createLinearGradient(0, 30, 0, h - 30); g.addColorStop(0, '#4a2412'); g.addColorStop(1, '#22100a'); x.fillStyle = g; x.fillRect(30, 30, w - 60, h - 60);
@@ -61,10 +62,10 @@ export async function build({ THREE, kit, font, renderer }) {
   for (const sx of [-1, 1]) {
     plane(L0, WH - 3, wallM(L0, WH - 3), [sx * 19.985, (WH + 3) / 2, C0], -sx * Math.PI / 2);
     const pt = panelT.clone(); pt.needsUpdate = true; pt.repeat.set(L0 / 4, 1);
-    plane(L0, 3, new THREE.MeshStandardMaterial({ map: pt, roughness: 0.35 }), [sx * 19.98, 1.5, C0], -sx * Math.PI / 2);
+    plane(L0, 3, new THREE.MeshLambertMaterial({ map: pt }), [sx * 19.98, 1.5, C0], -sx * Math.PI / 2);
   }
   plane(40, WH - 3, wallM(40, WH - 3), [0, (WH + 3) / 2, Z2 + 0.015], 0);
-  { const pt = panelT.clone(); pt.needsUpdate = true; pt.repeat.set(10, 1); plane(40, 3, new THREE.MeshStandardMaterial({ map: pt, roughness: 0.35 }), [0, 1.5, Z2 + 0.02], 0); }
+  { const pt = panelT.clone(); pt.needsUpdate = true; pt.repeat.set(10, 1); plane(40, 3, new THREE.MeshLambertMaterial({ map: pt }), [0, 1.5, Z2 + 0.02], 0); }
   // свод: небо в закатных облаках с золотыми кессонами
   const fresco = kit.canvasTex(2048, 1024, (x, w, h) => {
     const g = x.createLinearGradient(0, 0, w, 0); g.addColorStop(0, '#1a0806'); g.addColorStop(0.3, '#6a2a1a'); g.addColorStop(0.5, '#c8784a'); g.addColorStop(0.7, '#6a2a1a'); g.addColorStop(1, '#1a0806');
@@ -75,7 +76,7 @@ export async function build({ THREE, kit, font, renderer }) {
     for (let i = 0; i <= 12; i++) { x.beginPath(); x.moveTo(0, (i / 12) * h); x.lineTo(w, (i / 12) * h); x.stroke(); }
     for (let i = 0; i <= 16; i++) { x.beginPath(); x.moveTo((i / 16) * w, 0); x.lineTo((i / 16) * w, h); x.stroke(); }
   });
-  const vault = new THREE.Mesh(new THREE.CylinderGeometry(20.35, 20.35, L0, 64, 1, true, Math.PI / 2, Math.PI), new THREE.MeshStandardMaterial({ map: fresco, emissive: '#ffffff', emissiveMap: fresco, emissiveIntensity: 0.75, roughness: 0.8, side: THREE.BackSide }));
+  const vault = new THREE.Mesh(new THREE.CylinderGeometry(20.35, 20.35, L0, 64, 1, true, Math.PI / 2, Math.PI), new THREE.MeshBasicMaterial({ map: fresco, color: '#e8d4c8', side: THREE.BackSide }));   // роспись светится сама: свет на ней не считается
   vault.position.set(0, VY, C0); vault.rotation.x = Math.PI / 2; vault.scale.set(1, 1, 0.35); scene.add(vault);
 
   /* --- колоннада: один ярус крупных мраморных колонн (второго этажа больше нет), сверху антаблемент --- */

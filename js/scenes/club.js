@@ -18,6 +18,7 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.fog = new THREE.FogExp2('#0a0312', 0.03);   // пол и сетка уходят в темноту — края зала не видно
   scene.environment = kit.env(renderer, ['#ff2fd0', '#8a3dff', '#21e0ff', '#ffffff', '#ff5a8a']);
   const b = new Builder(), glows = [];
+  b.skip = kit.bakeSkip();   // запечённые виды не строятся кодом: готовая геометрия придёт из GLB (kit.applyBake)
   const PINK = '#ff2fd0', VIO = '#8a3dff', CY = '#21e0ff', RED = '#ff1a2e';
 
   /* --- бесконечный пол: тёмный глянец и неоновая сетка до горизонта (не запекается) --- */

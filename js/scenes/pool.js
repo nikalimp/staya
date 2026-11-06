@@ -86,6 +86,7 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   w.position.y = 0.12; scene.add(w);
 
   const b = new Builder(), R2 = kit.rng(23);
+  b.skip = kit.bakeSkip();   // сцена, осьминог и танцпол запечены (world/poolx): кодом строятся только неон и лучи
   /* --- главная сцена у бассейна (собрана как сцена AQUA): подиум, фермы, светодиодные колонны, колонки, пульт, экран --- */
   const { G, M } = kit, RH = 1.4, ST = T + RH, PINK = '#ff2fa8', CYAN = '#2fe6ff', VIOLET = '#8a4dff';
   b.add(G.rbox(22, RH, 7, 0.08), '#120e1e', 'gloss', M([0, T + RH / 2, SZ]));
@@ -111,24 +112,20 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
 
   /* --- осьминог: огромная надувная голова над сценой, светящиеся глаза, щупальца с присосками обнимают сцену --- */
   // по фото настоящего арт-объекта STAYA: тёмно-индиговый в ультрафиолете, белые глаза, щупальца завиваются наружу
-  const octM = new THREE.MeshStandardMaterial({ color: '#2b2296', emissive: '#2a17a6', emissiveIntensity: 0.55, roughness: 0.32, metalness: 0, envMapIntensity: 0.8 });
-  const suckM = new THREE.MeshStandardMaterial({ color: '#8a78ff', emissive: '#6a4dff', emissiveIntensity: 0.9, roughness: 0.3 });
-  const oct = new THREE.Group(); oct.userData.dynamic = true; scene.add(oct);
+  // осьминог собран в общую геометрию сцены (Builder): свет на нём запечён в Blender вместе со сценой (world/poolx)
+  const OC = '#3c2ec8', SUCK = '#a08cff', EYEC = '#eef4ff';
   const OH = [0, 15.2, SZ - 1.5];
-  const head = new THREE.Mesh(new THREE.SphereGeometry(5.6, 48, 32), octM); head.scale.set(1.12, 0.9, 0.82); head.position.set(...OH); oct.add(head);
+  b.add(new THREE.SphereGeometry(5.6, 48, 32), OC, 'gloss', M(OH, [0, 0, 0], [1.12, 0.9, 0.82]));
   // лоб-гребень и «брови» над глазами
-  const ridge = new THREE.Mesh(new THREE.SphereGeometry(2.2, 24, 16), octM); ridge.scale.set(0.7, 1.5, 0.6); ridge.position.set(0, OH[1] + 1.6, OH[2] + 3.7); oct.add(ridge);
+  b.add(new THREE.SphereGeometry(2.2, 24, 16), OC, 'gloss', M([0, OH[1] + 1.6, OH[2] + 3.7], [0, 0, 0], [0.7, 1.5, 0.6]));
   for (const sx of [-1, 1]) {
-    const brow = new THREE.Mesh(new THREE.TorusGeometry(1.75, 0.55, 12, 28, Math.PI * 1.15), octM);
-    brow.position.set(sx * 2.4, OH[1] + 0.3, OH[2] + 4.35); brow.rotation.set(0.25, 0, sx < 0 ? -0.1 : Math.PI - Math.PI * 0.15 + 0.1); oct.add(brow);
-    const eye = new THREE.Mesh(new THREE.SphereGeometry(1.45, 32, 20), new THREE.MeshBasicMaterial({ color: '#eef4ff', toneMapped: false }));
-    eye.scale.set(1.05, 0.78, 0.5); eye.position.set(sx * 2.4, OH[1] + 0.1, OH[2] + 4.45); eye.rotation.z = sx * -0.25; oct.add(eye);
+    b.add(new THREE.TorusGeometry(1.75, 0.55, 12, 28, Math.PI * 1.15), OC, 'gloss', M([sx * 2.4, OH[1] + 0.3, OH[2] + 4.35], [0.25, 0, sx < 0 ? -0.1 : Math.PI - Math.PI * 0.15 + 0.1]));
+    b.add(new THREE.SphereGeometry(1.45, 32, 20), EYEC, 'neon', M([sx * 2.4, OH[1] + 0.1, OH[2] + 4.45], [0, 0, sx * -0.25], [1.05, 0.78, 0.5]));   // глаза светятся сами
     glows.push([sx * 2.4, OH[1] + 0.1, OH[2] + 5.3, '#cfe0ff', 7, 0.5]);
     // щёки-мешки под глазами
-    const cheek = new THREE.Mesh(new THREE.SphereGeometry(1.6, 20, 14), octM); cheek.scale.set(1.2, 0.8, 0.9); cheek.position.set(sx * 1.6, OH[1] - 2.6, OH[2] + 3.6); oct.add(cheek);
+    b.add(new THREE.SphereGeometry(1.6, 20, 14), OC, 'gloss', M([sx * 1.6, OH[1] - 2.6, OH[2] + 3.6], [0, 0, 0], [1.2, 0.8, 0.9]));
   }
   // щупальце: труба по кривой, толщина убывает к кончику; на лицевой стороне — присоски-кольца
-  const suck = [];
   const tentacle = (pts, r0, r1, n = 120) => {
     const c = new THREE.CatmullRomCurve3(pts.map((q) => new THREE.Vector3(...q)), false, 'centripetal');
     const geo = new THREE.TubeGeometry(c, n, 1, 14, false), pos = geo.attributes.position, P = new THREE.Vector3();
@@ -136,13 +133,13 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
       const u = i / n; c.getPointAt(u, P); const r = r0 + (r1 - r0) * Math.pow(u, 0.8);
       for (let j = 0; j <= 14; j++) { const k = i * 15 + j; pos.setXYZ(k, P.x + (pos.getX(k) - P.x) * r, P.y + (pos.getY(k) - P.y) * r, P.z + (pos.getZ(k) - P.z) * r); }
     }
-    geo.computeVertexNormals(); oct.add(new THREE.Mesh(geo, octM));
+    geo.computeVertexNormals(); b.add(geo, OC, 'gloss');
     // присоски смотрят к зрителю (+z), по одной через равный шаг
-    const tg = new THREE.Vector3(), off = new THREE.Vector3();
+    const tg = new THREE.Vector3(), off = new THREE.Vector3(), q = new THREE.Quaternion();
     for (let u = 0.12; u < 0.97; u += 0.065) {
       c.getPointAt(u, P); c.getTangentAt(u, tg); const r = r0 + (r1 - r0) * Math.pow(u, 0.8);
-      off.set(0, 0, 1).addScaledVector(tg, -tg.z).normalize();
-      suck.push([P.clone().addScaledVector(off, r * 0.92), off.clone(), r * 0.42]);
+      off.set(0, 0, 1).addScaledVector(tg, -tg.z).normalize(); q.setFromUnitVectors(new THREE.Vector3(0, 0, 1), off);
+      b.add(new THREE.TorusGeometry(1, 0.32, 6, 14), SUCK, 'plastic', new THREE.Matrix4().compose(P.clone().addScaledVector(off, r * 0.92), q, new THREE.Vector3(r * 0.42, r * 0.42, r * 0.42)));
     }
   };
   for (const sx of [-1, 1]) {
@@ -156,9 +153,6 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     // нижние: стелются по земле наружу
     tentacle([[X(4.6), OH[1] - 3.2, OH[2] + 0.2], [X(8.6), 7.6, SZ + 1.0], [X(12.4), 2.4, SZ + 3.4], [X(16.2), 0.8, SZ + 4.6], [X(18.4), 1.8, SZ + 5.0], [X(17.6), 3.4, SZ + 5.0], [X(16.4), 2.6, SZ + 4.8]], 1.1, 0.26);
   }
-  const sm0 = new THREE.InstancedMesh(new THREE.TorusGeometry(1, 0.32, 8, 18), suckM, suck.length), mq = new THREE.Matrix4(), qq = new THREE.Quaternion();
-  suck.forEach(([p, n, r], i) => { qq.setFromUnitVectors(new THREE.Vector3(0, 0, 1), n); mq.compose(p, qq, new THREE.Vector3(r, r, r)); sm0.setMatrixAt(i, mq); });
-  oct.add(sm0);
   glows.push([0, OH[1] + 4, OH[2] + 3, '#6a4dff', 22, 0.12]);
   /* --- танцпол: светодиодный пол, неоновая арка входа, ферма с прожекторами и лазерами --- */
   const floorT = kit.canvasTex(1024, 1024, (x, w, h) => {
@@ -248,7 +242,8 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   for (const [x, z, ry, h] of [[-24, -8, 0.4, 10], [-30, 6, 2.0, 11], [-26, 15, 4.1, 10], [26, -18, 1.1, 11], [24, 12, 3.0, 10], [-20, -18, 5.0, 11], [DX + 12, DZ - 13, 2.5, 10], [DX + 12, DZ + 12, 0.9, 11], [DX - 12, DZ + 13, 3.6, 10], [DX - 12, DZ - 14, 1.6, 10.5]])
     props.push(kit.prop(scene, 'sf_palm', { p: [x, T - 0.3, z], ry, h }));
   await Promise.all(props);
-  scene.add(b.build());
+  const built = b.build(); scene.add(built);
+  await kit.applyBake(scene, built, 'poolx', { k: 8 });   // свет сцены у бассейна, осьминога и танцпола запечён в Blender (scripts/blender/bake_scene.py)
 
   /* --- свет для людей (запечённый двор от него не зависит) --- */
   scene.add(new THREE.HemisphereLight('#5b4bdf', '#12061f', 0.6));
@@ -341,7 +336,6 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
   });
   const update = (t) => {
     const now = performance.now() / 1000;
-    head.scale.set(1.12 + Math.sin(now * 1.3) * 0.012, 0.9 + Math.sin(now * 1.3) * 0.014, 0.82);
     // Луна медленно вращается и у самого края превращается в зеркальный диско-шар
     moonArt.rotation.y = now * 0.05 + t * 1.2;
     const mu = moonArt.material.uniforms; mu.tiles.value = Math.min(1, Math.max(0, (t - 0.91) / 0.08)); mu.time.value = now;

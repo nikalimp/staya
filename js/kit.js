@@ -60,6 +60,7 @@ export class Builder {
   pop() { this.stack.pop(); return this; }
   // opts: { flat: true } — гранёные нормали; { fade: [k0,k1] } — яркость по локальной Y (для лучей)
   add(geo, color, kind = 'gloss', m = null, opts = {}) {
+    if (this.skip?.has(kind)) { geo.dispose(); return this; }   // этот вид уже запечён в GLB: не строим его второй раз
     let g = geo.index ? geo.toNonIndexed() : geo.clone();
     geo.dispose();
     for (const k of Object.keys(g.attributes)) if (!KEEP.has(k)) g.deleteAttribute(k);
@@ -453,8 +454,9 @@ export function rippleNormal() {
 }
 export function water(w, h, color, o = {}) {
   const nm = rippleNormal().clone(); nm.needsUpdate = true; nm.repeat.set(w / (o.tile ?? 6), h / (o.tile ?? 6)); nm.userData.shared = false;
-  const mat = new THREE.MeshPhysicalMaterial({
-    color, roughness: o.rough ?? 0.06, metalness: o.metal ?? 0.1, clearcoat: 1, clearcoatRoughness: 0.03,
+  // вода — стандартный материал без лака: блики дают карта нормалей и отражение окружения
+  const mat = new THREE.MeshStandardMaterial({
+    color, roughness: o.rough ?? 0.06, metalness: o.metal ?? 0.1,
     normalMap: nm, normalScale: new THREE.Vector2(o.ns ?? 0.55, o.ns ?? 0.55),
     emissive: new THREE.Color(o.emissive ?? color), emissiveIntensity: o.ei ?? 0.35,
     transparent: o.opacity != null, opacity: o.opacity ?? 1, side: THREE.DoubleSide, depthWrite: o.opacity == null,
@@ -709,6 +711,35 @@ export function instanceStatic(scene, cell = 40) {
   return saved;
 }
 
+/* ---------- упрощение материалов: «физический» материал без пропускания света → стандартный ---------- */
+// Лак (clearcoat) — второй слой бликов: каждый пиксель считает освещение дважды. На глаз разница мала, на телефоне — заметная.
+// Блик лака заменяем на чуть меньшую шероховатость. Стекло с пропусканием (transmission) не трогаем.
+const _simple = new WeakMap();
+export function simplifyMaterials(scene) {
+  scene.traverse((o) => {
+    if (!o.material || o.isPoints) return;
+    for (let k = o; k && !k.isScene; k = k.parent) if (k.userData.loot) return;   // у самой сцены userData.loot — список предметов, его не считаем
+    // мелкие модели из библиотек (машины, мебель): без карт нормалей, шероховатости и металла — на экране их не видно,
+    // а каждое сочетание карт — отдельный шейдер, который компилируется при входе в мир
+    let small = false; for (let k = o; k && !k.isScene; k = k.parent) if (/^sf_car|^sf_lounger|^sf_easel/.test(k.userData.asset ?? '')) small = true;
+    const swap = (m) => {
+      if (m.userData.keepPhysical) return m;
+      const phys = m.isMeshPhysicalMaterial;
+      if (!phys && !(small && m.isMeshStandardMaterial)) return m;
+      const key = small ? 's' : 'p'; let cache = _simple.get(m); if (cache?.[key]) return cache[key];
+      const n = new THREE.MeshStandardMaterial(); THREE.MeshStandardMaterial.prototype.copy.call(n, m);
+      if (phys && m.clearcoat > 0) n.roughness = Math.min(n.roughness, (m.clearcoatRoughness ?? 0.1) + 0.12);
+      // пропускание света (transmission) заставляет three.js рисовать сцену второй раз; стекло — обычная прозрачность
+      if (phys && m.transmission > 0) { n.transparent = true; n.opacity = Math.min(n.opacity, 1 - m.transmission * 0.65); n.depthWrite = false; }
+      if (small) { n.normalMap = n.roughnessMap = n.metalnessMap = n.aoMap = null; }
+      n.onBeforeCompile = m.onBeforeCompile; n.customProgramCacheKey = m.customProgramCacheKey; n.name = m.name; n.userData = m.userData;
+      if (pulse.mats.has(m)) pulse.mats.add(n);
+      _simple.set(m, { ...cache, [key]: n }); return n;
+    };
+    o.material = Array.isArray(o.material) ? o.material.map(swap) : swap(o.material);
+  });
+}
+
 /* ---------- отклик мира на гостя: курсор (десктоп) или наклон телефона ---------- */
 const _timeU = { value: 0 };   // время сцены для шейдеров (main.js → tickTime)
 export function tickTime(now) { _timeU.value = now; }
@@ -774,7 +805,7 @@ export async function painting(scene, img, o = {}) {
     // видео в золотой раме: кадр 9:16, играет вместе с остальными видео сцены
     const v = document.createElement('video');
     Object.assign(v, { muted: true, loop: true, playsInline: true, preload: 'none', crossOrigin: 'anonymous' });
-    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); _videos.push({ scene, v, src: img });
+    v.setAttribute('muted', ''); v.setAttribute('playsinline', ''); var vEntry = { scene, v, src: img }; _videos.push(vEntry); watchFrames(v);
     tex = new THREE.VideoTexture(v); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex._aspect = 9 / 16;
     if (!quality.video) { tex = await new THREE.TextureLoader().loadAsync(img.replace(/\.mp4$/, '.webp')); tex.colorSpace = THREE.SRGBColorSpace; tex.flipY = false; tex._aspect = 9 / 16; }
   } else {
@@ -782,7 +813,7 @@ export async function painting(scene, img, o = {}) {
     tex = await _artTex.get(img);
   }
   const src = await loadAsset('fancy_picture_frame_01');
-  const m = src.clone(true), bb = new THREE.Box3().setFromObject(src), sz = bb.getSize(new THREE.Vector3());
+  const m = src.clone(true); if (o.video) vEntry.mesh = m; const bb = new THREE.Box3().setFromObject(src), sz = bb.getSize(new THREE.Vector3());
   const aspect = tex._aspect ?? tex.image.width / tex.image.height, h = o.h ?? 3, w = h * aspect * 1.08;
   const thin = sz.z < sz.x ? 'z' : 'x';                       // ось толщины рамы
   const kh = h / sz.y, kw = w / (thin === 'z' ? sz.x : sz.z);
@@ -853,17 +884,41 @@ export function videoScreen(scene, src, w, h, p, r = [0, 0, 0], fallback = null)
     m.material.color.set('#ffffff'); m.material.needsUpdate = true;
   }, { once: true });
   v.addEventListener('error', () => {}, { once: true });
-  _videos.push({ scene, v, src });
+  _videos.push({ scene, v, src, mesh: m }); watchFrames(v);
   scene.add(m); return m;
 }
+// Новый кадр видео: кадр сцены перерисовывается только тогда, когда видео дало новый кадр (25–30 раз в секунду),
+// а не 60 раз в секунду, пока видео просто играет.
+let _vframe = false;
+export const hasVideoFrames = typeof HTMLVideoElement !== 'undefined' && 'requestVideoFrameCallback' in HTMLVideoElement.prototype;
+function watchFrames(v) { if (!hasVideoFrames) return; const cb = () => { _vframe = true; v.requestVideoFrameCallback(cb); }; v.requestVideoFrameCallback(cb); }
+export function takeVideoFrame() { const f = _vframe; _vframe = false; return f; }
+// вход в сцену: видео сцены начинают загружаться, видео других сцен встают на паузу; играют — только экраны в кадре (videoVisibility)
 export function playVideos(scene) {
   for (const x of _videos) {
-    if (x.scene === scene) { if (!quality.video) continue; if (!x.v.src) { x.v.preload = 'auto'; x.v.src = x.src; } if (x.v.paused) x.v.play().catch(() => {}); }
+    if (x.scene === scene) { if (quality.video && !x.v.getAttribute('src')) { x.v.preload = 'auto'; x.v.src = x.src; } }
     else if (!x.v.paused) x.v.pause();
   }
 }
-// идёт ли сейчас хоть одно видео сцены: тогда кадр перерисовывается постоянно (иначе видео «замирает»)
+// играют только экраны, которые сейчас в кадре и не дальше 70 м; остальные стоят на последнем кадре (или на постере)
+const _fr = new THREE.Frustum(), _pm = new THREE.Matrix4(), _sph = new THREE.Sphere();
+export function videoVisibility(scene, camera) {
+  if (!quality.video) return;
+  _pm.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse); _fr.setFromProjectionMatrix(_pm);
+  for (const x of _videos) {
+    if (x.scene !== scene || !x.mesh) continue;
+    if (!x.r) { const bb = new THREE.Box3().setFromObject(x.mesh); x.c = bb.getCenter(new THREE.Vector3()); x.r = bb.getSize(new THREE.Vector3()).length() / 2 || 1; }
+    // экран мог сдвинуться вместе с группой (призма, карусель) — центр берём из мировой матрицы
+    x.mesh.updateWorldMatrix(true, false); _sph.center.setFromMatrixPosition(x.mesh.matrixWorld); _sph.radius = x.r * 1.2;
+    const vis = _fr.intersectsSphere(_sph) && _sph.center.distanceTo(camera.position) < 70;
+    if (vis) { if (!x.v.getAttribute('src')) { x.v.preload = 'auto'; x.v.src = x.src; } if (x.v.paused) x.v.play().catch(() => {}); }
+    else if (!x.v.paused) x.v.pause();
+  }
+}
+// идёт ли сейчас хоть одно видео сцены
 export function videosPlaying(scene) { return _videos.some((x) => x.scene === scene && !x.v.paused && x.v.readyState >= 2); }
+// сцена далеко позади: видео освобождают декодер и память, но остаются на месте — при возврате загрузятся снова
+export function releaseVideos(scene) { for (const x of _videos) if (x.scene === scene && x.v.getAttribute('src')) { x.v.pause(); x.v.removeAttribute('src'); x.v.load(); } }
 // сцена выгружена — её видео останавливаются и освобождают память
 export function dropVideos(scene) {
   for (let k = _videos.length - 1; k >= 0; k--) if (_videos[k].scene === scene) { const v = _videos[k].v; v.pause(); v.removeAttribute('src'); v.load(); _videos.splice(k, 1); }
@@ -893,6 +948,8 @@ export function vScreen(scene, src, p, ry = 0, h = 6, o = {}) {
 // world/<id>/<id>.glb — та же геометрия Builder (без неона) с UV под карту света; <id>_light.webp — свет (L·0.5, sRGB).
 // Меши Builder этих видов заменяются запечёнными; неон, стекло, лучи и люди остаются как были.
 const BAKED_KINDS = ['gloss', 'plastic', 'matte', 'metal', 'chrome', 'sand'];
+// для мира с запечённым светом: виды, которые Builder может не строить — их геометрия придёт готовой из GLB
+export const bakeSkip = () => (globalThis.__noBake ? null : new Set(BAKED_KINDS));
 export async function applyBake(scene, group, id, o = {}) {
   if (globalThis.__noBake) return;   // dev/export.html выгружает исходную геометрию
   try {
@@ -952,9 +1009,10 @@ export async function inflatableLogo(url, width, o = {}) {
   const shapes = data.paths.flatMap((p) => SVGLoader.createShapes(p));
   const vb = data.xml.viewBox?.baseVal, W = vb?.width || 4480, Hs = vb?.height || 1012, k = width / W;
   const puff = o.puff ?? 95;   // толщина «надува» в единицах SVG
-  const geo = new THREE.ExtrudeGeometry(shapes, { depth: puff * 0.6, curveSegments: 10, bevelEnabled: true, bevelThickness: puff, bevelSize: puff * 0.62, bevelSegments: 7 });
+  const geo = new THREE.ExtrudeGeometry(shapes, { depth: puff * 0.6, curveSegments: o.curve ?? 10, bevelEnabled: true, bevelThickness: puff, bevelSize: puff * 0.62, bevelSegments: o.bevelSeg ?? 7 });
   geo.scale(k, k, k); geo.computeBoundingBox();
   { const bb = geo.boundingBox; geo.translate(-(bb.min.x + bb.max.x) / 2, -bb.min.y, -(bb.min.z + bb.max.z) / 2); }   // низ на y = 0, центр по x и z; надпись читается с +Z
+  if (o.geometryOnly) return geo;   // для Builder: буквы уходят в общую запечённую геометрию
   const mat = new THREE.MeshStandardMaterial({ color: o.color ?? '#ff2a9d', roughness: 0.28, metalness: 0, emissive: o.emissive ?? '#8a0a52', emissiveIntensity: 0.55, envMapIntensity: 0.7 });
   const g = new THREE.Group(); g.add(new THREE.Mesh(geo, mat)); g.userData.height = Hs * k;
   return g;
