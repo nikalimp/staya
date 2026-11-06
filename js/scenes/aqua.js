@@ -11,6 +11,7 @@ export async function build({ THREE, kit, font, renderer }) {
   scene.fog = new THREE.FogExp2('#cfe8fa', 0.0028);
   scene.environment = kit.env(renderer, ['#ffffff', '#bfe6ff', '#ffe8c8', '#7fd0ff', '#ffd28a', '#ffffff'], '#bfe0ff');
   const b = new Builder(), glows = [], R = kit.rng(11);
+  b.skip = kit.bakeSkip();   // запечённые виды не строятся кодом: готовая геометрия придёт из GLB (kit.applyBake)
   b.rim = ['#2fe6ff', '#ff3fb4', '#7ff2ff'];   // контровой свет силуэтов
   const PINK = '#ff2fa8', CYAN = '#2fe6ff', VIOLET = '#8a4dff', YEL = '#ffd84a';
 
@@ -126,8 +127,8 @@ export async function build({ THREE, kit, font, renderer }) {
   // экран поднят и отодвинут: когда камера заходит за спины диджеев, он не закрывает полкадра
   kit.videoScreen(scene, 'video/aqua-h.mp4', 15, 7.5, [0, ST + 5.3, SZ - 3.7], [0, 0, 0], tex);
   // надувные буквы «СТАЯ» (контуры из файла бренда world/logo.svg) стоят на ферме над сценой
-  const puffy = await kit.inflatableLogo('world/logo.svg', 16);
-  puffy.position.set(0, TY + 0.5, zf + 0.4); scene.add(puffy);   // на передней балке фермы — не прячутся за прожекторами
+  // буквы — часть запечённой геометрии: свет на них посчитан в Blender
+  b.add(await kit.inflatableLogo('world/logo.svg', 16, { geometryOnly: true, curve: 4, bevelSeg: 4 }), '#ff3aa6', 'gloss', M([0, TY + 0.5, zf + 0.4]));   // на передней балке фермы — не прячутся за прожекторами
   glows.push([0, TY + 1.8, SZ + 2.2, PINK, 14, 0.14]);
   // светящийся логотип по центру фасада сцены
   const facade = await kit.logoSign('world/logo.svg', 5.6, ['#ff4fb8', '#ffffff', '#7ff2ff']);

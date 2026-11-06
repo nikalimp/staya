@@ -54,8 +54,8 @@ LINKS.filter((l) => l.href).forEach((l) => {
 // Выбор: по видеокарте и памяти при старте; через 4 секунды после старта — проверка реальной частоты кадров.
 const TIERS = {
   low: { pr: 1, tex: '-s', bloom: false, aa: false, video: true, aniso: 1 },
-  mid: { pr: 1.5, tex: '-m', bloom: false, aa: false, video: true, aniso: 2 },
-  high: { pr: 1.75, tex: '', bloom: true, aa: true, video: true, aniso: 4 },
+  mid: { pr: 1.35, tex: '-m', bloom: false, aa: false, video: true, aniso: 2 },
+  high: { pr: 1.5, tex: '', bloom: true, aa: true, video: true, aniso: 4 },
 };
 const TIER_ORDER = ['low', 'mid', 'high'];
 function detectTier(gl) {
@@ -158,14 +158,16 @@ async function buildScene(i) {
     const mod = await SCENES[i].load();
     const t0 = performance.now();
     const res = await mod.build({ THREE, kit, font, renderer, mobile, quality });
+    kit.simplifyMaterials(res.scene);   // «физические» материалы с лаком → стандартные: меньше расчётов на пиксель и меньше шейдеров
     res.scene.traverse((o) => { if ((o.isMesh || o.isPoints) && !o.userData.dynamic) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
     res.scene.updateMatrixWorld(true);
     // одинаковые неподвижные предметы (пальмы, колонны, лежаки) рисуются одним вызовом
     kit.instanceStatic(res.scene);
     kit.glowMats.forEach((m) => (m.uniforms.uScale.value = glowScale));
     // шейдеры компилируются параллельно (KHR_parallel_shader_compile); видео сцены грузятся позже, при входе в неё
+    const t1 = performance.now();
     await (renderer.compileAsync ? renderer.compileAsync(res.scene, camera).catch(() => {}) : Promise.resolve(renderer.compile(res.scene, camera)));
-    if (DEBUG) console.log(`[staya] ${SCENES[i].id} built in ${(performance.now() - t0).toFixed(0)} ms`);
+    if (DEBUG) console.log(`[staya] ${SCENES[i].id} built in ${(performance.now() - t0).toFixed(0)} ms (сборка ${(t1 - t0).toFixed(0)}, шейдеры ${(performance.now() - t1).toFixed(0)})`);
     queueUploads(res.scene);
     built.set(i, res); building.delete(i);
     if (i === curIdx) kit.playVideos(res.scene);   // сцена догрузилась, когда мы уже в ней
@@ -208,11 +210,30 @@ function renderPreview(owner, next, again = false) {
   mesh.material.map = rt.texture; mesh.material.needsUpdate = true;
   owner.scene.userData.rt = rt; owner.previewDone = true; dirty = true;
 }
-// Загрузка: прелоадер ждёт первые две сцены, остальные грузятся следом по порядку и остаются в памяти.
-// prefetch — страховка, если зритель обогнал фоновую загрузку.
-// Сцены на две и больше позади (и дальше двух впереди при скролле назад) выгружаются из памяти и при возврате собираются снова.
+// Загрузка: прелоадер ждёт первый мир; при входе в мир собираются два следующих (prefetch).
 const AHEAD = 2;
-function prefetch(i) { for (let k = 1; k <= AHEAD; k++) if (i + k < N && !built.has(i + k)) idle(() => buildScene(i + k)); }
+// Миры дальше одного позади и двух впереди отдают видеопамять: геометрия, текстуры и видео выгружаются из видеокарты,
+// а сам мир остаётся собранным — при возврате он загрузится в видеокарту снова, без повторной сборки.
+const released = new Set();
+const texOf = (o, cb) => { const ms = o.material ? (Array.isArray(o.material) ? o.material : [o.material]) : []; for (const m of ms) for (const key in m) { const t = m[key]; if (t?.isTexture && !t.isVideoTexture) cb(t); } };
+function releaseFar(i) {
+  // общие ресурсы (одна модель пальмы в двух мирах) не трогаем, если ими пользуется мир рядом
+  const keep = new Set();
+  for (const [k, res] of built) if (!(k < i - 1 || k > i + 2)) res.scene.traverse((o) => { if (o.geometry) keep.add(o.geometry); texOf(o, (t) => keep.add(t)); });
+  for (const [k, res] of built) {
+    const far = k < i - 1 || k > i + 2;
+    if (far && !released.has(k)) {
+      released.add(k); kit.releaseVideos(res.scene);
+      res.scene.traverse((o) => {
+        if (o.geometry && !keep.has(o.geometry)) o.geometry.dispose();
+        texOf(o, (t) => { if (!keep.has(t)) { t.dispose(); seenTex.delete(t); } });
+      });
+      if (DEBUG) console.log('[staya] released', SCENES[k].id);
+    } else if (!far && released.has(k)) { released.delete(k); queueUploads(res.scene); }
+  }
+}
+const NOPRE = DEBUG && /[?&]noprefetch/.test(location.search);   // отладка: миры собираются только по запросу (замер сборки)
+function prefetch(i) { if (NOPRE) return; for (let k = 1; k <= AHEAD; k++) if (i + k < N && !built.has(i + k)) idle(() => buildScene(i + k)); }
 
 /* ---------- скролл → позиция ---------- */
 function scrollToG(y) {
@@ -280,12 +301,13 @@ function apply(g) {
   // (через кадр: кадр виллы почти неподвижен, а рендер второй сцены дорогой)
   if (tier === 'high' && s.preview?.live?.(t) && built.has(i + 1) && (previewTick = !previewTick)) { renderPreview(s, built.get(i + 1), true); dirty = true; }
   fpsSample();
+  if (STATS) { renderer.info.autoReset = false; renderer.info.reset(); }   // счётчик: вызовы всех проходов кадра вместе
   if (composer) {
     renderPass.scene = s.scene; bloomPass.strength = (s.bloom ?? 0.42) * (1 + 0.3 * kit.pulse.beat);
     vigPass.uniforms.uZoom.value = speedK * 0.011; vigPass.uniforms.uRGB.value = speedK * 0.007;
     composer.render();
   } else renderer.render(s.scene, camera);
-  if (i !== curIdx) { if (curIdx >= 0 && started) audio.fx?.rumble(); curIdx = i; audio.go(i); prefetch(i); kit.playVideos(s.scene); if (started) history.replaceState(null, '', '#' + SCENES[i].id); }
+  if (i !== curIdx) { if (curIdx >= 0 && started) audio.fx?.rumble(); curIdx = i; audio.go(i); prefetch(i); releaseFar(i); kit.playVideos(s.scene); kit.videoVisibility(s.scene, camera); if (started) history.replaceState(null, '', '#' + SCENES[i].id); }
   audio.space(camera, s.scene.userData.stage);
   const fin = i === N - 1 && t > (SCENES[i].final ?? 0.72);
   finalEl.classList.toggle('on', fin);
@@ -311,14 +333,50 @@ function keyScroll(f) {
   keyVel += (dir * innerHeight * 0.022 - keyVel) * (1 - Math.pow(0.88, f));
   if (Math.abs(keyVel) > 0.3) scrollBy(0, keyVel * f); else keyVel = 0;
 }
+// Колесо мыши и трекпад на десктопе: страница едет к цели плавно (как Lenis), а не прыжками по 100 px.
+// На телефонах остаётся родной скролл с инерцией пальца.
+let wheelY = null;
+if (!isTouch && !reduced) addEventListener('wheel', (e) => {
+  if (!started || e.ctrlKey || e.defaultPrevented) return;
+  e.preventDefault();
+  const k = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? innerHeight : 1;
+  const max = document.documentElement.scrollHeight - innerHeight;
+  wheelY = Math.max(0, Math.min(max, (wheelY ?? scrollY) + e.deltaY * k));
+}, { passive: false });
+addEventListener('scroll', () => { if (wheelY !== null && Math.abs(scrollY - wheelY) > innerHeight * 3) wheelY = null; }, { passive: true });   // полоса прокрутки, клавиши, ссылка — колесо отпускает
+function wheelTick(f) {
+  if (wheelY === null) return;
+  if (held.size) { wheelY = null; return; }
+  const d = wheelY - scrollY;
+  if (Math.abs(d) < 0.5) { scrollTo(0, wheelY); wheelY = null; return; }
+  scrollTo(0, scrollY + d * (1 - Math.pow(1 - 0.22, f)));
+}
 // Движение считается по времени, а не по кадрам: пропущенный кадр — просто шаг побольше, без остановки и рывка;
 // на экранах 60, 90 и 120 Гц камера едет с одной скоростью.
-let lastT = 0;
+let lastT = 0, visT = 0;
+// ?stats — счётчик для проверки на своём телефоне: частота кадров, время кадра (среднее и 95-й процентиль),
+// сколько кадров реально перерисовано, вызовы отрисовки, треугольники, уровень качества, длинные задачи
+const STATS = /[?&]stats/.test(location.search) ? (() => {
+  const el = document.createElement('pre');
+  el.style.cssText = 'position:fixed;left:8px;top:8px;z-index:99;margin:0;padding:8px 10px;background:rgba(0,0,0,.72);color:#9fffb0;font:12px/1.35 ui-monospace,Menlo,monospace;border-radius:8px;pointer-events:none;white-space:pre';
+  document.body.appendChild(el);
+  const st = { el, dts: [], renders: 0, long: 0, longMax: 0, t: performance.now(), calls: 0, tris: 0 };
+  try { new PerformanceObserver((l) => l.getEntries().forEach((e) => { st.long++; st.longMax = Math.max(st.longMax, e.duration); })).observe({ type: 'longtask' }); } catch (e) { /* нет поддержки */ }
+  return st;
+})() : null;
+function statsTick(now, dt) {
+  const S = STATS; S.dts.push(dt);
+  if (now - S.t < 500) return;
+  const a = S.dts.slice().sort((x, y) => x - y), avg = a.reduce((x, y) => x + y, 0) / a.length, p95 = a[Math.floor(a.length * 0.95)] ?? 0, sec = (now - S.t) / 1000;
+  S.el.textContent = `fps ${(a.length / sec).toFixed(0)}  кадр ${avg.toFixed(1)} мс  p95 ${p95.toFixed(1)} мс\nперерисовано ${(S.renders / sec).toFixed(0)}/с  вызовов ${S.calls}  треуг. ${(S.tris / 1000).toFixed(0)}k\nуровень ${tier}  пикс. ${renderer.getPixelRatio().toFixed(2)}  мир ${SCENES[curIdx]?.id ?? '—'}\nдлинные задачи ${S.long}  макс ${S.longMax.toFixed(0)} мс`;
+  S.dts = []; S.renders = 0; S.t = now;
+}
 const damp = (k60, f) => 1 - Math.pow(1 - k60, f);   // доля пути за кадр длиной f (k60 — доля за 1/60 с)
 
 function loop(now = performance.now()) {
+  if (STATS && lastT) statsTick(now, now - lastT);
   const f = Math.min(4, Math.max(0.25, lastT ? (now - lastT) / (1000 / 60) : 1)); lastT = now;
-  keyScroll(f);
+  keyScroll(f); wheelTick(f);
   target = scrollToG(scrollY);
   if (reduced || jumping) cur = target;
   else {
@@ -348,11 +406,18 @@ function loop(now = performance.now()) {
     // звуковые эффекты: срабатывают, когда скролл проходит точку вперёд
     for (let i = Math.floor(lastG); i <= Math.min(N - 1, Math.floor(cur)); i++) for (const [t, k] of SCENES[i].sfx || []) { const g = i + t; if (g > lastG && g <= cur) audio.fx[k]?.(); }
   }
-  if (started && curIdx >= 0 && built.has(curIdx) && kit.videosPlaying(built.get(curIdx).scene)) dirty = true;
-  if (started && (cur !== lastG || dirty)) { if (apply(cur)) { lastG = cur; dirty = false; } }
+  if (started && curIdx >= 0 && built.has(curIdx)) {
+    const sc = built.get(curIdx).scene;
+    // новый кадр рисуется, только когда видео дало новый кадр; без requestVideoFrameCallback — пока видео играет
+    if (kit.hasVideoFrames ? kit.takeVideoFrame() : kit.videosPlaying(sc)) dirty = true;
+    // 4 раза в секунду: играют только экраны в кадре
+    if (now - visT > 250) { visT = now; kit.videoVisibility(sc, camera); }
+  }
+  if (started && (cur !== lastG || dirty)) { if (apply(cur)) { lastG = cur; dirty = false; if (STATS) { STATS.renders++; STATS.calls = renderer.info.render.calls; STATS.tris = renderer.info.render.triangles; } } }
   requestAnimationFrame(loop);
 }
 function tweenScroll(toY, ms = 1400) {
+  wheelY = null;
   const from = scrollY, t0 = performance.now();
   const step = (now) => {
     const k = Math.min(1, (now - t0) / ms), e = k < 0.5 ? 4 * k * k * k : 1 - Math.pow(-2 * k + 2, 3) / 2;
@@ -628,7 +693,8 @@ async function boot() {
   await Promise.all([fontP, cssFontP]); setReal(45);
   // прелоадер ждёт только первый мир и начало его музыки; остальные миры строятся по порядку уже во время прогулки
   await buildScene(0); setReal(90);
-  (async () => { for (let i = 1; i < N; i++) { await buildScene(i).catch(() => {}); await new Promise((r) => idle(r)); } })();
+  // остальные миры не собираются все сразу: при входе в мир собираются два следующих (prefetch), дальние позади выгружаются (releaseFar)
+  if (!NOPRE) idle(() => buildScene(1));
   await firstTrack;
   setReal(100);
 }
@@ -664,7 +730,7 @@ const jumpNav = document.createElement('nav'); jumpNav.id = 'jump'; jumpNav.setA
 const NAMES = { aqua: 'AQUA', pool: 'POOL', club: '2K17', halloween: 'HALLOWEEN', phuket: 'PHUKET' };
 SCENES.forEach((sc, k) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = `${k + 1}. ${NAMES[sc.id]}`; b.addEventListener('click', () => jumpTo(k)); jumpNav.appendChild(b); });
 document.body.appendChild(jumpNav);
-function jumpTo(k) { if (!started || LITE) return; const g = k + FADE * 1.4; jumping = true; scrollTo(0, gToScroll(g)); cur = target = g; buildScene(k).then(() => (dirty = true)); jumping = false; dirty = true; }
+function jumpTo(k) { if (!started || LITE) return; wheelY = null; const g = k + FADE * 1.4; jumping = true; scrollTo(0, gToScroll(g)); cur = target = g; buildScene(k).then(() => (dirty = true)); jumping = false; dirty = true; }
 addEventListener('keydown', (e) => { if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(document.activeElement?.tagName)) return; const k = '12345'.indexOf(e.key); if (k >= 0) jumpTo(k); });
 
 // Отладка: __staya.go(g) — камера в точку g (номер сцены + доля)
@@ -675,8 +741,8 @@ window.__staya = {
     if (i < N - 1 && SCENES[i].out === 'cut') await buildScene(i + 1);
     jumping = true; scrollTo(0, gToScroll(g)); cur = target = g; apply(g); lastG = g; jumping = false;
   },
-  tier: () => tier, cam: () => camera,
-  info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, built: [...built.keys()] }),
+  tier: () => tier, cam: () => camera, build: (i) => buildScene(i).then(() => true),
+  info: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles, geos: renderer.info.memory.geometries, progs: renderer.info.programs?.length, texs: renderer.info.memory.textures, built: [...built.keys()] }),
   ready: () => real >= 100,
   scene: (i) => built.get(i)?.scene,
   pick: (x, y) => { const r = new THREE.Raycaster(); r.setFromCamera(new THREE.Vector2(x, y), camera); const s = built.get(curIdx)?.scene; return s ? r.intersectObject(s, true).slice(0, 4).map((h) => [h.object.type, h.object.name, h.object.parent?.name, h.object.material?.type, h.object.material?.name, +h.distance.toFixed(2), h.object.geometry?.type, JSON.stringify(h.object.geometry?.parameters ?? {}).slice(0, 80)]) : []; },
