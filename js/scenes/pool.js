@@ -191,7 +191,8 @@ export async function build({ THREE, kit, font, renderer, mobile, quality }) {
     kit.laser(b, [x, TH - 0.4, z], [DX + (R2() - 0.5) * 30, 0.5 + R2() * 4, DZ + (z < DZ ? 1 : -1) * (8 + R2() * 10)], c);
   }
   /* --- четыре вертикальных экрана на сторонах пентагона, лицом к центру --- */
-  ['video/pool-v.mp4', 'video/pool-v2.mp4', 'video/pool-v3.mp4', 'video/pool-v4.mp4'].forEach((src, i) => {
+  // один ролик на всех четырёх экранах (один декодер)
+  ['video/pool-v2.mp4', 'video/pool-v2.mp4', 'video/pool-v2.mp4', 'video/pool-v2.mp4'].forEach((src, i) => {
     const phi = [108, 36, -36, -108][i] * Math.PI / 180, r = PAP + 0.8;
     kit.vScreen(scene, src, [DX + Math.cos(phi) * r, 0.6, DZ + Math.sin(phi) * r], Math.atan2(-Math.cos(phi), -Math.sin(phi)), 9, { edge: i % 2 ? '#ff3fb4' : '#2fe6ff' });
   });
