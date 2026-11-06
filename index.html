@@ -19,7 +19,7 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@600;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@500;700;900&family=Manrope:wght@600;800&family=VT323&display=swap" rel="stylesheet">
 <style>
 :root{ color-scheme:dark; --bg:#000; --ink:#fff; --muted:rgba(255,255,255,.6); --pink:#ff3fb4; --cyan:#2fe6ff; --safe-b:env(safe-area-inset-bottom,0px) }
 *{box-sizing:border-box;margin:0;padding:0}
@@ -76,6 +76,46 @@ html{scrollbar-width:none} body::-webkit-scrollbar{display:none}
 #ring.ready .tri{opacity:1;transform:none}
 #ring.ready .fg,#ring.ready .bg{opacity:0;transition:opacity .5s}
 #ring:focus-visible{outline:2px solid #fff;outline-offset:8px}
+
+/* ---------- фон прелоадера: синтвейв-дорога на VHS-кассете (только CSS, анимации — transform/opacity) ---------- */
+.vhs{position:absolute;inset:0;overflow:hidden;z-index:0;pointer-events:none;--hz:58%;
+  background:linear-gradient(180deg,#05010f 0%,#1a0638 32%,#4a0c5c calc(var(--hz) - 6%),#ff3fb4 var(--hz),#0d0221 var(--hz))}
+.pre-in{position:relative;z-index:2}
+.vhs .stars{position:absolute;inset:0 0 calc(100% - var(--hz) + 18%);opacity:.7;
+  background-image:radial-gradient(1px 1px at 12% 18%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 27% 42%,#ffd1ee 50%,transparent 51%),radial-gradient(1.5px 1.5px at 44% 12%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 63% 30%,#bff6ff 50%,transparent 51%),radial-gradient(1px 1px at 78% 9%,#fff 50%,transparent 51%),radial-gradient(1.5px 1.5px at 88% 38%,#ffd1ee 50%,transparent 51%),radial-gradient(1px 1px at 6% 52%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 35% 64%,#bff6ff 50%,transparent 51%),radial-gradient(1px 1px at 93% 60%,#fff 50%,transparent 51%),radial-gradient(1px 1px at 55% 50%,#fff 50%,transparent 51%)}
+.vhs .glow{position:absolute;left:50%;top:var(--hz);width:120vmin;height:80vmin;transform:translate(-50%,-62%);background:radial-gradient(closest-side,rgba(255,63,180,.55),rgba(255,63,180,0))}
+.vhs .sun{position:absolute;left:50%;top:var(--hz);width:min(62vmin,520px);aspect-ratio:1;border-radius:50%;transform:translate(-50%,-78%);
+  background:linear-gradient(180deg,#fff27a 0%,#ffb347 30%,#ff4f9a 62%,#c2187f 100%);
+  -webkit-mask-image:linear-gradient(180deg,#000 50%,transparent 50% 53%,#000 53% 61%,transparent 61% 65%,#000 65% 72%,transparent 72% 77%,#000 77% 83%,transparent 83% 89%,#000 89%);
+  mask-image:linear-gradient(180deg,#000 50%,transparent 50% 53%,#000 53% 61%,transparent 61% 65%,#000 65% 72%,transparent 72% 77%,#000 77% 83%,transparent 83% 89%,#000 89%)}
+.vhs .hills{position:absolute;left:0;width:100%;height:16vmin;top:var(--hz);transform:translateY(-100%)}
+.vhs .floor{position:absolute;left:0;right:0;top:var(--hz);bottom:0;perspective:320px;perspective-origin:50% 0;overflow:hidden}
+.vhs .plane{position:absolute;left:-150%;width:400%;top:0;height:260%;transform-origin:50% 0;transform:rotateX(78deg);overflow:hidden}
+.vhs .grid{--rw:120px;position:absolute;left:0;right:0;top:-80px;bottom:0;will-change:transform;animation:vhsRoad .5s linear infinite;background-color:#0d0221;
+  background-image:
+    repeating-linear-gradient(180deg,#ffe36e 0 40px,transparent 40px 80px),
+    linear-gradient(90deg,transparent calc(50% - var(--rw) - 8px),#2fe6ff calc(50% - var(--rw) - 8px) calc(50% - var(--rw)),rgba(8,0,18,.94) calc(50% - var(--rw)) calc(50% + var(--rw)),#2fe6ff calc(50% + var(--rw)) calc(50% + var(--rw) + 8px),transparent calc(50% + var(--rw) + 8px)),
+    repeating-linear-gradient(90deg,rgba(255,63,180,.85) 0 3px,transparent 3px 80px),
+    repeating-linear-gradient(180deg,rgba(255,63,180,.85) 0 3px,transparent 3px 80px);
+  background-size:8px 100%,100% 100%,100% 100%,100% 100%;background-position:50% 0,0 0,50% 0,0 0;
+  background-repeat:repeat-y,no-repeat,repeat,repeat}
+@keyframes vhsRoad{to{transform:translateY(80px)}}
+.vhs .haze{position:absolute;left:0;right:0;top:var(--hz);height:22%;background:linear-gradient(180deg,rgba(255,63,180,.55),rgba(74,12,92,.35) 30%,rgba(13,2,33,0))}
+.vhs .shade{position:absolute;inset:0;background:radial-gradient(ellipse 70% 55% at 50% 46%,rgba(5,1,15,.55),rgba(5,1,15,0) 70%),linear-gradient(180deg,rgba(0,0,0,0) 70%,rgba(5,1,15,.65))}
+.vhs .scan{position:absolute;inset:0;background:repeating-linear-gradient(180deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.28) 2px 3px);mix-blend-mode:multiply}
+.vhs .noise{position:absolute;inset:-50%;opacity:.13;will-change:transform;animation:vhsNoise .4s steps(4) infinite;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1.4 -.2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+@keyframes vhsNoise{0%{transform:translate(0,0)}25%{transform:translate(-7%,4%)}50%{transform:translate(5%,-6%)}75%{transform:translate(-4%,-3%)}100%{transform:translate(6%,5%)}}
+.vhs .track{position:absolute;left:0;right:0;top:0;height:9vh;opacity:0;will-change:transform,opacity;animation:vhsTrack 7s linear infinite;
+  background:linear-gradient(180deg,rgba(255,255,255,0),rgba(255,255,255,.16) 45%,rgba(47,230,255,.18) 55%,rgba(255,255,255,0))}
+@keyframes vhsTrack{0%{transform:translateY(-10vh);opacity:0}6%{opacity:1}40%{transform:translateY(105vh);opacity:1}41%,100%{transform:translateY(105vh);opacity:0}}
+.vhs .osd{position:absolute;font:28px/1 VT323,ui-monospace,monospace;letter-spacing:.06em;color:#fff;text-shadow:2px 0 rgba(255,63,180,.8),-2px 0 rgba(47,230,255,.8)}
+.vhs .osd.tl{top:calc(18px + env(safe-area-inset-top,0px));left:22px;animation:vhsBlink 1.2s steps(1) infinite}
+.vhs .osd.tr{top:calc(18px + env(safe-area-inset-top,0px));right:22px}
+.vhs .osd.bl{bottom:calc(16px + var(--safe-b));left:22px;font-size:22px;opacity:.85}
+@keyframes vhsBlink{60%{opacity:.25}}
+@media (max-width:600px){.vhs{--hz:72%} .vhs .sun{width:78vmin} .vhs .hills{height:12vh} .vhs .grid{--rw:44px} .vhs .osd{font-size:22px} .vhs .osd.bl{font-size:18px}}
+@media (prefers-reduced-motion:reduce){.vhs .grid,.vhs .noise,.vhs .track,.vhs .osd.tl{animation:none}}
 
 /* ---------- прелоадер: звук слева, слежение за головой справа ---------- */
 .pre-row{display:flex;align-items:center;gap:clamp(18px,5vw,36px)}
@@ -143,6 +183,14 @@ canvas.confetti{position:fixed;inset:0;z-index:9;pointer-events:none}
 <body class="locked">
 
 <div id="pre" role="dialog" aria-label="Загрузка STAYA">
+  <div class="vhs" aria-hidden="true">
+    <div class="stars"></div><div class="glow"></div><div class="sun"></div>
+    <svg class="hills" viewBox="0 0 1000 100" preserveAspectRatio="none"><path d="M0 100V70l60-28 50 22 70-46 60 40 40-18 70 50 40-14 60 14h100l60-14 40 14 70-50 40 18 60-40 70 46 50-22 60 28v30z" fill="#14032b" stroke="#ff3fb4" stroke-width="1.5" vector-effect="non-scaling-stroke"/><path d="M0 100V84l90-18 80 20 90-30 80 26 60-10 100 28 100-28 60 10 80-26 90 30 80-20 90 18v16z" fill="#0a0118" stroke="#2fe6ff" stroke-opacity=".6" stroke-width="1" vector-effect="non-scaling-stroke"/></svg>
+    <div class="floor"><div class="plane"><div class="grid"></div></div></div>
+    <div class="haze"></div><div class="shade"></div>
+    <div class="track"></div><div class="noise"></div><div class="scan"></div>
+    <span class="osd tl">PLAY ▶</span><span class="osd tr">SP</span><span class="osd bl">STAYA · VHS</span>
+  </div>
   <div class="pre-in">
     <div class="brand" aria-hidden="true"><div class="logo">STAYA<br>WORLD</div><div class="sub">B-DAY 8 YEARS</div></div>
     <p class="loot-hint">Собери 8 предметов по пути<br>и получи <b>стикерпак в подарок</b></p>
