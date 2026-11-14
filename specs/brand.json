@@ -1,0 +1,27 @@
+{
+  "name": "STAYA",
+  "site": "https://staya.nikalimp.ru",
+  "siteLabel": "staya.nikalimp.ru · тестовый домен",
+  "logo": "../scripts/blender/Logo.svg",
+  "font": {
+    "family": "Manrope",
+    "source": "fontsource:manrope",
+    "note": "на сайте — Manrope 600/800 и Unbounded 900 (fonts/web); для PDF — @fontsource-variable/manrope"
+  },
+  "colors": {
+    "bg": "#000000",
+    "fg": "#0b0610",
+    "card": "#ffffff",
+    "muted": "#f6eef3",
+    "mfg": "#6b5a66",
+    "border": "#ecdde6",
+    "brand": "#ff3fb4",
+    "brandBg": "#ffe9f5",
+    "onBrand": "#000000",
+    "accent": "#2fe6ff",
+    "shade": "#0b0610"
+  },
+  "radius": 14,
+  "pattern": "dots",
+  "blogPath": ""
+}
